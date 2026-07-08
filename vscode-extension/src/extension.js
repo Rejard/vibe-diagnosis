@@ -1,6 +1,7 @@
 const vscode = require('vscode');
 const { exec } = require('child_process');
 const path = require('path');
+const http = require('http');
 
 let statusBarItem;
 let outputChannel;
@@ -19,8 +20,9 @@ function activate(context) {
   const runJsonCmd = vscode.commands.registerCommand('vibeDiagnosis.runJson', () => runDiagnostics(true));
   const initCmd = vscode.commands.registerCommand('vibeDiagnosis.init', initDiagnostics);
   const dashCmd = vscode.commands.registerCommand('vibeDiagnosis.dashboard', openDashboard);
+  const repairCmd = vscode.commands.registerCommand('vibeDiagnosis.repair', autoRepair);
 
-  context.subscriptions.push(runCmd, runJsonCmd, initCmd, dashCmd, outputChannel, diagnosticCollection, statusBarItem);
+  context.subscriptions.push(runCmd, runJsonCmd, initCmd, dashCmd, repairCmd, outputChannel, diagnosticCollection, statusBarItem);
 
   const workspaceRoot = getWorkspaceRoot();
   if (workspaceRoot) {
@@ -93,6 +95,128 @@ function runDiagnostics(jsonMode) {
 
     renderResults(parsed, workspaceRoot);
   });
+}
+
+function runDiagnosticsAsync(workspaceRoot) {
+  return new Promise((resolve, reject) => {
+    const bin = findVibeDiagBin();
+    const isLocalBin = bin.endsWith('.js');
+    const cmd = isLocalBin
+      ? `node "${bin}" run --json --cwd "${workspaceRoot}"`
+      : `npx vibe-diag run --json --cwd "${workspaceRoot}"`;
+
+    exec(cmd, { windowsHide: true, timeout: 30000 }, (error, stdout, stderr) => {
+      try {
+        resolve(JSON.parse(stdout));
+      } catch {
+        reject(new Error(stderr || stdout || 'Failed to parse diagnostic output'));
+      }
+    });
+  });
+}
+
+function postRepairRequest(diagId) {
+  return new Promise((resolve, reject) => {
+    const body = JSON.stringify({ diagId });
+    const options = {
+      hostname: 'localhost',
+      port: 7700,
+      path: '/api/repair',
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Content-Length': Buffer.byteLength(body)
+      }
+    };
+
+    const req = http.request(options, (res) => {
+      let data = '';
+      res.on('data', (chunk) => { data += chunk; });
+      res.on('end', () => {
+        if (res.statusCode >= 200 && res.statusCode < 300) {
+          try {
+            resolve(JSON.parse(data));
+          } catch {
+            resolve({ message: data });
+          }
+        } else {
+          reject(new Error(`Repair API returned ${res.statusCode}: ${data}`));
+        }
+      });
+    });
+
+    req.on('error', (err) => reject(err));
+    req.write(body);
+    req.end();
+  });
+}
+
+async function autoRepair() {
+  const workspaceRoot = getWorkspaceRoot();
+  if (!workspaceRoot) {
+    vscode.window.showWarningMessage('Vibe Diagnosis: No workspace folder open.');
+    return;
+  }
+
+  let parsed;
+  try {
+    parsed = await vscode.window.withProgress(
+      { location: vscode.ProgressLocation.Notification, title: 'Vibe Diagnosis: Running diagnostics...' },
+      () => runDiagnosticsAsync(workspaceRoot)
+    );
+  } catch (err) {
+    vscode.window.showErrorMessage(`Vibe Diagnosis: Diagnostics failed — ${err.message}`);
+    return;
+  }
+
+  const failedItems = (parsed.results || []).filter(
+    (r) => r.status === 'ERROR' || r.status === 'WARNING'
+  );
+
+  if (failedItems.length === 0) {
+    vscode.window.showInformationMessage('Vibe Diagnosis: All diagnostics passed. Nothing to repair.');
+    renderResults(parsed, workspaceRoot);
+    return;
+  }
+
+  const statusIcons = { ERROR: '\u274c', WARNING: '\u26a0\ufe0f' };
+  const picks = failedItems.map((r) => ({
+    label: `${statusIcons[r.status] || ''} ${r.id}`,
+    description: r.status,
+    detail: r.details,
+    diagId: r.id
+  }));
+
+  const selected = await vscode.window.showQuickPick(picks, {
+    placeHolder: 'Select a diagnostic to auto-repair',
+    matchOnDescription: true,
+    matchOnDetail: true
+  });
+
+  if (!selected) return;
+
+  try {
+    const result = await vscode.window.withProgress(
+      { location: vscode.ProgressLocation.Notification, title: `Vibe Diagnosis: Repairing ${selected.diagId}...`, cancellable: false },
+      () => postRepairRequest(selected.diagId)
+    );
+
+    outputChannel.clear();
+    outputChannel.appendLine(`Auto Repair Result — ${selected.diagId}`);
+    outputChannel.appendLine('\u2500'.repeat(55));
+    outputChannel.appendLine(typeof result === 'string' ? result : JSON.stringify(result, null, 2));
+    outputChannel.show();
+
+    vscode.window.showInformationMessage(`Vibe Diagnosis: Repair completed for ${selected.diagId}`);
+  } catch (err) {
+    outputChannel.clear();
+    outputChannel.appendLine(`Auto Repair Failed — ${selected.diagId}`);
+    outputChannel.appendLine('\u2500'.repeat(55));
+    outputChannel.appendLine(err.message || String(err));
+    outputChannel.show();
+
+    vscode.window.showErrorMessage(`Vibe Diagnosis: Repair failed — ${err.message}`);
+  }
 }
 
 function renderResults(parsed, workspaceRoot) {

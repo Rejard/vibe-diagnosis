@@ -115,7 +115,7 @@ module.exports = {
 ### Output example
 
 ```
-  Vibe Diagnosis v1.0.4 — my-project
+  Vibe Diagnosis v1.1.0 — my-project
   ─────────────────────────────────────────
 
   TASK │ task-001-user-login       │ ✅ OK      │ Login flow verified
@@ -142,6 +142,55 @@ Features:
 - One-click "Run Diagnostics" button
 - Error pattern viewer with modal
 - Dark mode premium UI
+- BYOK configuration bar (Provider / API Key / Model)
+- Auto Repair button on ERROR and WARNING cards
+- AI status indicator (connected / disconnected)
+
+---
+
+## 🤖 BYOK Auto Repair
+
+**Bring Your Own Key** — connect your own AI provider to automatically analyze and fix failing diagnostics, right from the dashboard.
+
+No vendor lock-in. Your API key stays on your machine and is never sent anywhere except the provider you choose.
+
+### Supported Providers
+
+| Provider | Model examples |
+|---|---|
+| **OpenAI** | `gpt-4o`, `gpt-4o-mini` |
+| **Anthropic** | `claude-sonnet-4-20250514`, `claude-3-5-haiku-20241022` |
+| **Google Gemini** | `gemini-2.5-flash`, `gemini-2.5-pro` |
+| **OpenRouter** | Any model available on OpenRouter |
+
+### Dashboard Configuration
+
+Open the dashboard and use the BYOK configuration bar at the top:
+
+1. Select a **Provider** from the dropdown
+2. Enter your **API Key**
+3. Optionally set a **Model** (defaults are provided per provider)
+4. Click **Save** — settings are stored locally in `.vibe-diagnosis/config.json`
+
+Once configured, ERROR and WARNING diagnostic cards will show an **Auto Repair** button. Click it to send the diagnostic context to your AI provider and receive a suggested fix.
+
+### Environment Variable Override
+
+You can also configure BYOK via environment variables (useful for CI/CD or team-shared setups):
+
+```bash
+export VIBE_DIAG_PROVIDER=openai      # openai | anthropic | gemini | openrouter
+export VIBE_DIAG_API_KEY=sk-...
+export VIBE_DIAG_MODEL=gpt-4o          # optional, uses provider default
+```
+
+Environment variables take precedence over `config.json` settings.
+
+### Security
+
+- API keys are stored locally in `.vibe-diagnosis/config.json`
+- `config.json` is automatically added to `.gitignore` during `init`
+- Keys are never logged, transmitted to third parties, or included in diagnostics output
 
 ---
 

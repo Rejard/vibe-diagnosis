@@ -2,7 +2,7 @@
   "name": "vibe-diagnosis-vscode",
   "displayName": "Vibe Diagnosis",
   "description": "Self-diagnosis framework for vibe coding projects — Health monitoring, diagnostics dashboard, and error pattern tracking for AI-assisted development",
-  "version": "1.0.2",
+  "version": "1.1.0",
   "publisher": "Rejard",
   "license": "Apache-2.0",
   "icon": "icon.png",
@@ -48,6 +48,10 @@
       {
         "command": "vibeDiagnosis.dashboard",
         "title": "Vibe Diagnosis: Open Dashboard"
+      },
+      {
+        "command": "vibeDiagnosis.repair",
+        "title": "Vibe Diagnosis: Auto Repair"
       }
     ]
   },
