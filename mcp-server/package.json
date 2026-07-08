@@ -1,0 +1,35 @@
+{
+  "name": "vibe-diagnosis-mcp",
+  "version": "1.0.0",
+  "description": "MCP server for vibe-diagnosis — AI agents run diagnostics automatically",
+  "type": "module",
+  "bin": {
+    "vibe-diagnosis-mcp": "./index.js"
+  },
+  "files": [
+    "index.js"
+  ],
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "vibe-coding",
+    "diagnosis",
+    "ai-agent"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Rejard/vibe-diagnosis.git",
+    "directory": "mcp-server"
+  },
+  "homepage": "https://github.com/Rejard/vibe-diagnosis#readme",
+  "bugs": {
+    "url": "https://github.com/Rejard/vibe-diagnosis/issues"
+  },
+  "author": "Rejard <lemaiiisk@gmail.com>",
+  "license": "MIT",
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "vibe-diagnosis": "^1.0.0",
+    "zod": "^3.24.0"
+  }
+}
