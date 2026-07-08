@@ -4,6 +4,7 @@
   "description": "Self-diagnosis framework for vibe coding projects — Health monitoring, diagnostics dashboard, and error pattern tracking for AI-assisted development",
   "version": "1.0.1",
   "publisher": "Rejard",
+  "license": "Apache-2.0",
   "icon": "icon.png",
   "engines": {
     "vscode": "^1.80.0"
