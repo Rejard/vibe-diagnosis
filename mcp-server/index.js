@@ -37,7 +37,7 @@ const server = new McpServer({
 
 server.tool(
   "run_diagnostics",
-  "Run all .diag.js diagnostics in the project and return structured results with OK/WARNING/ERROR status and health percentage",
+  "Run all .diag.js diagnostics in the project and return structured results with OK/WARNING/ERROR status and health percentage. Trigger: 자가진단 실행, 진단 돌려줘, run diagnostics",
   {
     projectDir: z.string().describe("Absolute path to the project root directory containing .vibe-diagnosis/"),
   },
@@ -81,7 +81,7 @@ server.tool(
 
 server.tool(
   "init_diagnostics",
-  "Initialize .vibe-diagnosis/ directory structure in a project with config, example diagnostic, and error pattern template",
+  "Initialize .vibe-diagnosis/ directory structure in a project with config, example diagnostic, and error pattern template. Trigger: 자가진단 적용, 자가진단 MCP 적용, 자가진단 초기화, vibe-diagnosis init",
   {
     projectDir: z.string().describe("Absolute path to the project root directory"),
   },
@@ -271,7 +271,7 @@ server.tool(
 
 server.tool(
   "open_dashboard",
-  "Open the Vibe Diagnosis web dashboard in the browser. Shows all diagnostics as visual cards with a Run button for one-click verification.",
+  "Open the Vibe Diagnosis web dashboard in the browser. Shows all diagnostics as visual cards with a Run button for one-click verification. Trigger: 대시보드 열어줘, 자가진단 대시보드, dashboard",
   {
     projectDir: z.string().describe("Absolute path to the project root directory"),
     port: z.number().optional().describe("Port number (default: 7700)"),
