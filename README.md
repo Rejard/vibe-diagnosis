@@ -221,4 +221,7 @@ For production, remove or gitignore the diagnostics directory:
 
 ## License
 
-MIT
+Apache License 2.0 — Open, Royalty-Free
+
+See [LICENSE](./LICENSE) for details.
+

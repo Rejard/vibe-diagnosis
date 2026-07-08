@@ -3,6 +3,9 @@ const fs = require('fs');
 const path = require('path');
 const { runDiagnostics, discoverDiagnostics } = require('./runner');
 const { validateDiagnosticModule } = require('./schema');
+const { getByokConfig, saveByokConfig } = require('./config-manager');
+const { repairDiagnostic } = require('./repairer');
+const { listProviders } = require('./ai-provider');
 
 const HTML_PATH = path.join(__dirname, 'dashboard.html');
 
@@ -53,6 +56,8 @@ function sendJson(res, data, status = 200) {
   res.writeHead(status, {
     'Content-Type': 'application/json',
     'Access-Control-Allow-Origin': '*',
+    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+    'Access-Control-Allow-Headers': 'Content-Type',
   });
   res.end(JSON.stringify(data));
 }
@@ -70,9 +75,28 @@ function sendHtml(res, html) {
   res.end(html);
 }
 
+function readBody(req) {
+  return new Promise((resolve, reject) => {
+    let data = '';
+    req.on('data', chunk => { data += chunk; });
+    req.on('end', () => {
+      try { resolve(JSON.parse(data)); }
+      catch { reject(new Error('Invalid JSON body')); }
+    });
+    req.on('error', reject);
+  });
+}
+
 function startDashboard(projectDir, port = 7700) {
+  let lastRunResults = [];
+
   const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, `http://${req.headers.host}`);
+
+    if (req.method === 'OPTIONS') {
+      sendJson(res, {});
+      return;
+    }
 
     if (req.method === 'GET' && url.pathname === '/') {
       const html = fs.readFileSync(HTML_PATH, 'utf-8');
@@ -106,6 +130,7 @@ function startDashboard(projectDir, port = 7700) {
     if (req.method === 'POST' && url.pathname === '/api/run') {
       try {
         const results = await runDiagnostics(projectDir);
+        lastRunResults = results;
         const summary = {
           total: results.length,
           ok: results.filter(r => r.status === 'OK').length,
@@ -115,6 +140,60 @@ function startDashboard(projectDir, port = 7700) {
         const overallStatus = summary.error > 0 ? 'ERROR' : summary.warning > 0 ? 'WARNING' : 'OK';
         const healthPercent = summary.total > 0 ? Math.round((summary.ok / summary.total) * 100) : 100;
         sendJson(res, { results, summary, overallStatus, healthPercent });
+      } catch (err) {
+        sendJson(res, { error: err.message }, 500);
+      }
+      return;
+    }
+
+    if (req.method === 'GET' && url.pathname === '/api/byok/config') {
+      const byok = getByokConfig(projectDir, { maskKey: true });
+      const providers = listProviders();
+      sendJson(res, { byok, providers });
+      return;
+    }
+
+    if (req.method === 'POST' && url.pathname === '/api/byok/save') {
+      try {
+        const body = await readBody(req);
+        const { provider, apiKey, model } = body;
+        saveByokConfig(projectDir, { provider: provider || '', apiKey: apiKey || '', model: model || '' });
+        const byok = getByokConfig(projectDir, { maskKey: true });
+        sendJson(res, { success: true, byok });
+      } catch (err) {
+        sendJson(res, { error: err.message }, 400);
+      }
+      return;
+    }
+
+    if (req.method === 'POST' && url.pathname === '/api/repair') {
+      try {
+        const body = await readBody(req);
+        const { diagId } = body;
+        if (!diagId) {
+          sendJson(res, { error: 'diagId is required' }, 400);
+          return;
+        }
+
+        const diagResult = lastRunResults.find(r => r.id === diagId);
+        if (!diagResult) {
+          sendJson(res, { error: `No recent result found for "${diagId}". Run diagnostics first.` }, 404);
+          return;
+        }
+
+        if (diagResult.status === 'OK') {
+          sendJson(res, { error: `Diagnostic "${diagId}" is already OK.` }, 400);
+          return;
+        }
+
+        const result = await repairDiagnostic(projectDir, diagResult);
+
+        if (result.rerunResult) {
+          const idx = lastRunResults.findIndex(r => r.id === diagId);
+          if (idx !== -1) lastRunResults[idx] = result.rerunResult;
+        }
+
+        sendJson(res, result);
       } catch (err) {
         sendJson(res, { error: err.message }, 500);
       }

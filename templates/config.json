@@ -2,5 +2,10 @@
   "projectName": "",
   "diagnosticsDir": "diagnostics",
   "errorPatternsDir": "error-patterns",
-  "layers": ["TASK", "FUNCTION", "SYSTEM"]
+  "layers": ["TASK", "FUNCTION", "SYSTEM"],
+  "byok": {
+    "provider": "",
+    "apiKey": "",
+    "model": ""
+  }
 }

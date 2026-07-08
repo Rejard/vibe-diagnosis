@@ -1,6 +1,6 @@
 {
   "name": "vibe-diagnosis",
-  "version": "1.0.5",
+  "version": "1.0.6",
   "description": "Self-diagnosis framework for vibe coding projects",
   "main": "src/runner.js",
   "bin": {
@@ -34,7 +34,7 @@
     "url": "https://github.com/Rejard/vibe-diagnosis/issues"
   },
   "author": "Rejard <lemaiiisk@gmail.com>",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "engines": {
     "node": ">=16.0.0"
   }

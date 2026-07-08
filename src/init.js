@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { ensureGitignore } = require('./config-manager');
 
 const TEMPLATE_DIR = path.join(__dirname, '..', 'templates');
 
@@ -61,6 +62,8 @@ function initialize(targetDir) {
   const errorPatternDest = path.join(errorPatternsDir, 'ERR_000_template.md');
   fs.copyFileSync(errorPatternSrc, errorPatternDest);
 
+  ensureGitignore(targetDir);
+
   const mcpAdded = setupGeminiMcp(targetDir);
 
   console.log(`\n  \x1b[32m✅ Initialized .vibe-diagnosis/ in ${targetDir}\x1b[0m`);
@@ -83,7 +86,9 @@ function initialize(targetDir) {
   console.log('  Next steps:');
   console.log('    1. Edit diagnostics/example.diag.js or create new .diag.js files');
   console.log('    2. Run: npx vibe-diag run');
+  console.log('    3. Configure BYOK in dashboard: npx vibe-diag dashboard');
   console.log('');
 }
+
 
 module.exports = { initialize };
