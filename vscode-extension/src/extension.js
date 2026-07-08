@@ -18,8 +18,9 @@ function activate(context) {
   const runCmd = vscode.commands.registerCommand('vibeDiagnosis.run', () => runDiagnostics(false));
   const runJsonCmd = vscode.commands.registerCommand('vibeDiagnosis.runJson', () => runDiagnostics(true));
   const initCmd = vscode.commands.registerCommand('vibeDiagnosis.init', initDiagnostics);
+  const dashCmd = vscode.commands.registerCommand('vibeDiagnosis.dashboard', openDashboard);
 
-  context.subscriptions.push(runCmd, runJsonCmd, initCmd, outputChannel, diagnosticCollection, statusBarItem);
+  context.subscriptions.push(runCmd, runJsonCmd, initCmd, dashCmd, outputChannel, diagnosticCollection, statusBarItem);
 
   const workspaceRoot = getWorkspaceRoot();
   if (workspaceRoot) {
@@ -178,6 +179,23 @@ function initDiagnostics() {
       vscode.window.showErrorMessage('Vibe Diagnosis: Init failed. Check output for details.');
     }
   });
+}
+
+function openDashboard() {
+  const workspaceRoot = getWorkspaceRoot();
+  if (!workspaceRoot) {
+    vscode.window.showWarningMessage('Vibe Diagnosis: No workspace folder open.');
+    return;
+  }
+
+  const bin = findVibeDiagBin();
+  const isLocalBin = bin.endsWith('.js');
+  const cmd = isLocalBin
+    ? `node "${bin}" dashboard --cwd "${workspaceRoot}"`
+    : `npx vibe-diag dashboard --cwd "${workspaceRoot}"`;
+
+  exec(cmd, { windowsHide: true, timeout: 5000 }, () => {});
+  vscode.window.showInformationMessage('Vibe Diagnosis: Dashboard opened at http://localhost:7700');
 }
 
 module.exports = { activate, deactivate };

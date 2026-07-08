@@ -1,9 +1,10 @@
 {
   "name": "vibe-diagnosis-vscode",
   "displayName": "Vibe Diagnosis",
-  "description": "Self-diagnosis framework for vibe coding projects",
-  "version": "1.0.0",
+  "description": "Self-diagnosis framework for vibe coding projects — Health monitoring, diagnostics dashboard, and error pattern tracking for AI-assisted development",
+  "version": "1.0.1",
   "publisher": "Rejard",
+  "icon": "icon.png",
   "engines": {
     "vscode": "^1.80.0"
   },
@@ -15,12 +16,16 @@
     "vibe-coding",
     "diagnosis",
     "testing",
-    "ai"
+    "ai",
+    "self-diagnosis",
+    "health-check",
+    "mcp"
   ],
   "repository": {
     "type": "git",
     "url": "https://github.com/Rejard/vibe-diagnosis"
   },
+  "homepage": "https://github.com/Rejard/vibe-diagnosis#readme",
   "main": "./src/extension.js",
   "activationEvents": [
     "workspaceContains:.vibe-diagnosis"
@@ -38,6 +43,10 @@
       {
         "command": "vibeDiagnosis.runJson",
         "title": "Vibe Diagnosis: Run (JSON)"
+      },
+      {
+        "command": "vibeDiagnosis.dashboard",
+        "title": "Vibe Diagnosis: Open Dashboard"
       }
     ]
   },
