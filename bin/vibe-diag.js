@@ -7,6 +7,7 @@ const command = args[0];
 
 const flags = {
   json: args.includes('--json'),
+  all: args.includes('--all'),
   cwd: null,
   port: 7700,
 };
@@ -51,6 +52,14 @@ async function main() {
       startDashboard(targetDir, flags.port);
       break;
     }
+    case 'config': {
+      await handleConfig();
+      break;
+    }
+    case 'repair': {
+      await handleRepair();
+      break;
+    }
     default: {
       const pkg = require('../package.json');
       console.log(`\n  Vibe Diagnosis v${pkg.version}\n`);
@@ -60,9 +69,141 @@ async function main() {
       console.log('    vibe-diag run --json           Output results as JSON');
       console.log('    vibe-diag dashboard            Open web dashboard (default port 7700)');
       console.log('    vibe-diag dashboard --port 8080  Use custom port');
+      console.log('    vibe-diag config get           Show current BYOK configuration');
+      console.log('    vibe-diag config set <key> <value>  Set BYOK config (provider, apiKey, model)');
+      console.log('    vibe-diag repair <diagId>      Auto-repair a specific diagnostic with AI');
+      console.log('    vibe-diag repair --all         Auto-repair all failing diagnostics');
       console.log('    vibe-diag --cwd <path>        Run in specified directory\n');
     }
   }
+}
+
+async function handleConfig() {
+  const subCmd = args[1];
+  const { getByokConfig, saveByokConfig, getResolvedByok } = require('../src/config-manager');
+
+  if (subCmd === 'get') {
+    const byok = getByokConfig(targetDir, { maskKey: true });
+    const resolved = getResolvedByok(targetDir);
+    const envOverrides = [];
+    if (process.env.VIBE_DIAG_PROVIDER) envOverrides.push('provider');
+    if (process.env.VIBE_DIAG_API_KEY) envOverrides.push('apiKey');
+    if (process.env.VIBE_DIAG_MODEL) envOverrides.push('model');
+
+    console.log(`\n  \x1b[36m🤖 BYOK Configuration\x1b[0m`);
+    console.log(`  \x1b[90m${'─'.repeat(40)}\x1b[0m`);
+    console.log(`  Provider:  \x1b[37m${byok.provider || '(not set)'}\x1b[0m`);
+    console.log(`  API Key:   \x1b[37m${byok.apiKey || '(not set)'}\x1b[0m`);
+    console.log(`  Model:     \x1b[37m${byok.model || '(not set)'}\x1b[0m`);
+    if (envOverrides.length > 0) {
+      console.log(`  \x1b[90m${'─'.repeat(40)}\x1b[0m`);
+      console.log(`  \x1b[33m⚡ Env override:\x1b[0m ${envOverrides.join(', ')}`);
+    }
+    console.log('');
+    return;
+  }
+
+  if (subCmd === 'set') {
+    const key = args[2];
+    const value = args[3];
+
+    const validKeys = ['provider', 'apiKey', 'model'];
+    if (!key || !validKeys.includes(key)) {
+      console.log(`\n  \x1b[31m❌ Invalid key.\x1b[0m Valid keys: ${validKeys.join(', ')}\n`);
+      process.exitCode = 1;
+      return;
+    }
+    if (!value) {
+      console.log(`\n  \x1b[31m❌ Value is required.\x1b[0m Usage: vibe-diag config set ${key} <value>\n`);
+      process.exitCode = 1;
+      return;
+    }
+
+    saveByokConfig(targetDir, { [key]: value });
+    const display = key === 'apiKey' && value.length > 8
+      ? value.slice(0, 4) + '****' + value.slice(-4)
+      : value;
+    console.log(`\n  \x1b[32m✅ Set ${key} = ${display}\x1b[0m\n`);
+    return;
+  }
+
+  console.log('\n  Usage:');
+  console.log('    vibe-diag config get               Show BYOK configuration');
+  console.log('    vibe-diag config set provider <name>  Set provider (openai|anthropic|gemini|openrouter)');
+  console.log('    vibe-diag config set apiKey <key>     Set API key');
+  console.log('    vibe-diag config set model <name>     Set model name\n');
+}
+
+async function handleRepair() {
+  const { runDiagnostics } = require('../src/runner');
+  const { repairDiagnostic } = require('../src/repairer');
+  const diagId = flags.all ? null : args[1];
+
+  if (!diagId && !flags.all) {
+    console.log('\n  Usage:');
+    console.log('    vibe-diag repair <diagId>    Repair a specific diagnostic');
+    console.log('    vibe-diag repair --all       Repair all failing diagnostics\n');
+    return;
+  }
+
+  console.log(`\n  \x1b[36m🔧 Running diagnostics...\x1b[0m`);
+  const results = await runDiagnostics(targetDir);
+  const failing = results.filter(r => r.status === 'ERROR' || r.status === 'WARNING');
+
+  if (failing.length === 0) {
+    console.log(`  \x1b[32m✅ All diagnostics passed! Nothing to repair.\x1b[0m\n`);
+    return;
+  }
+
+  let targets;
+  if (flags.all) {
+    targets = failing;
+  } else {
+    const target = failing.find(r => r.id === diagId);
+    if (!target) {
+      const match = results.find(r => r.id === diagId);
+      if (match && match.status === 'OK') {
+        console.log(`  \x1b[32m✅ "${diagId}" is already OK.\x1b[0m\n`);
+      } else {
+        console.log(`  \x1b[31m❌ Diagnostic "${diagId}" not found.\x1b[0m`);
+        console.log(`  Available: ${results.map(r => r.id).join(', ')}\n`);
+        process.exitCode = 1;
+      }
+      return;
+    }
+    targets = [target];
+  }
+
+  console.log(`  Found ${failing.length} failing, repairing ${targets.length}...\n`);
+
+  let successCount = 0;
+  for (const target of targets) {
+    const icon = target.status === 'ERROR' ? '🔴' : '🟡';
+    process.stdout.write(`  ${icon} ${target.id.padEnd(30)} `);
+
+    const result = await repairDiagnostic(targetDir, target);
+
+    if (result.success) {
+      console.log(`\x1b[32m✅ Fixed\x1b[0m  ${result.summary}`);
+      successCount++;
+    } else if (result.error) {
+      console.log(`\x1b[31m❌ Failed\x1b[0m ${result.error}`);
+    } else {
+      console.log(`\x1b[33m⚠️  Partial\x1b[0m ${result.summary}`);
+    }
+
+    if (result.filesModified.length > 0) {
+      console.log(`    Files: ${result.filesModified.join(', ')}`);
+    }
+    if (result.backupFiles.length > 0) {
+      console.log(`    Backups: ${result.backupFiles.map(f => path.basename(f)).join(', ')}`);
+    }
+  }
+
+  console.log(`\n  \x1b[90m${'─'.repeat(40)}\x1b[0m`);
+  console.log(`  Repaired: ${successCount}/${targets.length}`);
+  if (successCount < targets.length) process.exitCode = 1;
+  console.log('');
 }
 
 main().catch(err => {
