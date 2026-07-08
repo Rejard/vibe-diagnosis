@@ -100,7 +100,9 @@ server.tool(
         };
       }
 
-      initialize(projectDir);
+      const origLog = console.log;
+      console.log = () => {};
+      try { initialize(projectDir); } finally { console.log = origLog; }
 
       return {
         content: [
@@ -279,7 +281,7 @@ server.tool(
   async ({ projectDir, port }) => {
     try {
       const dashboardPort = port || 7700;
-      const { exec } = await import("child_process");
+      const { spawn } = await import("child_process");
 
       let vibeDiagBin;
       try {
@@ -293,8 +295,12 @@ server.tool(
         );
       }
 
-      const cmd = `node "${vibeDiagBin}" dashboard --cwd "${projectDir}" --port ${dashboardPort}`;
-      exec(cmd, { windowsHide: true, detached: false });
+      const child = spawn("node", [vibeDiagBin, "dashboard", "--cwd", projectDir, "--port", String(dashboardPort)], {
+        windowsHide: true,
+        detached: true,
+        stdio: "ignore",
+      });
+      child.unref();
 
       return {
         content: [
