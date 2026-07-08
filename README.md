@@ -165,6 +165,111 @@ npx vibe-diag run --cwd examples/calculator
 
 ---
 
+## 🤖 MCP 서버 — AI 에이전트 연동
+
+AI 에이전트가 코딩 중 **자동으로** 진단을 실행하고, 에러 패턴을 참조할 수 있습니다.
+
+```bash
+npm install -g vibe-diagnosis-mcp
+```
+
+### MCP 도구 목록
+
+| 도구 | 설명 |
+|---|---|
+| `run_diagnostics` | 프로젝트 진단 실행 → JSON 결과 반환 |
+| `init_diagnostics` | .vibe-diagnosis/ 초기화 |
+| `list_diagnostics` | 진단 파일 목록 + 메타데이터 조회 |
+| `read_error_pattern` | 과거 에러 패턴 로그 읽기 |
+| `write_error_pattern` | 새 에러 패턴 기록 |
+
+### Gemini (Antigravity 2.0)
+
+`.gemini/settings.json`:
+```json
+{
+  "mcpServers": {
+    "vibe-diagnosis": {
+      "command": "npx",
+      "args": ["vibe-diagnosis-mcp"]
+    }
+  }
+}
+```
+
+### Claude Desktop
+
+`claude_desktop_config.json`:
+```json
+{
+  "mcpServers": {
+    "vibe-diagnosis": {
+      "command": "npx",
+      "args": ["vibe-diagnosis-mcp"]
+    }
+  }
+}
+```
+
+### Cursor
+
+`.cursor/mcp.json`:
+```json
+{
+  "mcpServers": {
+    "vibe-diagnosis": {
+      "command": "npx",
+      "args": ["vibe-diagnosis-mcp"]
+    }
+  }
+}
+```
+
+### Windsurf
+
+`~/.codeium/windsurf/mcp_config.json`:
+```json
+{
+  "mcpServers": {
+    "vibe-diagnosis": {
+      "command": "npx",
+      "args": ["vibe-diagnosis-mcp"]
+    }
+  }
+}
+```
+
+---
+
+## 🧩 VS Code 확장
+
+GitHub Releases에서 `.vsix` 파일을 다운로드하여 설치:
+
+1. VS Code에서 `Ctrl+Shift+P` → "Install from VSIX..."
+2. `vibe-diagnosis-vscode-1.0.0.vsix` 선택
+
+**기능:**
+- Status Bar에 건강도 퍼센트 표시
+- `Ctrl+Shift+P` → "Vibe Diagnosis: Run" 으로 진단 실행
+- Problems Panel에 ERROR/WARNING 연동
+
+---
+
+## 🔄 에이전트 자동화
+
+AI 에이전트가 **알아서** 진단을 실행하게 하려면, 프로젝트의 `.agents/AGENTS.md` 또는 `CLAUDE.md`에 추가:
+
+```markdown
+## Vibe Diagnosis Rules
+- Task 완료 후 반드시 `run_diagnostics` MCP 도구로 검증할 것
+- 에러 패턴 발견 시 `write_error_pattern`으로 기록할 것
+- 새 Task에 대응하는 .diag.js 파일을 함께 생성할 것
+```
+
+이렇게 하면 **MCP 등록 → init → 바이브 코딩** — 에이전트가 자동으로 진단 루프를 돕니다.
+
+---
+
 ## License
 
 MIT
