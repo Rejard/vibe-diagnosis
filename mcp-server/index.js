@@ -269,5 +269,50 @@ server.tool(
   }
 );
 
+server.tool(
+  "open_dashboard",
+  "Open the Vibe Diagnosis web dashboard in the browser. Shows all diagnostics as visual cards with a Run button for one-click verification.",
+  {
+    projectDir: z.string().describe("Absolute path to the project root directory"),
+    port: z.number().optional().describe("Port number (default: 7700)"),
+  },
+  async ({ projectDir, port }) => {
+    try {
+      const dashboardPort = port || 7700;
+      const { exec } = await import("child_process");
+
+      let vibeDiagBin;
+      try {
+        vibeDiagBin = require.resolve("vibe-diagnosis/bin/vibe-diag.js");
+      } catch {
+        vibeDiagBin = path.resolve(
+          path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Z]:)/, "$1")),
+          "..",
+          "bin",
+          "vibe-diag.js"
+        );
+      }
+
+      const cmd = `node "${vibeDiagBin}" dashboard --cwd "${projectDir}" --port ${dashboardPort}`;
+      exec(cmd, { windowsHide: true, detached: false });
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: `Dashboard opened at http://localhost:${dashboardPort}\nProject: ${projectDir}`,
+          },
+        ],
+      };
+    } catch (err) {
+      return {
+        content: [{ type: "text", text: `Error opening dashboard: ${err.message}` }],
+        isError: true,
+      };
+    }
+  }
+);
+
 const transport = new StdioServerTransport();
 await server.connect(transport);
+
