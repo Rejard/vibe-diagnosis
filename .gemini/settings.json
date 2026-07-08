@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "vibe-diagnosis": {
+      "command": "npx",
+      "args": ["vibe-diagnosis-mcp"]
+    }
+  }
+}
