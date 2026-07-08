@@ -4,8 +4,14 @@
   "description": "Self-diagnosis framework for vibe coding projects",
   "main": "src/runner.js",
   "bin": {
-    "vibe-diag": "./bin/vibe-diag.js"
+    "vibe-diag": "bin/vibe-diag.js"
   },
+  "files": [
+    "bin/",
+    "src/",
+    "templates/",
+    "README.md"
+  ],
   "scripts": {
     "test": "node bin/vibe-diag.js run",
     "test:example": "node bin/vibe-diag.js run --cwd examples/calculator"
@@ -15,9 +21,19 @@
     "diagnosis",
     "testing",
     "self-diagnosis",
-    "quality"
+    "quality",
+    "ai",
+    "agent"
   ],
-  "author": "Rejard",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/Rejard/vibe-diagnosis.git"
+  },
+  "homepage": "https://github.com/Rejard/vibe-diagnosis#readme",
+  "bugs": {
+    "url": "https://github.com/Rejard/vibe-diagnosis/issues"
+  },
+  "author": "Rejard <lemaiiisk@gmail.com>",
   "license": "MIT",
   "engines": {
     "node": ">=16.0.0"
