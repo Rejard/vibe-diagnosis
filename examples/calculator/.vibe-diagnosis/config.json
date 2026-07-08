@@ -1,0 +1,6 @@
+{
+  "projectName": "simple-calculator",
+  "diagnosticsDir": "diagnostics",
+  "errorPatternsDir": "error-patterns",
+  "layers": ["TASK", "FUNCTION", "SYSTEM"]
+}

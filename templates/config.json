@@ -1,0 +1,6 @@
+{
+  "projectName": "",
+  "diagnosticsDir": "diagnostics",
+  "errorPatternsDir": "error-patterns",
+  "layers": ["TASK", "FUNCTION", "SYSTEM"]
+}

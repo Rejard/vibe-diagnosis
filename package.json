@@ -1,0 +1,25 @@
+{
+  "name": "vibe-diagnosis",
+  "version": "1.0.0",
+  "description": "Self-diagnosis framework for vibe coding projects",
+  "main": "src/runner.js",
+  "bin": {
+    "vibe-diag": "./bin/vibe-diag.js"
+  },
+  "scripts": {
+    "test": "node bin/vibe-diag.js run",
+    "test:example": "node bin/vibe-diag.js run --cwd examples/calculator"
+  },
+  "keywords": [
+    "vibe-coding",
+    "diagnosis",
+    "testing",
+    "self-diagnosis",
+    "quality"
+  ],
+  "author": "Rejard",
+  "license": "MIT",
+  "engines": {
+    "node": ">=16.0.0"
+  }
+}
