@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>🩺 Vibe Diagnosis Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+:root{
+  --bg:#0a0a0f;--surface:#12121a;--surface2:#1a1a28;--surface3:#22223a;
+  --border:#2a2a40;--text:#e8e8f0;--text2:#9090a8;--text3:#606078;
+  --ok:#00d68f;--ok-bg:rgba(0,214,143,.1);--ok-border:rgba(0,214,143,.25);
+  --warn:#ffaa00;--warn-bg:rgba(255,170,0,.1);--warn-border:rgba(255,170,0,.25);
+  --err:#ff3d71;--err-bg:rgba(255,61,113,.1);--err-border:rgba(255,61,113,.25);
+  --accent:#6c5ce7;--accent2:#a78bfa;
+  --radius:16px;--radius-sm:10px;
+}
+body{font-family:'Inter',sans-serif;background:var(--bg);color:var(--text);min-height:100vh;overflow-x:hidden}
+
+.bg-glow{position:fixed;top:-200px;left:50%;transform:translateX(-50%);width:800px;height:800px;background:radial-gradient(circle,rgba(108,92,231,.08) 0%,transparent 70%);pointer-events:none;z-index:0}
+
+.container{max-width:1200px;margin:0 auto;padding:24px;position:relative;z-index:1}
+
+header{display:flex;align-items:center;justify-content:space-between;padding:20px 0;margin-bottom:32px}
+.logo{display:flex;align-items:center;gap:12px}
+.logo-icon{font-size:28px}
+.logo h1{font-size:22px;font-weight:700;background:linear-gradient(135deg,var(--accent2),var(--ok));-webkit-background-clip:text;-webkit-text-fill-color:transparent}
+.logo span{font-size:13px;color:var(--text3);font-weight:400}
+
+.health-ring{position:relative;width:72px;height:72px}
+.health-ring svg{transform:rotate(-90deg)}
+.health-ring circle{fill:none;stroke-width:5}
+.health-ring .ring-bg{stroke:var(--surface3)}
+.health-ring .ring-fg{stroke:var(--ok);stroke-linecap:round;transition:stroke-dashoffset .8s ease,stroke .4s ease}
+.health-text{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);font-size:16px;font-weight:700}
+.health-label{position:absolute;top:50%;left:50%;transform:translate(-50%,12px);font-size:9px;color:var(--text3);text-transform:uppercase;letter-spacing:1px}
+
+.toolbar{display:flex;align-items:center;gap:16px;margin-bottom:28px;flex-wrap:wrap}
+.btn-run{
+  display:flex;align-items:center;gap:10px;padding:12px 28px;
+  background:linear-gradient(135deg,var(--accent),#8b5cf6);color:#fff;
+  border:none;border-radius:var(--radius-sm);font-size:15px;font-weight:600;
+  cursor:pointer;transition:all .2s ease;font-family:'Inter',sans-serif;
+  box-shadow:0 4px 20px rgba(108,92,231,.3);
+}
+.btn-run:hover{transform:translateY(-2px);box-shadow:0 6px 28px rgba(108,92,231,.45)}
+.btn-run:active{transform:translateY(0)}
+.btn-run.running{opacity:.7;pointer-events:none}
+.btn-run .spinner{display:none;width:16px;height:16px;border:2px solid rgba(255,255,255,.3);border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite}
+.btn-run.running .spinner{display:block}
+.btn-run.running .btn-icon{display:none}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+.stats{display:flex;gap:12px;margin-left:auto}
+.stat{padding:8px 16px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;color:var(--text2)}
+.stat strong{color:var(--text);font-weight:600}
+
+.section-title{font-size:14px;font-weight:600;color:var(--text2);text-transform:uppercase;letter-spacing:1.5px;margin-bottom:16px;display:flex;align-items:center;gap:8px}
+.section-title .count{background:var(--surface3);padding:2px 10px;border-radius:20px;font-size:12px;color:var(--text3)}
+
+.cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(320px,1fr));gap:16px;margin-bottom:40px}
+
+.card{
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
+  padding:20px;transition:all .3s ease;position:relative;overflow:hidden;
+}
+.card:hover{border-color:var(--surface3);transform:translateY(-2px);box-shadow:0 8px 32px rgba(0,0,0,.3)}
+.card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;border-radius:var(--radius) var(--radius) 0 0}
+.card.status-ok::before{background:var(--ok)}
+.card.status-warning::before{background:var(--warn)}
+.card.status-error::before{background:var(--err)}
+.card.status-pending::before{background:var(--text3)}
+
+.card-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px}
+.card-name{font-size:15px;font-weight:600;line-height:1.3}
+.card-badge{padding:3px 10px;border-radius:6px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:.5px;white-space:nowrap}
+.badge-task{background:rgba(108,92,231,.15);color:var(--accent2)}
+.badge-function{background:rgba(0,214,143,.15);color:var(--ok)}
+.badge-system{background:rgba(255,170,0,.15);color:var(--warn)}
+
+.card-id{font-size:12px;color:var(--text3);margin-bottom:8px;font-family:monospace}
+.card-status{display:flex;align-items:center;gap:8px;margin-top:12px;padding-top:12px;border-top:1px solid var(--border)}
+.status-dot{width:8px;height:8px;border-radius:50%}
+.status-dot.ok{background:var(--ok);box-shadow:0 0 8px var(--ok)}
+.status-dot.warning{background:var(--warn);box-shadow:0 0 8px var(--warn)}
+.status-dot.error{background:var(--err);box-shadow:0 0 8px var(--err)}
+.status-dot.pending{background:var(--text3)}
+.card-details{font-size:13px;color:var(--text2);flex:1}
+.card-duration{font-size:12px;color:var(--text3)}
+.card-task{font-size:11px;color:var(--accent2);margin-top:4px}
+
+.errors-section{margin-top:8px}
+.error-list{list-style:none}
+.error-item{
+  display:flex;align-items:center;gap:10px;padding:12px 16px;
+  background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);
+  margin-bottom:8px;font-size:13px;color:var(--text2);cursor:pointer;transition:all .2s ease;
+}
+.error-item:hover{border-color:var(--accent);color:var(--text)}
+.error-item .icon{font-size:16px}
+
+.modal-overlay{display:none;position:fixed;inset:0;background:rgba(0,0,0,.6);backdrop-filter:blur(4px);z-index:100;align-items:center;justify-content:center}
+.modal-overlay.active{display:flex}
+.modal{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:24px;max-width:640px;width:90%;max-height:80vh;overflow-y:auto}
+.modal h3{font-size:16px;margin-bottom:16px;display:flex;align-items:center;gap:8px}
+.modal pre{background:var(--surface2);padding:16px;border-radius:var(--radius-sm);font-size:13px;line-height:1.6;white-space:pre-wrap;color:var(--text2);overflow-x:auto}
+.modal .close{float:right;background:none;border:none;color:var(--text3);font-size:20px;cursor:pointer}
+.modal .close:hover{color:var(--text)}
+
+.toast{position:fixed;bottom:24px;right:24px;padding:14px 24px;border-radius:var(--radius-sm);font-size:14px;font-weight:500;z-index:200;transform:translateY(100px);opacity:0;transition:all .3s ease}
+.toast.show{transform:translateY(0);opacity:1}
+.toast.success{background:var(--ok);color:#000}
+.toast.error{background:var(--err);color:#fff}
+
+.empty{text-align:center;padding:60px 20px;color:var(--text3)}
+.empty .icon{font-size:48px;margin-bottom:16px}
+.empty p{font-size:15px}
+
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+.card{animation:fadeIn .4s ease both}
+.card:nth-child(2){animation-delay:.05s}
+.card:nth-child(3){animation-delay:.1s}
+.card:nth-child(4){animation-delay:.15s}
+.card:nth-child(5){animation-delay:.2s}
+.card:nth-child(6){animation-delay:.25s}
+
+@media(max-width:640px){
+  .cards{grid-template-columns:1fr}
+  .toolbar{flex-direction:column;align-items:stretch}
+  .stats{margin-left:0}
+  header{flex-direction:column;gap:16px}
+}
+</style>
+</head>
+<body>
+<div class="bg-glow"></div>
+<div class="container">
+  <header>
+    <div class="logo">
+      <span class="logo-icon">🩺</span>
+      <div>
+        <h1>Vibe Diagnosis</h1>
+        <span id="projectName">Loading...</span>
+      </div>
+    </div>
+    <div class="health-ring" id="healthRing">
+      <svg width="72" height="72" viewBox="0 0 72 72">
+        <circle class="ring-bg" cx="36" cy="36" r="30"/>
+        <circle class="ring-fg" id="ringFg" cx="36" cy="36" r="30"
+                stroke-dasharray="188.5" stroke-dashoffset="188.5"/>
+      </svg>
+      <span class="health-text" id="healthText">—</span>
+      <span class="health-label">Health</span>
+    </div>
+  </header>
+
+  <div class="toolbar">
+    <button class="btn-run" id="btnRun" onclick="runDiagnostics()">
+      <span class="btn-icon">🔍</span>
+      <span class="spinner"></span>
+      Run Diagnostics
+    </button>
+    <div class="stats" id="statsBar">
+      <div class="stat"><strong id="statTotal">—</strong> total</div>
+      <div class="stat" style="color:var(--ok)"><strong id="statOk">—</strong> OK</div>
+      <div class="stat" style="color:var(--warn)"><strong id="statWarn">—</strong> WARN</div>
+      <div class="stat" style="color:var(--err)"><strong id="statErr">—</strong> ERR</div>
+    </div>
+  </div>
+
+  <div class="section-title">Diagnostics <span class="count" id="diagCount">0</span></div>
+  <div class="cards" id="cardsContainer">
+    <div class="empty"><div class="icon">📋</div><p>Loading diagnostics...</p></div>
+  </div>
+
+  <div class="errors-section">
+    <div class="section-title">Error Patterns <span class="count" id="errorCount">0</span></div>
+    <ul class="error-list" id="errorList"></ul>
+  </div>
+</div>
+
+<div class="modal-overlay" id="modalOverlay" onclick="closeModal(event)">
+  <div class="modal" id="modal">
+    <button class="close" onclick="document.getElementById('modalOverlay').classList.remove('active')">&times;</button>
+    <h3 id="modalTitle"></h3>
+    <pre id="modalContent"></pre>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const API = '';
+
+async function fetchList() {
+  const res = await fetch(API + '/api/list');
+  return res.json();
+}
+
+async function fetchErrors() {
+  const res = await fetch(API + '/api/errors');
+  return res.json();
+}
+
+async function fetchErrorContent(filename) {
+  const res = await fetch(API + '/api/errors/' + encodeURIComponent(filename));
+  return res.text();
+}
+
+function updateHealthRing(percent) {
+  const circ = 188.5;
+  const offset = circ - (circ * percent / 100);
+  const ring = document.getElementById('ringFg');
+  const text = document.getElementById('healthText');
+  ring.style.strokeDashoffset = offset;
+  text.textContent = percent + '%';
+
+  if (percent === 100) ring.style.stroke = 'var(--ok)';
+  else if (percent >= 70) ring.style.stroke = 'var(--warn)';
+  else ring.style.stroke = 'var(--err)';
+}
+
+function createCard(diag, result) {
+  const status = result ? result.status.toLowerCase() : 'pending';
+  const details = result ? result.details : 'Not yet tested';
+  const duration = result ? result.duration + 'ms' : '—';
+  const layerClass = 'badge-' + (diag.layer || 'task').toLowerCase();
+
+  return `
+    <div class="card status-${status}">
+      <div class="card-header">
+        <div>
+          <div class="card-name">${diag.name || diag.id}</div>
+          <div class="card-id">${diag.id}</div>
+        </div>
+        <span class="card-badge ${layerClass}">${diag.layer || 'UNKNOWN'}</span>
+      </div>
+      ${diag.linkedTask ? `<div class="card-task">🔗 ${diag.linkedTask}</div>` : ''}
+      <div class="card-status">
+        <span class="status-dot ${status}"></span>
+        <span class="card-details">${details}</span>
+        <span class="card-duration">${duration}</span>
+      </div>
+    </div>
+  `;
+}
+
+function showToast(message, type) {
+  const toast = document.getElementById('toast');
+  toast.textContent = message;
+  toast.className = 'toast ' + type + ' show';
+  setTimeout(() => toast.classList.remove('show'), 3000);
+}
+
+let diagnosticsList = [];
+let lastResults = {};
+
+async function loadDiagnostics() {
+  try {
+    diagnosticsList = await fetchList();
+    renderCards();
+    document.getElementById('diagCount').textContent = diagnosticsList.length;
+  } catch (err) {
+    document.getElementById('cardsContainer').innerHTML =
+      '<div class="empty"><div class="icon">⚠️</div><p>Failed to load diagnostics</p></div>';
+  }
+}
+
+async function loadErrors() {
+  try {
+    const errors = await fetchErrors();
+    const list = document.getElementById('errorList');
+    document.getElementById('errorCount').textContent = errors.length;
+
+    if (errors.length === 0) {
+      list.innerHTML = '<li class="error-item"><span class="icon">✨</span> No error patterns recorded</li>';
+      return;
+    }
+
+    list.innerHTML = errors.map(f =>
+      `<li class="error-item" onclick="showError('${f}')">
+        <span class="icon">📄</span> ${f}
+      </li>`
+    ).join('');
+  } catch {}
+}
+
+function renderCards() {
+  const container = document.getElementById('cardsContainer');
+
+  if (diagnosticsList.length === 0) {
+    container.innerHTML = '<div class="empty"><div class="icon">📋</div><p>No diagnostics found. Create .diag.js files in .vibe-diagnosis/diagnostics/</p></div>';
+    return;
+  }
+
+  container.innerHTML = diagnosticsList.map(d => createCard(d, lastResults[d.id])).join('');
+}
+
+async function runDiagnostics() {
+  const btn = document.getElementById('btnRun');
+  btn.classList.add('running');
+
+  try {
+    const res = await fetch(API + '/api/run', { method: 'POST' });
+    const data = await res.json();
+
+    lastResults = {};
+    data.results.forEach(r => { lastResults[r.id] = r; });
+
+    document.getElementById('statTotal').textContent = data.summary.total;
+    document.getElementById('statOk').textContent = data.summary.ok;
+    document.getElementById('statWarn').textContent = data.summary.warning;
+    document.getElementById('statErr').textContent = data.summary.error;
+
+    updateHealthRing(data.healthPercent);
+    renderCards();
+
+    await loadDiagnostics();
+
+    if (data.overallStatus === 'OK') {
+      showToast('✅ All diagnostics passed! Health ' + data.healthPercent + '%', 'success');
+    } else {
+      showToast('⚠️ Issues detected — Health ' + data.healthPercent + '%', 'error');
+    }
+  } catch (err) {
+    showToast('❌ Failed to run diagnostics', 'error');
+  } finally {
+    btn.classList.remove('running');
+  }
+}
+
+async function showError(filename) {
+  try {
+    const content = await fetchErrorContent(filename);
+    document.getElementById('modalTitle').innerHTML = '📄 ' + filename;
+    document.getElementById('modalContent').textContent = content;
+    document.getElementById('modalOverlay').classList.add('active');
+  } catch {}
+}
+
+function closeModal(event) {
+  if (event.target === document.getElementById('modalOverlay')) {
+    document.getElementById('modalOverlay').classList.remove('active');
+  }
+}
+
+async function init() {
+  document.getElementById('projectName').textContent = window.location.host;
+  await Promise.all([loadDiagnostics(), loadErrors()]);
+}
+
+init();
+</script>
+</body>
+</html>
