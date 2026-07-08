@@ -83,10 +83,16 @@ You: "Apply vibe-diagnosis to this project"
 Install globally or use via npx:
 
 ```bash
-npx vibe-diag init          # Initialize .vibe-diagnosis/ + auto-configure MCP
-npx vibe-diag run           # Run all diagnostics
-npx vibe-diag run --json    # JSON output (for CI/CD)
-npx vibe-diag dashboard     # Open web dashboard
+npx vibe-diag init                        # Initialize .vibe-diagnosis/ + auto-configure MCP
+npx vibe-diag run                         # Run all diagnostics
+npx vibe-diag run --json                  # JSON output (for CI/CD)
+npx vibe-diag dashboard                   # Open web dashboard
+npx vibe-diag config get                  # Show BYOK configuration
+npx vibe-diag config set provider openai  # Set AI provider
+npx vibe-diag config set apiKey sk-...    # Set API key
+npx vibe-diag config set model gpt-4o     # Set model name
+npx vibe-diag repair <diagId>             # Auto-repair a specific diagnostic
+npx vibe-diag repair --all                # Auto-repair all failing diagnostics
 ```
 
 ### Writing a diagnostic
@@ -172,7 +178,7 @@ Open the dashboard and use the BYOK configuration bar at the top:
 3. Optionally set a **Model** (defaults are provided per provider)
 4. Click **Save** — settings are stored locally in `.vibe-diagnosis/config.json`
 
-Once configured, ERROR and WARNING diagnostic cards will show an **Auto Repair** button. Click it to send the diagnostic context to your AI provider and receive a suggested fix.
+Once configured, ERROR and WARNING diagnostic cards will show an **Auto Repair** button. Click it to automatically fix the issue using your AI provider.
 
 ### Environment Variable Override
 
@@ -199,12 +205,13 @@ Environment variables take precedence over `config.json` settings.
 Search `vibe-diagnosis` in VS Code Extensions Marketplace, or install from `.vsix`:
 
 1. `Ctrl+Shift+P` → "Install from VSIX..."
-2. Select `vibe-diagnosis-vscode-1.0.1.vsix`
+2. Select `vibe-diagnosis-vscode-1.1.0.vsix`
 
 **Commands:**
 - `Vibe Diagnosis: Run` — Run all diagnostics
 - `Vibe Diagnosis: Init` — Initialize project
 - `Vibe Diagnosis: Open Dashboard` — Open web dashboard
+- `Vibe Diagnosis: Auto Repair` — AI-powered auto-repair for failing diagnostics
 - Status bar shows health percentage
 
 ---

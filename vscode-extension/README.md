@@ -6,6 +6,7 @@ Self-diagnosis framework for vibe coding projects.
 
 - **Status Bar Health Indicator** — Shows project health percentage at a glance
 - **Run Diagnostics** — Execute all `.diag.js` files with one command
+- **Auto Repair** — AI-powered auto-repair for failing diagnostics (BYOK)
 - **Open Dashboard** — Visual web dashboard with one-click diagnosis
 - **Problems Panel** — ERROR/WARNING items appear in VS Code Problems panel
 
@@ -16,6 +17,7 @@ Self-diagnosis framework for vibe coding projects.
 | `Vibe Diagnosis: Run` | Run all diagnostics and show results |
 | `Vibe Diagnosis: Init` | Initialize .vibe-diagnosis/ in current project |
 | `Vibe Diagnosis: Open Dashboard` | Open web dashboard in browser |
+| `Vibe Diagnosis: Auto Repair` | AI-powered auto-repair for failing diagnostics |
 | `Vibe Diagnosis: Run (JSON)` | Output results as JSON |
 
 ## Quick Start
