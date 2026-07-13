@@ -22,9 +22,9 @@ If you are using AI coding assistants (such as Cursor, Windsurf, or Claude Deskt
 Just say this to your AI agent:
 > "Install the `vibe-diagnosis-mcp` package globally, register it as an MCP server, and strictly follow these rules for this project: 1) Run `run_diagnostics` after every completed task to verify correctness. 2) If any diagnostics fail, immediately use the repair tool or local `fix/heal` methods to restore the health score to 100%. 3) Automatically create a corresponding `.diag.js` file in `.vibe-diagnosis/diagnostics/` for any new task you perform. 4) Use `open_dashboard` to launch the visual dashboard when requested."
 
-#### For Existing Users (Update to latest v1.1.2)
+#### For Existing Users (Update to latest v1.2.0)
 If you already have `vibe-diagnosis-mcp` installed and want to update to the latest version to enjoy offline hybrid repairs and automated background dashboards, just say this to your AI agent:
-> "Force-update the `vibe-diagnosis-mcp` package to the latest version (v1.1.2) and reload the MCP settings."
+> "Force-update the `vibe-diagnosis-mcp` package to the latest version (v1.2.0) and reload the MCP settings."
 
 ### 1. Add MCP config
 
@@ -133,7 +133,7 @@ module.exports = {
 ### Output example
 
 ```
-  Vibe Diagnosis v1.1.2 — my-project
+  Vibe Diagnosis v1.2.0 — my-project
   ─────────────────────────────────────────
 
   TASK │ task-001-user-login       │ ✅ OK      │ Login flow verified

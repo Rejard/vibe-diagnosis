@@ -44,6 +44,14 @@ function isPortInUse(port) {
   });
 }
 
+async function findFreePort(startPort) {
+  let port = startPort;
+  while (await isPortInUse(port)) {
+    port++;
+  }
+  return port;
+}
+
 function startDashboardBackground(targetDir, port) {
   const binPath = path.join(__dirname, 'vibe-diag.js');
   const child = spawn(process.execPath, [binPath, 'dashboard', '--port', port.toString(), '--cwd', targetDir], {
@@ -62,17 +70,13 @@ function openBrowser(url) {
 }
 
 async function autoStartDashboardIfNeeded() {
-  const port = flags.port;
-  const inUse = await isPortInUse(port);
+  const hasExplicitPort = args.includes('--port');
+  const port = hasExplicitPort ? flags.port : await findFreePort(flags.port);
   const url = `http://localhost:${port}`;
 
-  if (inUse) {
-    openBrowser(url);
-  } else {
-    startDashboardBackground(targetDir, port);
-    await new Promise((resolve) => setTimeout(resolve, 800));
-    openBrowser(url);
-  }
+  startDashboardBackground(targetDir, port);
+  await new Promise((resolve) => setTimeout(resolve, 800));
+  openBrowser(url);
 }
 
 async function main() {
@@ -104,7 +108,9 @@ async function main() {
     }
     case 'dashboard': {
       const { startDashboard } = require('../src/dashboard');
-      startDashboard(targetDir, flags.port);
+      const hasExplicitPort = args.includes('--port');
+      const port = hasExplicitPort ? flags.port : await findFreePort(flags.port);
+      startDashboard(targetDir, port);
       break;
     }
     case 'config': {

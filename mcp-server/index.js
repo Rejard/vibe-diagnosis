@@ -39,7 +39,7 @@ const { repairDiagnostic } = core.repairer;
 
 const server = new McpServer({
   name: "vibe-diagnosis",
-  version: "1.1.1",
+  version: "1.2.0",
 });
 
 function isPortInUse(port) {
@@ -56,6 +56,14 @@ function isPortInUse(port) {
   });
 }
 
+async function findFreePort(startPort) {
+  let port = startPort;
+  while (await isPortInUse(port)) {
+    port++;
+  }
+  return port;
+}
+
 function openBrowser(url) {
   const cmd = process.platform === "win32" ? `start "" "${url}"`
     : process.platform === "darwin" ? `open "${url}"`
@@ -63,36 +71,58 @@ function openBrowser(url) {
   exec(cmd, { windowsHide: true });
 }
 
-async function autoStartDashboardIfNeeded(projectDir, port = 7700) {
-  const inUse = await isPortInUse(port);
+async function autoStartDashboardIfNeeded(projectDir, defaultPort = 7700, isExplicitPort = false) {
+  const port = isExplicitPort ? defaultPort : await findFreePort(defaultPort);
   const url = `http://localhost:${port}`;
 
-  if (inUse) {
-    openBrowser(url);
-  } else {
-    try {
-      let vibeDiagBin;
-      try {
-        vibeDiagBin = require.resolve("vibe-diagnosis/bin/vibe-diag.js");
-      } catch {
-        const currentFileUrl = new URL(import.meta.url);
-        const resolvedPath = currentFileUrl.pathname.replace(/^\/([A-Z]:)/, "$1");
-        vibeDiagBin = path.resolve(path.dirname(resolvedPath), "..", "bin", "vibe-diag.js");
-      }
+  try {
+    const candidates = [
+      "C:\\Users\\lemai\\AppData\\Roaming\\npm\\node_modules\\vibe-diagnosis\\bin\\vibe-diag.js",
+      "c:\\home\\vibe-diagnosis\\bin\\vibe-diag.js"
+    ];
 
-      // Spawn detached background process of vibe-diag CLI to run the dashboard independently
-      const child = spawn(process.execPath, [vibeDiagBin, "dashboard", "--cwd", projectDir, "--port", String(port)], {
+    let vibeDiagBin = null;
+    for (const cand of candidates) {
+      if (fs.existsSync(cand)) {
+        vibeDiagBin = cand;
+        break;
+      }
+    }
+
+    if (!vibeDiagBin) {
+      vibeDiagBin = "vibe-diag";
+    }
+
+    const isJsFile = vibeDiagBin.endsWith(".js");
+    const spawnCmd = isJsFile ? process.execPath : vibeDiagBin;
+    const spawnArgs = isJsFile
+      ? [vibeDiagBin, "dashboard", "--cwd", projectDir, "--port", String(port)]
+      : ["dashboard", "--cwd", projectDir, "--port", String(port)];
+
+    // Launch process securely in background using path-immune detached fork
+    if (process.platform === "win32") {
+      const cmd = `start "" /b "${spawnCmd}" ${spawnArgs.map(arg => `"${arg}"`).join(' ')}`;
+      exec(cmd, { windowsHide: true }, (error, stdout, stderr) => {
+        if (error || stderr) {
+          try {
+            fs.writeFileSync(path.join(projectDir, '.vibe-diagnosis', 'mcp-spawn-error.log'), `Cmd: ${cmd}\nError: ${error ? error.message : ''}\nStderr: ${stderr}\nStdout: ${stdout}`);
+          } catch (err) {}
+        }
+      });
+    } else {
+      const child = spawn(spawnCmd, spawnArgs, {
         windowsHide: true,
         detached: true,
         stdio: "ignore",
       });
       child.unref();
-    } catch (e) {
-      // Safe skip if background spawn fails
     }
-    await new Promise((resolve) => setTimeout(resolve, 1000));
-    openBrowser(url);
+  } catch (e) {
+    // Safe skip if background spawn fails
   }
+  await new Promise((resolve) => setTimeout(resolve, 1000));
+  openBrowser(url);
+  return port;
 }
 
 server.tool(
@@ -120,7 +150,7 @@ server.tool(
         summary.total > 0 ? Math.round((summary.ok / summary.total) * 100) : 100;
 
       if (autoLaunchDashboard) {
-        autoStartDashboardIfNeeded(projectDir, 7700).catch(() => {});
+        autoStartDashboardIfNeeded(projectDir, 7700, false).catch(() => {});
       }
 
       return {
@@ -213,6 +243,7 @@ server.tool(
           success: repairResult.success,
           summary: repairResult.summary,
           error: repairResult.error,
+          rerunResult: repairResult.rerunResult,
         });
       }
 
@@ -294,8 +325,7 @@ server.tool(
             delete require.cache[require.resolve(filePath)];
             mod = require(filePath);
           } catch (err) {
-            // Dynamic import fallback for secure ESM project diagnostic script loading
-            const fileUrl = require('url').pathToFileURL(filePath).href;
+            const fileUrl = require("url").pathToFileURL(filePath).href;
             const esmMod = await import(fileUrl);
             mod = esmMod.default || esmMod;
           }
@@ -425,14 +455,15 @@ server.tool(
   },
   async ({ projectDir, port }) => {
     try {
-      const dashboardPort = port || 7700;
-      await autoStartDashboardIfNeeded(projectDir, dashboardPort);
+      const isExplicit = typeof port === "number";
+      const defaultPort = port || 7700;
+      const actualPort = await autoStartDashboardIfNeeded(projectDir, defaultPort, isExplicit);
 
       return {
         content: [
           {
             type: "text",
-            text: `Dashboard opened at http://localhost:${dashboardPort}\nProject: ${projectDir}`,
+            text: `Dashboard opened at http://localhost:${actualPort}\nProject: ${projectDir}`,
           },
         ],
       };
