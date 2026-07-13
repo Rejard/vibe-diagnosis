@@ -20,7 +20,7 @@ Use one of these three paths. Most AI coding users should choose **MCP**.
 | Terminal or CI | [CLI](#cli) |
 | VS Code without an MCP client | [VS Code extension](#vs-code-extension) |
 
-> **Version note:** the VS Code extension is currently **1.2.4**. The published npm packages `vibe-diagnosis` (CLI) and `vibe-diagnosis-mcp` are currently **1.2.1**. They are separate packages, so their version numbers may differ.
+> **Version note:** the VS Code extension, `vibe-diagnosis` (CLI), and `vibe-diagnosis-mcp` are currently **1.2.4**.
 
 ### MCP setup (recommended)
 
@@ -112,7 +112,7 @@ module.exports = {
 ### Output example
 
 ```
-  Vibe Diagnosis v1.2.1 — my-project
+  Vibe Diagnosis v1.2.4 — my-project
   ─────────────────────────────────────────
 
   TASK │ task-001-user-login       │ ✅ OK      │ Login flow verified
