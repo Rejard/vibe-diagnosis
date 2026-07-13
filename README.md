@@ -14,6 +14,18 @@ When coding with AI agents, prove that your project works — with code.
 
 The fastest way to use vibe-diagnosis is through **MCP** (Model Context Protocol). Just add the config to your AI tool and start coding.
 
+### 🤖 AI Agent Quick Installation & Update
+
+If you are using AI coding assistants (such as Cursor, Windsurf, or Claude Desktop), you can ask your AI agent to automatically configure or update the MCP server for you.
+
+#### For New Users (First-time setup)
+Just say this to your AI agent:
+> "Install the `vibe-diagnosis-mcp` package globally and configure it as an MCP server in my agent's settings."
+
+#### For Existing Users (Update to latest v1.1.1)
+If you already have `vibe-diagnosis-mcp` installed and want to update to the latest version to enjoy offline hybrid repairs and automated background dashboards, just say this to your AI agent:
+> "Force-update the `vibe-diagnosis-mcp` package to the latest version (v1.1.1) and reload the MCP settings."
+
 ### 1. Add MCP config
 
 Add the following JSON block to your AI tool's config file:
