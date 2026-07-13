@@ -33,70 +33,88 @@ async function runDiagnostics(projectDir) {
     }];
   }
 
-  for (const filePath of files) {
-    const startTime = Date.now();
-    let mod;
+  let db = null;
+  try {
+    const { PrismaClient } = require('@prisma/client');
+    db = new PrismaClient();
+  } catch (err) {
+    // Prisma client is not available in the target project, which is fine
+  }
 
-    try {
-      delete require.cache[require.resolve(filePath)];
-      mod = require(filePath);
-    } catch (err) {
-      results.push({
-        id: path.basename(filePath, '.diag.js'),
-        name: path.basename(filePath),
-        layer: 'UNKNOWN',
-        status: 'ERROR',
-        details: `Failed to load: ${err.message}`,
-        duration: Date.now() - startTime,
-      });
-      continue;
-    }
+  try {
+    for (const filePath of files) {
+      const startTime = Date.now();
+      let mod;
 
-    const validation = validateDiagnosticModule(mod, filePath);
-    if (!validation.valid) {
-      results.push({
-        id: mod.id || path.basename(filePath, '.diag.js'),
-        name: mod.name || path.basename(filePath),
-        layer: mod.layer || 'UNKNOWN',
-        status: 'ERROR',
-        details: `Schema violation: ${validation.errors.join('; ')}`,
-        duration: Date.now() - startTime,
-      });
-      continue;
-    }
-
-    try {
-      const result = await mod.run({ projectDir });
-      const resultError = validateResult(result, mod.id);
-
-      if (resultError) {
+      try {
+        delete require.cache[require.resolve(filePath)];
+        mod = require(filePath);
+      } catch (err) {
         results.push({
-          id: mod.id,
-          name: mod.name,
-          layer: mod.layer,
-          ...resultError,
+          id: path.basename(filePath, '.diag.js'),
+          name: path.basename(filePath),
+          layer: 'UNKNOWN',
+          status: 'ERROR',
+          details: `Failed to load: ${err.message}`,
           duration: Date.now() - startTime,
         });
-      } else {
+        continue;
+      }
+
+      const validation = validateDiagnosticModule(mod, filePath);
+      if (!validation.valid) {
+        results.push({
+          id: mod.id || path.basename(filePath, '.diag.js'),
+          name: mod.name || path.basename(filePath),
+          layer: mod.layer || 'UNKNOWN',
+          status: 'ERROR',
+          details: `Schema violation: ${validation.errors.join('; ')}`,
+          duration: Date.now() - startTime,
+        });
+        continue;
+      }
+
+      try {
+        const result = await mod.run({ projectDir, db });
+        const resultError = validateResult(result, mod.id);
+
+        if (resultError) {
+          results.push({
+            id: mod.id,
+            name: mod.name,
+            layer: mod.layer,
+            ...resultError,
+            duration: Date.now() - startTime,
+          });
+        } else {
+          results.push({
+            id: mod.id,
+            name: mod.name,
+            layer: mod.layer,
+            linkedTask: mod.linkedTask || null,
+            status: result.status,
+            details: result.details || '',
+            duration: Date.now() - startTime,
+          });
+        }
+      } catch (err) {
         results.push({
           id: mod.id,
           name: mod.name,
           layer: mod.layer,
-          linkedTask: mod.linkedTask || null,
-          status: result.status,
-          details: result.details || '',
+          status: 'ERROR',
+          details: `Runtime error: ${err.message}`,
           duration: Date.now() - startTime,
         });
       }
-    } catch (err) {
-      results.push({
-        id: mod.id,
-        name: mod.name,
-        layer: mod.layer,
-        status: 'ERROR',
-        details: `Runtime error: ${err.message}`,
-        duration: Date.now() - startTime,
-      });
+    }
+  } finally {
+    if (db && typeof db.$disconnect === 'function') {
+      try {
+        await db.$disconnect();
+      } catch (err) {
+        // Safe disconnection handling
+      }
     }
   }
 

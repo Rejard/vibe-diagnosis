@@ -1,6 +1,8 @@
 #!/usr/bin/env node
 
 const path = require('path');
+const net = require('net');
+const { spawn, exec } = require('child_process');
 
 const args = process.argv.slice(2);
 const command = args[0];
@@ -24,6 +26,55 @@ if (portIndex !== -1 && args[portIndex + 1]) {
 
 const targetDir = flags.cwd || process.cwd();
 
+function isPortInUse(port) {
+  return new Promise((resolve) => {
+    const server = net.createServer();
+    server.once('error', (err) => {
+      if (err.code === 'EADDRINUSE') {
+        resolve(true);
+      } else {
+        resolve(false);
+      }
+    });
+    server.once('listening', () => {
+      server.close();
+      resolve(false);
+    });
+    server.listen(port);
+  });
+}
+
+function startDashboardBackground(targetDir, port) {
+  const binPath = path.join(__dirname, 'vibe-diag.js');
+  const child = spawn(process.execPath, [binPath, 'dashboard', '--port', port.toString(), '--cwd', targetDir], {
+    detached: true,
+    stdio: 'ignore',
+    windowsHide: true,
+  });
+  child.unref();
+}
+
+function openBrowser(url) {
+  const cmd = process.platform === 'win32' ? `start "" "${url}"`
+    : process.platform === 'darwin' ? `open "${url}"`
+    : `xdg-open "${url}"`;
+  exec(cmd, { windowsHide: true });
+}
+
+async function autoStartDashboardIfNeeded() {
+  const port = flags.port;
+  const inUse = await isPortInUse(port);
+  const url = `http://localhost:${port}`;
+
+  if (inUse) {
+    openBrowser(url);
+  } else {
+    startDashboardBackground(targetDir, port);
+    await new Promise((resolve) => setTimeout(resolve, 800));
+    openBrowser(url);
+  }
+}
+
 async function main() {
   switch (command) {
     case 'init': {
@@ -34,6 +85,10 @@ async function main() {
     case 'run': {
       const { runDiagnostics } = require('../src/runner');
       const { formatResults, formatResultsJson } = require('../src/reporter');
+
+      if (!flags.json) {
+        autoStartDashboardIfNeeded().catch(() => {});
+      }
 
       const results = await runDiagnostics(targetDir);
 
@@ -60,6 +115,12 @@ async function main() {
       await handleRepair();
       break;
     }
+    case 'heal': {
+      flags.all = true;
+      autoStartDashboardIfNeeded().catch(() => {});
+      await handleRepair();
+      break;
+    }
     default: {
       const pkg = require('../package.json');
       console.log(`\n  Vibe Diagnosis v${pkg.version}\n`);
@@ -73,6 +134,7 @@ async function main() {
       console.log('    vibe-diag config set <key> <value>  Set BYOK config (provider, apiKey, model)');
       console.log('    vibe-diag repair <diagId>      Auto-repair a specific diagnostic with AI');
       console.log('    vibe-diag repair --all         Auto-repair all failing diagnostics');
+      console.log('    vibe-diag heal                 Auto-heal all failing diagnostics (local or AI)');
       console.log('    vibe-diag --cwd <path>        Run in specified directory\n');
     }
   }

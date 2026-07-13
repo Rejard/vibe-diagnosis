@@ -169,6 +169,70 @@ async function rerunSingleDiagnostic(projectDir, diagId) {
 }
 
 async function repairDiagnostic(projectDir, diagResult) {
+  const diagFiles = discoverDiagnostics(projectDir);
+  const matchingDiag = diagFiles.find(f => path.basename(f, '.diag.js') === diagResult.id);
+
+  if (matchingDiag && fs.existsSync(matchingDiag)) {
+    try {
+      delete require.cache[require.resolve(matchingDiag)];
+      const mod = require(matchingDiag);
+      const localFix = mod.fix || mod.heal;
+
+      if (typeof localFix === 'function') {
+        let db = null;
+        try {
+          const { PrismaClient } = require('@prisma/client');
+          db = new PrismaClient();
+        } catch (err) {
+          // Prisma client is not available in the target project, which is fine
+        }
+
+        try {
+          await localFix({ projectDir, db });
+        } catch (err) {
+          return {
+            success: false,
+            diagId: diagResult.id,
+            filesModified: [],
+            backupFiles: [],
+            summary: 'Local fix/heal execution failed.',
+            rerunResult: null,
+            error: `Local fix error: ${err.message}`,
+          };
+        } finally {
+          if (db && typeof db.$disconnect === 'function') {
+            try {
+              await db.$disconnect();
+            } catch (err) {
+              // Safe disconnection handling
+            }
+          }
+        }
+
+        const rerunResult = await rerunSingleDiagnostic(projectDir, diagResult.id);
+        return {
+          success: rerunResult?.status === 'OK',
+          diagId: diagResult.id,
+          filesModified: [],
+          backupFiles: [],
+          summary: "Locally healed using diagnostic's custom fix/heal method.",
+          rerunResult,
+          error: null,
+        };
+      }
+    } catch (err) {
+      return {
+        success: false,
+        diagId: diagResult.id,
+        filesModified: [],
+        backupFiles: [],
+        summary: 'Local loader failed.',
+        rerunResult: null,
+        error: `Failed to load or execute local repair: ${err.message}`,
+      };
+    }
+  }
+
   const byok = getResolvedByok(projectDir);
 
   if (!byok.provider || !byok.apiKey || !byok.model) {
