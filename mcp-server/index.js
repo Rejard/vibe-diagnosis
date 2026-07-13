@@ -6,6 +6,8 @@ import { z } from "zod";
 import { createRequire } from "module";
 import fs from "fs";
 import path from "path";
+import net from "net";
+import { exec, spawn } from "child_process";
 
 const require = createRequire(import.meta.url);
 
@@ -15,12 +17,16 @@ function loadCore() {
       runner: require("vibe-diagnosis/src/runner"),
       schema: require("vibe-diagnosis/src/schema"),
       init: require("vibe-diagnosis/src/init"),
+      repairer: require("vibe-diagnosis/src/repairer"),
+      dashboard: require("vibe-diagnosis/src/dashboard"),
     };
   } catch {
     return {
       runner: require("../src/runner"),
       schema: require("../src/schema"),
       init: require("../src/init"),
+      repairer: require("../src/repairer"),
+      dashboard: require("../src/dashboard"),
     };
   }
 }
@@ -29,19 +35,74 @@ const core = loadCore();
 const { runDiagnostics, discoverDiagnostics } = core.runner;
 const { validateDiagnosticModule } = core.schema;
 const { initialize } = core.init;
+const { repairDiagnostic } = core.repairer;
 
 const server = new McpServer({
   name: "vibe-diagnosis",
-  version: "1.1.0",
+  version: "1.1.1",
 });
+
+function isPortInUse(port) {
+  return new Promise((resolve) => {
+    const srv = net.createServer();
+    srv.once("error", (err) => {
+      resolve(err.code === "EADDRINUSE");
+    });
+    srv.once("listening", () => {
+      srv.close();
+      resolve(false);
+    });
+    srv.listen(port);
+  });
+}
+
+function openBrowser(url) {
+  const cmd = process.platform === "win32" ? `start "" "${url}"`
+    : process.platform === "darwin" ? `open "${url}"`
+    : `xdg-open "${url}"`;
+  exec(cmd, { windowsHide: true });
+}
+
+async function autoStartDashboardIfNeeded(projectDir, port = 7700) {
+  const inUse = await isPortInUse(port);
+  const url = `http://localhost:${port}`;
+
+  if (inUse) {
+    openBrowser(url);
+  } else {
+    try {
+      let vibeDiagBin;
+      try {
+        vibeDiagBin = require.resolve("vibe-diagnosis/bin/vibe-diag.js");
+      } catch {
+        const currentFileUrl = new URL(import.meta.url);
+        const resolvedPath = currentFileUrl.pathname.replace(/^\/([A-Z]:)/, "$1");
+        vibeDiagBin = path.resolve(path.dirname(resolvedPath), "..", "bin", "vibe-diag.js");
+      }
+
+      // Spawn detached background process of vibe-diag CLI to run the dashboard independently
+      const child = spawn(process.execPath, [vibeDiagBin, "dashboard", "--cwd", projectDir, "--port", String(port)], {
+        windowsHide: true,
+        detached: true,
+        stdio: "ignore",
+      });
+      child.unref();
+    } catch (e) {
+      // Safe skip if background spawn fails
+    }
+    await new Promise((resolve) => setTimeout(resolve, 1000));
+    openBrowser(url);
+  }
+}
 
 server.tool(
   "run_diagnostics",
-  "Run all .diag.js diagnostics in the project and return structured results with OK/WARNING/ERROR status and health percentage. Trigger: 자가진단 실행, 진단 돌려줘, run diagnostics",
+  "Run all .diag.js diagnostics in the project, automatically boot up the dashboard server and open user's browser, returning structured results. Trigger: 자가진단 실행, 진단 돌려줘, run diagnostics",
   {
     projectDir: z.string().describe("Absolute path to the project root directory containing .vibe-diagnosis/"),
+    autoLaunchDashboard: z.boolean().optional().default(true).describe("Whether to automatically start the dashboard server and launch browser"),
   },
-  async ({ projectDir }) => {
+  async ({ projectDir, autoLaunchDashboard }) => {
     try {
       const results = await runDiagnostics(projectDir);
 
@@ -57,6 +118,10 @@ server.tool(
 
       const healthPercent =
         summary.total > 0 ? Math.round((summary.ok / summary.total) * 100) : 100;
+
+      if (autoLaunchDashboard) {
+        autoStartDashboardIfNeeded(projectDir, 7700).catch(() => {});
+      }
 
       return {
         content: [
@@ -80,8 +145,97 @@ server.tool(
 );
 
 server.tool(
+  "repair_diagnostic",
+  "Auto-repair a specific failed diagnostic using either local fix/heal business methods or AI BYOK reasoning. Trigger: 자가치유 실행, repair diagnostic",
+  {
+    projectDir: z.string().describe("Absolute path to the project root directory"),
+    diagId: z.string().describe("Diagnostic ID to repair (e.g. wallet-transaction-integrity)"),
+  },
+  async ({ projectDir, diagId }) => {
+    try {
+      const results = await runDiagnostics(projectDir);
+      const target = results.find((r) => r.id === diagId);
+
+      if (!target) {
+        return {
+          content: [{ type: "text", text: `Diagnostic "${diagId}" not found in current project.` }],
+          isError: true,
+        };
+      }
+
+      if (target.status === "OK") {
+        return {
+          content: [{ type: "text", text: `Diagnostic "${diagId}" is already healthy and OK.` }],
+        };
+      }
+
+      const repairResult = await repairDiagnostic(projectDir, target);
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify(repairResult, null, 2),
+          },
+        ],
+      };
+    } catch (err) {
+      return {
+        content: [{ type: "text", text: `Error repairing diagnostic "${diagId}": ${err.message}` }],
+        isError: true,
+      };
+    }
+  }
+);
+
+server.tool(
+  "heal_all",
+  "Auto-repair and self-heal all failing diagnostics in the project automatically in sequence. Trigger: 자가치유 전수 실행, heal all failing diagnostics",
+  {
+    projectDir: z.string().describe("Absolute path to the project root directory"),
+  },
+  async ({ projectDir }) => {
+    try {
+      const results = await runDiagnostics(projectDir);
+      const failing = results.filter((r) => r.status === "ERROR" || r.status === "WARNING");
+
+      if (failing.length === 0) {
+        return {
+          content: [{ type: "text", text: "All diagnostics are healthy. Nothing to heal." }],
+        };
+      }
+
+      const repairResults = [];
+      for (const target of failing) {
+        const repairResult = await repairDiagnostic(projectDir, target);
+        repairResults.push({
+          id: target.id,
+          success: repairResult.success,
+          summary: repairResult.summary,
+          error: repairResult.error,
+        });
+      }
+
+      return {
+        content: [
+          {
+            type: "text",
+            text: JSON.stringify({ healedCount: repairResults.filter(r => r.success).length, details: repairResults }, null, 2),
+          },
+        ],
+      };
+    } catch (err) {
+      return {
+        content: [{ type: "text", text: `Error healing all diagnostics: ${err.message}` }],
+        isError: true,
+      };
+    }
+  }
+);
+
+server.tool(
   "init_diagnostics",
-  "Initialize .vibe-diagnosis/ directory structure in a project with config, example diagnostic, and error pattern template. Trigger: 자가진단 적용, 자가진단 MCP 적용, 자가진단 초기화, vibe-diagnosis init",
+  "Initialize .vibe-diagnosis/ directory structure in a project. Trigger: 자가진단 초기화, vibe-diagnosis init",
   {
     projectDir: z.string().describe("Absolute path to the project root directory"),
   },
@@ -91,12 +245,7 @@ server.tool(
 
       if (fs.existsSync(diagRoot)) {
         return {
-          content: [
-            {
-              type: "text",
-              text: `.vibe-diagnosis/ already exists in ${projectDir}`,
-            },
-          ],
+          content: [{ type: "text", text: `.vibe-diagnosis/ already exists in ${projectDir}` }],
         };
       }
 
@@ -108,7 +257,7 @@ server.tool(
         content: [
           {
             type: "text",
-            text: `Initialized .vibe-diagnosis/ in ${projectDir}\n\nCreated:\n- .vibe-diagnosis/config.json\n- .vibe-diagnosis/diagnostics/example.diag.js\n- .vibe-diagnosis/error-patterns/ERR_000_template.md`,
+            text: `Initialized .vibe-diagnosis/ in ${projectDir}`,
           },
         ],
       };
@@ -123,7 +272,7 @@ server.tool(
 
 server.tool(
   "list_diagnostics",
-  "List all diagnostic files (.diag.js) in the project with their metadata (id, name, layer)",
+  "List all diagnostic files (.diag.js) in the project with their metadata",
   {
     projectDir: z.string().describe("Absolute path to the project root directory"),
   },
@@ -133,20 +282,23 @@ server.tool(
 
       if (files.length === 0) {
         return {
-          content: [
-            {
-              type: "text",
-              text: "No .diag.js files found in .vibe-diagnosis/diagnostics/",
-            },
-          ],
+          content: [{ type: "text", text: "No .diag.js files found in .vibe-diagnosis/diagnostics/" }],
         };
       }
 
       const diagnostics = [];
       for (const filePath of files) {
         try {
-          delete require.cache[require.resolve(filePath)];
-          const mod = require(filePath);
+          let mod;
+          try {
+            delete require.cache[require.resolve(filePath)];
+            mod = require(filePath);
+          } catch (err) {
+            // Dynamic import fallback for secure ESM project diagnostic script loading
+            const fileUrl = require('url').pathToFileURL(filePath).href;
+            const esmMod = await import(fileUrl);
+            mod = esmMod.default || esmMod;
+          }
           const validation = validateDiagnosticModule(mod, filePath);
           diagnostics.push({
             file: path.basename(filePath),
@@ -189,7 +341,7 @@ server.tool(
     filename: z
       .string()
       .optional()
-      .describe("Specific error pattern filename (e.g. ERR_001_division_nan.md). If omitted, lists all available patterns"),
+      .describe("Specific error pattern filename. If omitted, lists all available patterns"),
   },
   async ({ projectDir, filename }) => {
     try {
@@ -237,12 +389,10 @@ server.tool(
 
 server.tool(
   "write_error_pattern",
-  "Create or update an error pattern log in .vibe-diagnosis/error-patterns/ to prevent repeating the same mistakes",
+  "Create or update an error pattern log in .vibe-diagnosis/error-patterns/",
   {
     projectDir: z.string().describe("Absolute path to the project root directory"),
-    filename: z
-      .string()
-      .describe("Error pattern filename (e.g. ERR_002_null_reference.md)"),
+    filename: z.string().describe("Error pattern filename (e.g. ERR_002_null_reference.md)"),
     content: z.string().describe("Markdown content for the error pattern log"),
   },
   async ({ projectDir, filename, content }) => {
@@ -255,12 +405,7 @@ server.tool(
       fs.writeFileSync(filePath, content, "utf-8");
 
       return {
-        content: [
-          {
-            type: "text",
-            text: `${existed ? "Updated" : "Created"} error pattern: ${filename}`,
-          },
-        ],
+        content: [{ type: "text", text: `${existed ? "Updated" : "Created"} error pattern: ${filename}` }],
       };
     } catch (err) {
       return {
@@ -273,7 +418,7 @@ server.tool(
 
 server.tool(
   "open_dashboard",
-  "Open the Vibe Diagnosis web dashboard in the browser. Shows all diagnostics as visual cards with a Run button for one-click verification. Trigger: 대시보드 열어줘, 자가진단 대시보드, dashboard",
+  "Open the Vibe Diagnosis web dashboard in the browser. Trigger: 대시보드 열어줘, dashboard",
   {
     projectDir: z.string().describe("Absolute path to the project root directory"),
     port: z.number().optional().describe("Port number (default: 7700)"),
@@ -281,26 +426,7 @@ server.tool(
   async ({ projectDir, port }) => {
     try {
       const dashboardPort = port || 7700;
-      const { spawn } = await import("child_process");
-
-      let vibeDiagBin;
-      try {
-        vibeDiagBin = require.resolve("vibe-diagnosis/bin/vibe-diag.js");
-      } catch {
-        vibeDiagBin = path.resolve(
-          path.dirname(new URL(import.meta.url).pathname.replace(/^\/([A-Z]:)/, "$1")),
-          "..",
-          "bin",
-          "vibe-diag.js"
-        );
-      }
-
-      const child = spawn("node", [vibeDiagBin, "dashboard", "--cwd", projectDir, "--port", String(dashboardPort)], {
-        windowsHide: true,
-        detached: true,
-        stdio: "ignore",
-      });
-      child.unref();
+      await autoStartDashboardIfNeeded(projectDir, dashboardPort);
 
       return {
         content: [
@@ -321,4 +447,3 @@ server.tool(
 
 const transport = new StdioServerTransport();
 await server.connect(transport);
-

@@ -174,8 +174,15 @@ async function repairDiagnostic(projectDir, diagResult) {
 
   if (matchingDiag && fs.existsSync(matchingDiag)) {
     try {
-      delete require.cache[require.resolve(matchingDiag)];
-      const mod = require(matchingDiag);
+      let mod;
+      try {
+        delete require.cache[require.resolve(matchingDiag)];
+        mod = require(matchingDiag);
+      } catch (err) {
+        const fileUrl = require('url').pathToFileURL(matchingDiag).href;
+        const esmMod = await import(fileUrl);
+        mod = esmMod.default || esmMod;
+      }
       const localFix = mod.fix || mod.heal;
 
       if (typeof localFix === 'function') {

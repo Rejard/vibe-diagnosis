@@ -50,15 +50,21 @@ async function runDiagnostics(projectDir) {
         delete require.cache[require.resolve(filePath)];
         mod = require(filePath);
       } catch (err) {
-        results.push({
-          id: path.basename(filePath, '.diag.js'),
-          name: path.basename(filePath),
-          layer: 'UNKNOWN',
-          status: 'ERROR',
-          details: `Failed to load: ${err.message}`,
-          duration: Date.now() - startTime,
-        });
-        continue;
+        try {
+          const fileUrl = require('url').pathToFileURL(filePath).href;
+          const esmMod = await import(fileUrl);
+          mod = esmMod.default || esmMod;
+        } catch (esmErr) {
+          results.push({
+            id: path.basename(filePath, '.diag.js'),
+            name: path.basename(filePath),
+            layer: 'UNKNOWN',
+            status: 'ERROR',
+            details: `Failed to load: ${err.message}`,
+            duration: Date.now() - startTime,
+          });
+          continue;
+        }
       }
 
       const validation = validateDiagnosticModule(mod, filePath);
