@@ -10,45 +10,21 @@ When coding with AI agents, prove that your project works — with code.
 
 ---
 
-## 🚀 Quick Start (MCP — Easiest)
+## 🚀 Start here
 
-The fastest way to use vibe-diagnosis is through **MCP** (Model Context Protocol). Just add the config to your AI tool and start coding.
+Use one of these three paths. Most AI coding users should choose **MCP**.
 
-> [!IMPORTANT]
-> **Required agent workflow for dashboard work**
->
-> Before starting any dashboard UI, dashboard API, dashboard data, or dashboard bug-fix task, the agent **must call `open_dashboard` first**. This starts the Vibe Diagnosis web dashboard server on `http://localhost:7700` (or the next available local port) and opens it in the browser. Installing the MCP server alone does **not** start this web server.
->
-> First inspect the available checks with `list_diagnostics`. If the current diagnostic list does not cover the dashboard task, the agent **must add a relevant `.diag.js` diagnostic** under `.vibe-diagnosis/diagnostics/` and use it to verify the work. After every completed task, the agent must run `run_diagnostics` and address failures before declaring the work complete.
+| What you use | Start with |
+|---|---|
+| Cursor, Claude Desktop, Gemini, Windsurf, or another MCP client | [MCP setup](#mcp-setup-recommended) |
+| Terminal or CI | [CLI](#cli) |
+| VS Code without an MCP client | [VS Code extension](#vs-code-extension) |
 
-### Copy-and-paste dashboard workflow
+> **Version note:** the VS Code extension is currently **1.2.4**. The published npm packages `vibe-diagnosis` (CLI) and `vibe-diagnosis-mcp` are currently **1.2.1**. They are separate packages, so their version numbers may differ.
 
-Use these requests in order when asking an AI agent to work on a dashboard:
+### MCP setup (recommended)
 
-1. `Open the Vibe Diagnosis dashboard for this project before starting dashboard work.`
-   - Expected tool: `open_dashboard` → starts the local dashboard server at `http://localhost:7700` (or the next free port).
-2. `List the current diagnostics and identify which checks cover this dashboard task.`
-   - Expected tool: `list_diagnostics`.
-3. `If no diagnostic covers this task, add a relevant .diag.js diagnostic and use it to verify the dashboard change.`
-   - Expected result: a new check in `.vibe-diagnosis/diagnostics/`.
-4. `Complete the dashboard task, run the full self-diagnosis, and fix any failed diagnostics before reporting completion.`
-   - Expected tool: `run_diagnostics` → verifies the project and keeps the dashboard available.
-
-### 🤖 AI Agent Quick Installation & Update
-
-If you are using AI coding assistants (such as Cursor, Windsurf, or Claude Desktop), you can ask your AI agent to automatically configure or update the MCP server for you.
-
-#### For New Users (First-time setup)
-Just say this to your AI agent:
-> "Install the `vibe-diagnosis-mcp` package globally, register it as an MCP server, and strictly follow these rules for this project: 1) Before starting any dashboard UI, dashboard API, dashboard data, or dashboard bug-fix task, always call `open_dashboard` to start the Vibe Diagnosis web dashboard server and open it in the browser. 2) Before work, inspect checks with `list_diagnostics`; if the task is not covered, create a relevant `.diag.js` file in `.vibe-diagnosis/diagnostics/` and use it for verification. 3) Run `run_diagnostics` after every completed task to verify correctness. 4) If any diagnostics fail, immediately use the repair tool or local `fix/heal` methods to restore the health score to 100%."
-
-#### For Existing Users (Update to latest v1.2.1)
-If you already have `vibe-diagnosis-mcp` installed and want to update to the latest version to enjoy offline hybrid repairs and automated background dashboards, just say this to your AI agent:
-> "Force-update the `vibe-diagnosis-mcp` package to the latest version (v1.2.1) and reload the MCP settings."
-
-### 1. Add MCP config
-
-Add the following JSON block to your AI tool's config file:
+1. Add this configuration to your AI tool's MCP settings. `npx` downloads and runs the MCP package automatically; a global install is not required.
 
 | AI Tool | Config File Path |
 |---|---|
@@ -68,63 +44,46 @@ Add the following JSON block to your AI tool's config file:
 }
 ```
 
-### 2. Tell your AI agent
+2. Restart or reload your AI tool so it discovers the `vibe-diagnosis` MCP server.
 
-> "Apply vibe-diagnosis to this project"
+3. Copy and send this one request to the AI agent:
 
-Done. The AI will initialize diagnostics, generate `.diag.js` files, and open the dashboard automatically.
+> `Set up Vibe Diagnosis for this project. Initialize diagnostics, create any diagnostics needed for the work, and run the full self-diagnosis when the work is complete.`
+
+That is enough for normal work. The agent should use `init_diagnostics` once, create or extend `.diag.js` checks when needed, then use `run_diagnostics` to verify the result.
+
+### Dashboard work: copy this request
+
+> `Before starting this dashboard task, call open_dashboard. Review the diagnostic list, add a relevant .diag.js check if this task is not covered, complete the work, then run diagnostics and fix failures before reporting completion.`
+
+`open_dashboard` starts the web dashboard at `http://localhost:7700` (or the next available local port). **Installing or connecting MCP alone does not start the web dashboard.**
+
+### The only phrases you need
+
+| Say to the agent | Expected MCP action |
+|---|---|
+| `Set up Vibe Diagnosis for this project.` | `init_diagnostics` |
+| `Run self-diagnosis.` | `run_diagnostics` |
+| `Open the diagnosis dashboard.` | `open_dashboard` |
+| `Show the diagnostic list.` | `list_diagnostics` |
 
 ---
 
-## 💬 Quick Triggers
-
-Once MCP is installed, just talk to your AI:
-
-### English
-
-| Say this | What happens |
-|---|---|
-| "Apply vibe-diagnosis to this project" | `init_diagnostics` → setup + generate diagnostics + dashboard |
-| "Run diagnostics" | `run_diagnostics` → run all checks |
-| "Open diagnosis dashboard" | `open_dashboard` → browser dashboard |
-| "Write error pattern" | `write_error_pattern` → log error pattern |
-
-### 한국어
-
-| 말하기 | 실행 결과 |
-|---|---|
-| "자가진단 MCP 적용해줘" | `init_diagnostics` → 초기화 + 진단 생성 + 대시보드 |
-| "자가진단 실행해줘" | `run_diagnostics` → 전체 진단 실행 |
-| "대시보드 열어줘" | `open_dashboard` → 브라우저 대시보드 |
-| "진단 돌려줘" | `run_diagnostics` → 결과 요약 |
-
-### Example Workflow
-
-```
-You: "Apply vibe-diagnosis to this project"
- AI: → init_diagnostics          ← .vibe-diagnosis/ created
- AI: → generates .diag.js files  ← diagnostics for existing code
- AI: → open_dashboard            ← browser opens http://localhost:7700
- AI: → run_diagnostics           ← Health 100% ✅
-```
-
----
-
-## 📦 CLI
+## CLI
 
 Install globally or use via npx:
 
 ```bash
-npx vibe-diag init                        # Initialize .vibe-diagnosis/ + auto-configure MCP
-npx vibe-diag run                         # Run all diagnostics
-npx vibe-diag run --json                  # JSON output (for CI/CD)
-npx vibe-diag dashboard                   # Open web dashboard
-npx vibe-diag config get                  # Show BYOK configuration
-npx vibe-diag config set provider openai  # Set AI provider
-npx vibe-diag config set apiKey sk-...    # Set API key
-npx vibe-diag config set model gpt-4o     # Set model name
-npx vibe-diag repair <diagId>             # Auto-repair a specific diagnostic
-npx vibe-diag repair --all                # Auto-repair all failing diagnostics
+npx -y vibe-diagnosis init                        # Initialize .vibe-diagnosis/
+npx -y vibe-diagnosis run                         # Run all diagnostics
+npx -y vibe-diagnosis run --json                  # JSON output (for CI/CD)
+npx -y vibe-diagnosis dashboard                   # Open web dashboard
+npx -y vibe-diagnosis config get                  # Show BYOK configuration
+npx -y vibe-diagnosis config set provider openai  # Set AI provider
+npx -y vibe-diagnosis config set apiKey sk-...    # Set API key
+npx -y vibe-diagnosis config set model gpt-4o     # Set model name
+npx -y vibe-diagnosis repair <diagId>             # Auto-repair a specific diagnostic
+npx -y vibe-diagnosis repair --all                # Auto-repair all failing diagnostics
 ```
 
 ### Writing a diagnostic
@@ -170,8 +129,8 @@ module.exports = {
 ## 🖥️ Web Dashboard
 
 ```bash
-npx vibe-diag dashboard            # http://localhost:7700
-npx vibe-diag dashboard --port 8080
+npx -y vibe-diagnosis dashboard            # http://localhost:7700
+npx -y vibe-diagnosis dashboard --port 8080
 ```
 
 Features:
@@ -237,7 +196,7 @@ Environment variables take precedence over `config.json` settings.
 Search `vibe-diagnosis` in VS Code Extensions Marketplace, or install from `.vsix`:
 
 1. `Ctrl+Shift+P` → "Install from VSIX..."
-2. Select `vibe-diagnosis-vscode-1.1.0.vsix`
+2. Select the downloaded `vibe-diagnosis-vscode-1.2.4.vsix` file.
 
 **Commands:**
 - `Vibe Diagnosis: Run` — Run all diagnostics

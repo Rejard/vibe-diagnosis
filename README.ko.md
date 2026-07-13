@@ -2,53 +2,27 @@
 
 **바이브코딩 프로젝트를 위한 자가 진단 프레임워크**
 
-> [!IMPORTANT]
-> ## 필수: 대시보드 작업 전 자가진단 대시보드 서버 실행
->
-> 대시보드 UI, 대시보드 API, 대시보드 데이터, 대시보드 버그 수정 작업을 시작하기 전에는 에이전트가 반드시 `open_dashboard`를 먼저 호출해야 합니다. 이 호출은 Vibe Diagnosis 웹 대시보드 서버를 `http://localhost:7700`(이미 사용 중이면 다음 빈 로컬 포트)에 실행하고 브라우저에서 엽니다. **MCP를 설치하거나 연결한 것만으로는 이 웹 서버가 실행되지 않습니다.**
->
-> 작업 전에 `list_diagnostics`로 현재 진단 목록을 확인하세요. 목록에 해당 대시보드 작업을 검증할 진단이 없다면, 에이전트는 `.vibe-diagnosis/diagnostics/`에 목적에 맞는 `.diag.js` 진단을 추가하고 작업 검증에 사용해야 합니다. 모든 작업 완료 후에는 반드시 `run_diagnostics`를 실행하고, 실패 항목을 해결한 뒤에 완료로 보고해야 합니다.
-
-### 대시보드 작업용 복사-붙여넣기 트리거 순서
-
-AI 에이전트에게 대시보드 작업을 요청할 때 아래 문장을 순서대로 복사해 사용할 수 있습니다.
-
-1. `대시보드 작업을 시작하기 전에 이 프로젝트의 Vibe Diagnosis 자가진단 대시보드를 열어줘.`
-   - 실행 도구: `open_dashboard` → `http://localhost:7700`(이미 사용 중이면 다음 빈 포트)에 로컬 서버를 실행합니다.
-2. `현재 자가진단 목록을 보여주고, 이번 대시보드 작업을 검증할 진단이 무엇인지 확인해줘.`
-   - 실행 도구: `list_diagnostics`.
-3. `이번 작업을 검증할 진단이 없다면 관련 .diag.js 진단을 추가하고, 대시보드 변경 검증에 활용해줘.`
-   - 기대 결과: `.vibe-diagnosis/diagnostics/`에 새 진단이 추가됩니다.
-4. `대시보드 작업을 완료한 뒤 전체 자가진단을 실행하고, 실패한 진단을 모두 해결한 후 완료를 보고해줘.`
-   - 실행 도구: `run_diagnostics` → 프로젝트를 검증하고 대시보드를 계속 사용할 수 있게 합니다.
-
 AI 에이전트와 함께 코딩할 때, "지금 이 프로젝트가 정상인가?"를 코드로 증명합니다.
-
-> **핵심 원칙 — Task ↔ Diagnostic 1:1 매핑**: 작업(Task)이 완료되면, 그 작업이 정상 동작함을 검증하는 진단(Diagnostic)이 반드시 함께 생성되어야 합니다.
 
 [English README](./README.md)
 
 ---
 
-## 🚀 빠른 시작 (MCP — 가장 쉬움)
+## 🚀 여기서 시작하세요
 
-AI 도구의 설정 파일에 아래 JSON을 추가하면 끝입니다.
+아래 세 가지 중 하나를 선택하면 됩니다. AI 코딩 도구를 사용한다면 **MCP 방식**을 권장합니다.
 
-### 🤖 AI 에이전트를 통한 빠른 설치 및 업데이트
+| 사용 환경 | 시작 방법 |
+|---|---|
+| Cursor, Claude Desktop, Gemini, Windsurf 등 MCP 지원 AI 도구 | [MCP 설정](#mcp-설정-권장) |
+| 터미널 또는 CI | [CLI](#cli) |
+| MCP를 쓰지 않는 VS Code | [VS Code 확장](#vs-code-확장) |
 
-Cursor, Windsurf, Claude Desktop 등 AI 코딩 어시스턴트를 사용 중이시라면, 본인의 AI 에이전트에게 지시하여 MCP 서버를 자동으로 구성하거나 업데이트할 수 있습니다.
+> **버전 안내:** VS Code 확장은 현재 **1.2.4**입니다. npm의 `vibe-diagnosis`(CLI)와 `vibe-diagnosis-mcp` 패키지는 현재 **1.2.1**입니다. 별도 패키지이므로 버전 번호가 다를 수 있습니다.
 
-#### 신규 사용자 (최초 설치 및 연동)
-AI 에이전트에게 채팅창으로 다음과 같이 지시하세요:
-> "`vibe-diagnosis-mcp` 패키지를 글로벌 설치하고 내 AI 에이전트 설정에 MCP 서버로 등록해 줘. 그리고 이 프로젝트에서는 앞으로 다음 자가진단 규칙을 엄격히 준수해 줘: 1) 매 작업(Task) 완료 직후 반드시 `run_diagnostics` 도구를 돌려 정상 작동 여부를 스스로 검증할 것. 2) 진단 실패(ERROR/WARNING) 발견 시 즉시 자가치유 코드(fix/heal)나 AI 복구를 실행하여 건강도 100%를 회복시킬 것. 3) 새로 수행한 작업에 대응하는 `.diag.js` 진단 스크립트를 `.vibe-diagnosis/diagnostics/` 경로에 함께 작성할 것. 4) 필요에 따라 `open_dashboard`로 대시보드를 열어 진행 상황을 모니터링할 것."
+### MCP 설정 (권장)
 
-#### 기존 사용자 (최신 v1.2.1 버전으로 업데이트)
-이미 `vibe-diagnosis-mcp`를 사용 중이며, 이번에 새로 탑재된 오프라인 하이브리드 로컬 복구 및 대시보드 자동 기동 기능을 사용하기 위해 최신 버전으로 업데이트하려면 AI 에이전트에게 다음과 같이 지시하세요:
-> "`vibe-diagnosis-mcp` 패키지를 최신 버전(v1.2.1)으로 강제 업데이트하고 MCP 설정을 다시 불러와(Reload) 줘."
-
-### 1. MCP 설정 추가
-
-아래 JSON을 AI 도구의 설정 파일에 추가하세요:
+1. AI 도구의 MCP 설정 파일에 아래 내용을 추가하세요. `npx`가 MCP 패키지를 자동으로 내려받아 실행하므로 전역 설치는 필요하지 않습니다.
 
 | AI 도구 | 설정 파일 경로 |
 |---|---|
@@ -68,54 +42,42 @@ AI 에이전트에게 채팅창으로 다음과 같이 지시하세요:
 }
 ```
 
-### 2. AI에게 말하기
+2. AI 도구를 재시작하거나 MCP 설정을 다시 불러와 `vibe-diagnosis` 서버를 인식시킵니다.
 
-다음 요청문을 그대로 사용하면 대시보드 작업 시 서버 실행과 진단 확장 규칙까지 함께 전달할 수 있습니다.
+3. 아래 한 문장을 복사해 AI 에이전트에게 보내세요.
 
-> "`vibe-diagnosis-mcp`를 MCP 서버로 등록하고, 이 프로젝트에서는 다음 규칙을 반드시 지켜줘. 1) 대시보드 UI, API, 데이터 또는 버그 수정 작업을 시작하기 전에는 반드시 `open_dashboard`를 호출해 자가진단 대시보드 서버를 실행하고 브라우저에서 열 것. 2) 작업 전 `list_diagnostics`로 진단 목록을 확인하고, 작업을 검증할 진단이 없으면 `.vibe-diagnosis/diagnostics/`에 관련 `.diag.js`를 추가하여 활용할 것. 3) 모든 작업 완료 후 `run_diagnostics`를 실행할 것. 4) 실패한 진단은 해결한 뒤에만 작업 완료를 보고할 것."
+> `이 프로젝트에 Vibe Diagnosis를 설정해줘. 진단을 초기화하고, 작업에 필요한 진단을 추가한 뒤, 작업 완료 시 전체 자가진단을 실행해줘.`
 
-> "자가진단 MCP 적용해줘"
+일반 작업은 이것으로 충분합니다. 에이전트는 최초 한 번 `init_diagnostics`를 실행하고, 필요한 `.diag.js` 진단을 만들거나 확장한 후 `run_diagnostics`로 결과를 검증합니다.
 
-끝. AI가 알아서 초기화하고, 진단 파일을 생성하고, 대시보드를 열어줍니다.
+### 대시보드 작업: 이 문장을 복사하세요
 
----
+> `이번 대시보드 작업을 시작하기 전에 open_dashboard를 호출해줘. 진단 목록을 확인하고 이번 작업용 진단이 없으면 .diag.js를 추가해줘. 작업을 완료한 뒤 전체 진단을 실행하고, 실패를 해결한 후 완료를 보고해줘.`
 
-## 💬 빠른 트리거
+`open_dashboard`는 `http://localhost:7700`(이미 사용 중이면 다음 빈 포트)에 웹 대시보드를 실행합니다. **MCP를 설치하거나 연결한 것만으로는 웹 대시보드 서버가 실행되지 않습니다.**
 
-MCP가 설치된 상태에서 AI에게 짧게 말하면 자동으로 실행됩니다:
+### 필요한 트리거는 네 가지입니다
 
-| 말하기 | 실행 결과 |
+| AI 에이전트에게 말하기 | 예상 MCP 동작 |
 |---|---|
-| "자가진단 MCP 적용해줘" | `init_diagnostics` → 초기화 + 진단 생성 + 대시보드 |
-| "자가진단 실행해줘" | `run_diagnostics` → 전체 진단 실행 |
-| "자가진단 대시보드 열어줘" | `open_dashboard` → 브라우저에서 대시보드 |
-| "진단 돌려줘" | `run_diagnostics` → 결과 요약 |
+| `이 프로젝트에 Vibe Diagnosis를 설정해줘.` | `init_diagnostics` |
+| `자가진단 실행해줘.` | `run_diagnostics` |
+| `자가진단 대시보드를 열어줘.` | `open_dashboard` |
+| `현재 진단 목록을 보여줘.` | `list_diagnostics` |
 
-### 사용 흐름 예시
-
-```
-사용자: "자가진단 MCP 적용해줘"
-   AI: → init_diagnostics          ← .vibe-diagnosis/ 생성
-   AI: → .diag.js 파일 자동 생성    ← 기존 코드 분석
-   AI: → open_dashboard            ← 브라우저에서 http://localhost:7700 열림
-   AI: → run_diagnostics           ← Health 100% ✅
-```
-
----
-
-## 📦 CLI
+## CLI
 
 ```bash
-npx vibe-diag init                        # .vibe-diagnosis/ 초기화 + MCP 자동 설정
-npx vibe-diag run                         # 모든 진단 실행
-npx vibe-diag run --json                  # JSON 출력 (CI/CD용)
-npx vibe-diag dashboard                   # 웹 대시보드 열기
-npx vibe-diag config get                  # BYOK 설정 확인
-npx vibe-diag config set provider openai  # AI 프로바이더 설정
-npx vibe-diag config set apiKey sk-...    # API 키 설정
-npx vibe-diag config set model gpt-4o     # 모델명 설정
-npx vibe-diag repair <diagId>             # 특정 진단 AI 자동 수리
-npx vibe-diag repair --all                # 실패한 모든 진단 자동 수리
+npx -y vibe-diagnosis init                        # .vibe-diagnosis/ 초기화
+npx -y vibe-diagnosis run                         # 모든 진단 실행
+npx -y vibe-diagnosis run --json                  # JSON 출력 (CI/CD용)
+npx -y vibe-diagnosis dashboard                   # 웹 대시보드 열기
+npx -y vibe-diagnosis config get                  # BYOK 설정 확인
+npx -y vibe-diagnosis config set provider openai  # AI 프로바이더 설정
+npx -y vibe-diagnosis config set apiKey sk-...    # API 키 설정
+npx -y vibe-diagnosis config set model gpt-4o     # 모델명 설정
+npx -y vibe-diagnosis repair <diagId>             # 특정 진단 AI 자동 수리
+npx -y vibe-diagnosis repair --all                # 실패한 모든 진단 자동 수리
 ```
 
 ### 진단 파일 작성
@@ -161,8 +123,8 @@ module.exports = {
 ## 🖥️ 웹 대시보드
 
 ```bash
-npx vibe-diag dashboard            # http://localhost:7700
-npx vibe-diag dashboard --port 8080
+npx -y vibe-diagnosis dashboard            # http://localhost:7700
+npx -y vibe-diagnosis dashboard --port 8080
 ```
 
 기능:
@@ -228,7 +190,7 @@ export VIBE_DIAG_MODEL=gpt-4o          # 선택사항
 VS Code 확장 마켓플레이스에서 `vibe-diagnosis` 검색, 또는 `.vsix`로 설치:
 
 1. `Ctrl+Shift+P` → "Install from VSIX..."
-2. `vibe-diagnosis-vscode-1.1.0.vsix` 선택
+2. 내려받은 `vibe-diagnosis-vscode-1.2.4.vsix` 파일 선택
 
 **커맨드:**
 - `Vibe Diagnosis: Run` — 진단 실행
