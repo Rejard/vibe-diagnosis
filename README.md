@@ -4,7 +4,7 @@ Self-diagnosis for AI-assisted coding projects. It keeps small checks next to yo
 
 [한국어 README](./README.ko.md)
 
-> Current version: **1.2.4** for the CLI, MCP server, and VS Code extension.
+> Current version: **1.2.5** for the CLI, MCP server, and VS Code extension.
 
 ## Start in three steps
 
