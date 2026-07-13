@@ -14,13 +14,33 @@ When coding with AI agents, prove that your project works — with code.
 
 The fastest way to use vibe-diagnosis is through **MCP** (Model Context Protocol). Just add the config to your AI tool and start coding.
 
+> [!IMPORTANT]
+> **Required agent workflow for dashboard work**
+>
+> Before starting any dashboard UI, dashboard API, dashboard data, or dashboard bug-fix task, the agent **must call `open_dashboard` first**. This starts the Vibe Diagnosis web dashboard server on `http://localhost:7700` (or the next available local port) and opens it in the browser. Installing the MCP server alone does **not** start this web server.
+>
+> First inspect the available checks with `list_diagnostics`. If the current diagnostic list does not cover the dashboard task, the agent **must add a relevant `.diag.js` diagnostic** under `.vibe-diagnosis/diagnostics/` and use it to verify the work. After every completed task, the agent must run `run_diagnostics` and address failures before declaring the work complete.
+
+### Copy-and-paste dashboard workflow
+
+Use these requests in order when asking an AI agent to work on a dashboard:
+
+1. `Open the Vibe Diagnosis dashboard for this project before starting dashboard work.`
+   - Expected tool: `open_dashboard` → starts the local dashboard server at `http://localhost:7700` (or the next free port).
+2. `List the current diagnostics and identify which checks cover this dashboard task.`
+   - Expected tool: `list_diagnostics`.
+3. `If no diagnostic covers this task, add a relevant .diag.js diagnostic and use it to verify the dashboard change.`
+   - Expected result: a new check in `.vibe-diagnosis/diagnostics/`.
+4. `Complete the dashboard task, run the full self-diagnosis, and fix any failed diagnostics before reporting completion.`
+   - Expected tool: `run_diagnostics` → verifies the project and keeps the dashboard available.
+
 ### 🤖 AI Agent Quick Installation & Update
 
 If you are using AI coding assistants (such as Cursor, Windsurf, or Claude Desktop), you can ask your AI agent to automatically configure or update the MCP server for you.
 
 #### For New Users (First-time setup)
 Just say this to your AI agent:
-> "Install the `vibe-diagnosis-mcp` package globally, register it as an MCP server, and strictly follow these rules for this project: 1) Run `run_diagnostics` after every completed task to verify correctness. 2) If any diagnostics fail, immediately use the repair tool or local `fix/heal` methods to restore the health score to 100%. 3) Automatically create a corresponding `.diag.js` file in `.vibe-diagnosis/diagnostics/` for any new task you perform. 4) Use `open_dashboard` to launch the visual dashboard when requested."
+> "Install the `vibe-diagnosis-mcp` package globally, register it as an MCP server, and strictly follow these rules for this project: 1) Before starting any dashboard UI, dashboard API, dashboard data, or dashboard bug-fix task, always call `open_dashboard` to start the Vibe Diagnosis web dashboard server and open it in the browser. 2) Before work, inspect checks with `list_diagnostics`; if the task is not covered, create a relevant `.diag.js` file in `.vibe-diagnosis/diagnostics/` and use it for verification. 3) Run `run_diagnostics` after every completed task to verify correctness. 4) If any diagnostics fail, immediately use the repair tool or local `fix/heal` methods to restore the health score to 100%."
 
 #### For Existing Users (Update to latest v1.2.1)
 If you already have `vibe-diagnosis-mcp` installed and want to update to the latest version to enjoy offline hybrid repairs and automated background dashboards, just say this to your AI agent:
@@ -292,4 +312,3 @@ For production, remove or gitignore the diagnostics directory:
 Apache License 2.0 — Open, Royalty-Free
 
 See [LICENSE](./LICENSE) for details.
-
