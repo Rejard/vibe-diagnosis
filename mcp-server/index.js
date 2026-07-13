@@ -39,7 +39,7 @@ const { repairDiagnostic } = core.repairer;
 
 const server = new McpServer({
   name: "vibe-diagnosis",
-  version: "1.2.0",
+  version: "1.2.1",
 });
 
 function isPortInUse(port) {
@@ -72,55 +72,62 @@ function openBrowser(url) {
 }
 
 async function autoStartDashboardIfNeeded(projectDir, defaultPort = 7700, isExplicitPort = false) {
-  const port = isExplicitPort ? defaultPort : await findFreePort(defaultPort);
+  // 1. 기본 포트(7700)가 현재 사용 중인지 체크합니다.
+  const baseInUse = await isPortInUse(defaultPort);
+  
+  let port = defaultPort;
+  let shouldSpawn = !baseInUse;
+
+  if (baseInUse) {
+    // 2. 사용 중이라면, 순서대로 1씩 증가시켜서 빈 포트(7701, 7702...)를 찾아내는 똑똑한 방식을 작동시킵니다!
+    port = isExplicitPort ? defaultPort : await findFreePort(defaultPort);
+    
+    // 만약 새로 찾은 포트가 비어있다면, 그 포트로 대시보드 서버를 새로 켜주어야 합니다.
+    const targetInUse = await isPortInUse(port);
+    shouldSpawn = !targetInUse;
+  }
+
   const url = `http://localhost:${port}`;
 
-  try {
-    const candidates = [
-      "C:\\Users\\lemai\\AppData\\Roaming\\npm\\node_modules\\vibe-diagnosis\\bin\\vibe-diag.js",
-      "c:\\home\\vibe-diagnosis\\bin\\vibe-diag.js"
-    ];
+  if (shouldSpawn) {
+    try {
+      const candidates = [
+        "C:\\Users\\lemai\\AppData\\Roaming\\npm\\node_modules\\vibe-diagnosis\\bin\\vibe-diag.js",
+        "c:\\home\\vibe-diagnosis\\bin\\vibe-diag.js"
+      ];
 
-    let vibeDiagBin = null;
-    for (const cand of candidates) {
-      if (fs.existsSync(cand)) {
-        vibeDiagBin = cand;
-        break;
-      }
-    }
-
-    if (!vibeDiagBin) {
-      vibeDiagBin = "vibe-diag";
-    }
-
-    const isJsFile = vibeDiagBin.endsWith(".js");
-    const spawnCmd = isJsFile ? process.execPath : vibeDiagBin;
-    const spawnArgs = isJsFile
-      ? [vibeDiagBin, "dashboard", "--cwd", projectDir, "--port", String(port)]
-      : ["dashboard", "--cwd", projectDir, "--port", String(port)];
-
-    // Launch process securely in background using path-immune detached fork
-    if (process.platform === "win32") {
-      const cmd = `start "" /b "${spawnCmd}" ${spawnArgs.map(arg => `"${arg}"`).join(' ')}`;
-      exec(cmd, { windowsHide: true }, (error, stdout, stderr) => {
-        if (error || stderr) {
-          try {
-            fs.writeFileSync(path.join(projectDir, '.vibe-diagnosis', 'mcp-spawn-error.log'), `Cmd: ${cmd}\nError: ${error ? error.message : ''}\nStderr: ${stderr}\nStdout: ${stdout}`);
-          } catch (err) {}
+      let vibeDiagBin = null;
+      for (const cand of candidates) {
+        if (fs.existsSync(cand)) {
+          vibeDiagBin = cand;
+          break;
         }
-      });
-    } else {
+      }
+
+      if (!vibeDiagBin) {
+        vibeDiagBin = "vibe-diag";
+      }
+
+      const isJsFile = vibeDiagBin.endsWith(".js");
+      const spawnCmd = isJsFile ? process.execPath : vibeDiagBin;
+      const spawnArgs = isJsFile
+        ? [vibeDiagBin, "dashboard", "--cwd", projectDir, "--port", String(port)]
+        : ["dashboard", "--cwd", projectDir, "--port", String(port)];
+
+      // 윈도우 환경에서도 세션이 닫혀도 죽지 않도록 독립 분리 구동을 유지합니다.
       const child = spawn(spawnCmd, spawnArgs, {
         windowsHide: true,
         detached: true,
         stdio: "ignore",
       });
       child.unref();
+    } catch (e) {
+      // Safe skip if background spawn fails
     }
-  } catch (e) {
-    // Safe skip if background spawn fails
+    // 서버가 기동 완료되어 바인딩될 때까지 최소 안전 시간 대기
+    await new Promise((resolve) => setTimeout(resolve, 1000));
   }
-  await new Promise((resolve) => setTimeout(resolve, 1000));
+
   openBrowser(url);
   return port;
 }
