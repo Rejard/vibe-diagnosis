@@ -52,20 +52,17 @@ Use one of these three paths. Most AI coding users should choose **MCP**.
 
 That is enough for normal work. The agent should use `init_diagnostics` once, create or extend `.diag.js` checks when needed, then use `run_diagnostics` to verify the result.
 
-### Dashboard and self-diagnosis: copy this request
+### Copy one of these requests
 
-> `Before starting this dashboard task or reporting self-diagnosis results, call open_dashboard to start the Vibe Diagnosis web server. Verify that its local URL responds before telling me to open it. Review the diagnostic list, add a relevant .diag.js check if this task is not covered, complete the work, then run diagnostics and fix failures before reporting completion.`
+**To check your project now:**
 
-`open_dashboard` starts the web dashboard at `http://localhost:7700` (or the next available local port). **Installing or connecting MCP alone does not start the web dashboard.** Do not merely report a localhost URL: call `open_dashboard` and confirm that the server is responding first. If the MCP call cannot start it, use `npx -y vibe-diagnosis dashboard --cwd <project-path>` as the fallback.
+> `Run self-diagnosis. First call open_dashboard, start the dashboard server, and confirm that I can open it before you give me the local URL.`
 
-### The only phrases you need
+**Before dashboard work:**
 
-| Say to the agent | Expected MCP action |
-|---|---|
-| `Set up Vibe Diagnosis for this project.` | `init_diagnostics` |
-| `Run self-diagnosis and start the diagnosis dashboard first.` | `open_dashboard` → `run_diagnostics` |
-| `Open the diagnosis dashboard.` | `open_dashboard` |
-| `Show the diagnostic list.` | `list_diagnostics` |
+> `Before dashboard work, start and check the Vibe Diagnosis dashboard server. After the work, run self-diagnosis and fix any failures.`
+
+The agent must do three things: start the server with `open_dashboard`, confirm that `http://localhost:7700` (or the next free port) responds, then run `run_diagnostics`. If the task has no matching diagnostic, it must add a `.diag.js` check. If `open_dashboard` fails, the fallback is `npx -y vibe-diagnosis dashboard --cwd <project-path>`.
 
 ---
 
