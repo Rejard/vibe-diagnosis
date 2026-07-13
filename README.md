@@ -25,9 +25,11 @@ MCP is the recommended way to use Vibe Diagnosis with an AI coding tool.
 
 2. Restart or reload the AI tool.
 
-3. Send this to the AI agent:
+3. Copy this and send it to the AI agent:
 
-   > `Set up Vibe Diagnosis for this project. Initialize diagnostics, add checks for the work, and run self-diagnosis when the work is complete.`
+   ```bash
+   Set up Vibe Diagnosis for this project. Initialize diagnostics, add checks for the work, and run self-diagnosis when the work is complete.
+   ```
 
 `npx` installs and runs the MCP package when needed. A global installation is not required.
 
@@ -46,7 +48,9 @@ The dashboard is a local web server. Connecting the MCP server does **not** open
 
 Copy this when you want to check the project:
 
-> `Run self-diagnosis. First call open_dashboard, start the dashboard server, and confirm that I can open it before you give me the local URL.`
+```bash
+Run self-diagnosis. First call open_dashboard, start the dashboard server, and confirm that I can open it before you give me the local URL.
+```
 
 The agent must:
 
@@ -60,9 +64,11 @@ If the MCP server cannot start the dashboard, run this in the project folder:
 npx -y vibe-diagnosis dashboard --cwd <project-path>
 ```
 
-For dashboard work, use this request:
+For dashboard work, copy this request:
 
-> `Before dashboard work, start and check the Vibe Diagnosis dashboard server. After the work, run self-diagnosis and fix any failures.`
+```bash
+Before dashboard work, start and check the Vibe Diagnosis dashboard server. After the work, run self-diagnosis and fix any failures.
+```
 
 ## CLI
 
