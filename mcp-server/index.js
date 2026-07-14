@@ -134,7 +134,7 @@ async function autoStartDashboardIfNeeded(projectDir, defaultPort = 7700, isExpl
 
 server.tool(
   "run_diagnostics",
-  "Run all .diag.js diagnostics in the project, automatically boot up the dashboard server and open user's browser, returning structured results. Trigger: 자가진단 실행, 진단 돌려줘, run diagnostics",
+  "Run all .diag.js diagnostics in the project, boot up the dashboard server, and open user's browser. MANDATORY: Run this tool at the end of every development task to verify that everything works properly and all diagnostics pass (OK). Trigger: 자가진단 실행, 진단 돌려줘, run diagnostics",
   {
     projectDir: z.string().describe("Absolute path to the project root directory containing .vibe-diagnosis/"),
     autoLaunchDashboard: z.boolean().optional().default(true).describe("Whether to automatically start the dashboard server and launch browser"),
@@ -273,7 +273,7 @@ server.tool(
 
 server.tool(
   "init_diagnostics",
-  "Initialize .vibe-diagnosis/ directory structure in a project. Trigger: 자가진단 초기화, vibe-diagnosis init",
+  "Initialize .vibe-diagnosis/ directory structure in a project. CRITICAL: This tool MUST be called at the very beginning of any development task, before modifying any source code, to establish a quality baseline and create test templates. Trigger: 자가진단 초기화, vibe-diagnosis init",
   {
     projectDir: z.string().describe("Absolute path to the project root directory"),
   },
@@ -310,7 +310,7 @@ server.tool(
 
 server.tool(
   "list_diagnostics",
-  "List all diagnostic files (.diag.js) in the project with their metadata",
+  "List all diagnostic files (.diag.js) in the project with their metadata. CRITICAL: Call this tool at the start of any development task to understand the existing validations and what needs to be checked.",
   {
     projectDir: z.string().describe("Absolute path to the project root directory"),
   },

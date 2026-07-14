@@ -1,16 +1,63 @@
 # 🩺 vibe-diagnosis
 
-Self-diagnosis for AI-assisted coding projects. It keeps small checks next to your project, runs them, and shows the result in a local dashboard.
+A lightweight, agent-driven self-diagnosis and self-healing framework for AI-assisted development (Vibe Coding). Establish quality constraints, prevent regressions, and visualize failures via a beautiful local dashboard.
 
 [한국어 README](./README.ko.md)
 
-> Current version: **1.2.5** for the CLI, MCP server, and VS Code extension.
+> Current Version: **1.2.7** (Major Quality Overhaul Release)
 
-## Start in three steps
+---
 
-MCP is the recommended way to use Vibe Diagnosis with an AI coding tool.
+## 🎯 Why vibe-diagnosis?
 
-1. Add this to your AI tool's MCP configuration.
+**"Never code with your AI agent without a safety net."**
+
+While AI coding assistants (Cursor, Windsurf, Gemini/Antigravity, etc.) generate code at lightning speed, they are structurally prone to **overclaiming** ("Everything works flawlessly!") and **hallucinations**.
+
+`vibe-diagnosis` brings the absolute rigor of **Test-Driven Development (TDD)** to your AI-assisted sessions. It forces the coding agent to **"prove that your code works through a mechanical `.diag.js` script first, before declaring success."** This guarantees absolute codebase integrity, prevents regressions, and maintains high-speed developer momentum safely.
+
+---
+
+## 📋 Copy-Paste Prompt Templates for AI Agents
+
+Keep your coding agent on a tight quality leash. Copy and paste one of these instructions to set up the ideal TDD-style workflow.
+
+### Scenario A. 🆕 Initiating a New Project or Feature (Strict TDD)
+> "We are implementing a new [feature/app name]. Before writing any feature code, initialize Vibe Diagnosis (`init_diagnostics`), write relevant `.diag.js` validation scripts verifying our core requirements, and run them to confirm they fail (FAIL) first. Only then, implement the feature code step-by-step and run diagnostics frequently to guide your development."
+
+### Scenario B. 🔄 Joining or Continuing an Existing Project
+> "Please run the self-diagnostics tool (`run_diagnostics`) first. We need to verify the existing baseline and ensure all previously implemented features are healthy and green (OK) before we write any new code."
+
+### Scenario C. 💥 Resolving Code Failures & Self-Healing
+> "Use the self-healing tools (`heal_all` or `repair_diagnostic`) to automatically analyze and fix the currently failing diagnostics. Once repaired, rerun the diagnostics suite and open the dashboard."
+
+---
+
+## 🔒 Auto-Enforcing Rules for Top 3 AI Tools
+
+To make this completely hands-off, you can create a rule configuration file inside your project root. When major AI agents scan your workspace, they will automatically read this guidelines file and obey the TDD self-diagnosis workflow without you having to repeat yourself.
+
+Simply create one of these files in your workspace root:
+* **Antigravity / Gemini**: `.agents/AGENTS.md`
+* **Cursor**: `.cursorrules`
+* **Windsurf**: `.windsurfrules`
+
+### 📝 Content to Copy into Rules:
+```markdown
+## Vibe Diagnosis Rules (Self-Diagnosis Guidelines)
+- Whenever implementing or modifying features, you MUST create or update relevant `.diag.js` validation files in the `.vibe-diagnosis/diagnostics/` folder BEFORE writing any production code (TDD-style).
+- Run `run_diagnostics` frequently during mid-steps and final steps to verify overall codebase integrity.
+- If a diagnostic fails (FAIL), use `repair_diagnostic` or `heal_all` to automatically self-heal and resolve issues.
+- When done, call `open_dashboard` to boot up the browser dashboard and verify everything is 100% healthy (OK) before submitting the final walkthrough.
+```
+
+---
+
+## 🚀 Get Started in 3 Steps
+
+If you are using an AI agent with MCP support, this is the easiest route:
+
+1. Add the following to your AI tool's MCP configuration settings:
 
    ```json
    {
@@ -23,143 +70,115 @@ MCP is the recommended way to use Vibe Diagnosis with an AI coding tool.
    }
    ```
 
-2. Restart or reload the AI tool.
+2. Restart your AI tool or reload the MCP servers.
 
-3. Copy this and send it to the AI agent:
+3. Copy and send the following message to your coding agent:
 
    ```bash
-   Set up Vibe Diagnosis for this project. Initialize diagnostics, add checks for the work, and run self-diagnosis when the work is complete.
+   Set up Vibe Diagnosis for this project. Initialize the folder, add relevant checks for our tasks, and run the self-diagnosis once done.
    ```
 
-`npx` installs and runs the MCP package when needed. A global installation is not required.
+No global installation is required; `npx` will fetch and run the MCP packages on-demand.
 
-### MCP configuration paths
+### MCP Configuration Locations
 
-| AI tool | Configuration file |
+| AI Tool | Configuration File |
 |---|---|
-| Gemini / Antigravity | `.gemini/settings.json` in the project, or `~/.gemini/config/mcp_config.json` |
-| Claude Desktop | `%APPDATA%/Claude/claude_desktop_config.json` on Windows |
+| Gemini / Antigravity | `.gemini/settings.json` (Project) or `~/.gemini/config/mcp_config.json` (Global) |
+| Claude Desktop | Windows: `%APPDATA%/Claude/claude_desktop_config.json` |
 | Cursor | `.cursor/mcp.json` |
 | Windsurf | `~/.codeium/windsurf/mcp_config.json` |
 
-## Open the dashboard correctly
+---
 
-The dashboard is a local web server. Connecting the MCP server does **not** open the dashboard by itself.
+## 📊 Dashboard Guide
 
-Copy this when you want to check the project:
-
-```bash
-Run self-diagnosis. First call open_dashboard, start the dashboard server, and confirm that I can open it before you give me the local URL.
-```
-
-The agent must:
-
-1. Call `open_dashboard`.
-2. Confirm that `http://localhost:7700` responds. If 7700 is busy, it uses the next free local port.
-3. Run `run_diagnostics`.
-
-If the MCP server cannot start the dashboard, run this in the project folder:
+The dashboard is a local, private web server running on your machine. If the MCP client fails to start the dashboard automatically, you can always run it directly from your terminal inside the project root:
 
 ```bash
 npx -y vibe-diagnosis dashboard --cwd <project-path>
 ```
 
-For dashboard work, copy this request:
+If you want the agent to handle the dashboard initialization, ask:
 
 ```bash
-Before dashboard work, start and check the Vibe Diagnosis dashboard server. After the work, run self-diagnosis and fix any failures.
+Please run the self-diagnostics. Call `open_dashboard` to start the local dashboard, confirm it's healthy, and give me the localhost address.
 ```
 
-## CLI
+---
 
-Use these commands when you prefer a terminal or CI:
+## 🛠️ CLI Reference
+
+Use these commands inside your local shell or CI/CD pipelines:
 
 ```bash
-npx -y vibe-diagnosis init                  # Create .vibe-diagnosis/
-npx -y vibe-diagnosis run                   # Run all checks and open the dashboard
-npx -y vibe-diagnosis run --json            # Print JSON for CI
-npx -y vibe-diagnosis dashboard             # Start the dashboard server
-npx -y vibe-diagnosis repair <diagnosticId> # Repair one failed check
-npx -y vibe-diagnosis repair --all          # Repair all failed checks
-npx -y vibe-diagnosis heal                  # Run all available healing steps
+npx -y vibe-diagnosis init                  # Creates .vibe-diagnosis/ workspace
+npx -y vibe-diagnosis run                   # Runs all checks & boots up dashboard
+npx -y vibe-diagnosis run --json            # Formatted JSON output for CI pipelines
+npx -y vibe-diagnosis dashboard             # Runs standalone dashboard server
+npx -y vibe-diagnosis repair <diagnosticId> # Repairs a single failed check
+npx -y vibe-diagnosis repair --all          # Repairs all failed checks
+npx -y vibe-diagnosis heal                  # Triggers entire automatic self-healing routines
 ```
 
-## Diagnostics
+---
 
-`init` creates `.vibe-diagnosis/diagnostics/` with an example check. Add a `.diag.js` file whenever a task needs a new verification.
+## 📁 Diagnostic File(`.diag.js`) Format
+
+Executing `init` generates sample validation scripts inside `.vibe-diagnosis/diagnostics/`. Customize them to fit your business requirements:
 
 ```js
 module.exports = {
   id: 'homepage-loads',
-  name: 'Homepage loads',
-  layer: 'TASK', // TASK, FUNCTION, or SYSTEM
+  name: 'Verify Homepage Load Status',
+  layer: 'TASK', // Choose from: TASK, FUNCTION, SYSTEM
 
   async run() {
-    const homepageLoads = true; // Replace with a real check.
+    const homepageLoads = true; // Replace with actual test logic (e.g. fetch/axios calls)
 
     return homepageLoads
-      ? { status: 'OK', details: 'Homepage is available' }
-      : { status: 'ERROR', details: 'Homepage did not load' };
+      ? { status: 'OK', details: 'Homepage loads successfully.' }
+      : { status: 'ERROR', details: 'Homepage is unresponsive.' };
   },
 };
 ```
 
-Every diagnostic needs `id`, `name`, `layer`, and `run`. `run` must return `OK`, `WARNING`, or `ERROR`.
+* **Attributes**: Every diagnostic module must have unique `id`, human-readable `name`, execution `layer`, and an async `run()` function.
+* **Return Values**: `run()` must return `{ status: 'OK' | 'WARNING' | 'ERROR', details: string }`.
 
-Use `list_diagnostics` before a task. If no existing check proves the task works, ask the agent to add one.
+---
 
-## What the dashboard shows
+## 🤖 AI Self-Healing (BYOK)
 
-The local dashboard shows diagnostic results, error patterns, and optional AI repair settings. It is only available on your computer through its localhost address.
+Launch the local dashboard, navigate to settings, and securely register your AI Provider, API Key, and Model parameters to activate automatic repair routines (BYOK). 
 
-## Optional AI repair (BYOK)
+Keys are stored locally and encrypted inside `.vibe-diagnosis/config.json` (auto-appended to `.gitignore` during `init`).
 
-AI repair is optional. In the dashboard, choose a provider, enter your API key and model, then save. Supported providers are OpenAI, Anthropic, Google Gemini, and OpenRouter.
-
-The key is stored in `.vibe-diagnosis/config.json`. `init` adds that file to `.gitignore`. You can also use these environment variables:
+Alternatively, pass them directly via environment variables:
 
 ```bash
 VIBE_DIAG_PROVIDER=openai
 VIBE_DIAG_API_KEY=your-key
-VIBE_DIAG_MODEL=your-model
+VIBE_DIAG_MODEL=gpt-4o
 ```
 
-Environment variables override the saved dashboard settings. Review AI repair changes before keeping them.
+---
 
-## MCP tools
+## 📦 MCP Tools Directory
 
-| Tool | Use it for |
+| Tool | Purpose |
 |---|---|
-| `init_diagnostics` | Create the diagnostic folders and example check |
-| `run_diagnostics` | Run every diagnostic |
-| `open_dashboard` | Start and open the local dashboard |
-| `list_diagnostics` | See existing checks |
-| `repair_diagnostic` | Repair one failed diagnostic |
-| `heal_all` | Repair or heal all failed diagnostics |
-| `read_error_pattern` | Read a saved error pattern |
-| `write_error_pattern` | Save a recurring error pattern |
+| `init_diagnostics` | Creates the workspace folder and sample templates (MUST execute at task startup). |
+| `list_diagnostics` | Lists all active `.diag.js` files with their statuses (MUST execute before coding). |
+| `run_diagnostics` | Executes all checks and automatically integrates the dashboard (MUST execute before final delivery). |
+| `open_dashboard` | Spawns the local dashboard background server and launches the default browser. |
+| `repair_diagnostic` | Runs targeted AI BYOK repair reasoning for a specific failing diagnostic. |
+| `heal_all` | Sequentially attempts to self-heal and repair all failing diagnostics in the workspace. |
+| `read_error_pattern` | Reads specific recurring error pattern knowledge. |
+| `write_error_pattern` | Creates or saves a newly discovered error pattern log. |
 
-## VS Code extension
+---
 
-If the Vibe Diagnosis extension is installed, open the Command Palette and use:
-
-- `Vibe Diagnosis: Init`
-- `Vibe Diagnosis: Run`
-- `Vibe Diagnosis: Open Dashboard`
-- `Vibe Diagnosis: Auto Repair`
-
-## Keep the agent consistent
-
-Add this to your AI tool's project instruction file when you want the same behavior on every task:
-
-```markdown
-## Vibe Diagnosis rules
-
-- Add or update a .diag.js check when a task needs new verification.
-- Run run_diagnostics after completing a task.
-- Before giving a dashboard URL, call open_dashboard and confirm that the local server responds.
-```
-
-## License
+## 🤝 License
 
 [Apache License 2.0](./LICENSE)
