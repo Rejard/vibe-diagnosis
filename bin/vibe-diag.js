@@ -70,12 +70,34 @@ function openBrowser(url) {
 }
 
 async function autoStartDashboardIfNeeded() {
-  const hasExplicitPort = args.includes('--port');
-  const port = hasExplicitPort ? flags.port : await findFreePort(flags.port);
-  const url = `http://localhost:${port}`;
+  const fs = require('fs');
+  const lockPath = path.join(targetDir, '.vibe-diagnosis', 'active_port.json');
+  let port = flags.port;
+  let shouldSpawn = true;
 
-  startDashboardBackground(targetDir, port);
-  await new Promise((resolve) => setTimeout(resolve, 800));
+  if (!args.includes('--port') && fs.existsSync(lockPath)) {
+    try {
+      const lock = JSON.parse(fs.readFileSync(lockPath, 'utf8'));
+      if (lock && lock.port) {
+        const inUse = await isPortInUse(lock.port);
+        if (inUse) {
+          port = lock.port;
+          shouldSpawn = false;
+        }
+      }
+    } catch (e) {
+      // Safe skip
+    }
+  }
+
+  if (shouldSpawn) {
+    const hasExplicitPort = args.includes('--port');
+    port = hasExplicitPort ? flags.port : await findFreePort(flags.port);
+    startDashboardBackground(targetDir, port);
+    await new Promise((resolve) => setTimeout(resolve, 800));
+  }
+
+  const url = `http://localhost:${port}`;
   openBrowser(url);
 }
 

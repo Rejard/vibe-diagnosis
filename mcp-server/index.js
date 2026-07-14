@@ -72,24 +72,32 @@ function openBrowser(url) {
 }
 
 async function autoStartDashboardIfNeeded(projectDir, defaultPort = 7700, isExplicitPort = false) {
-  // 1. 기본 포트(7700)가 현재 사용 중인지 체크합니다.
-  const baseInUse = await isPortInUse(defaultPort);
-  
+  const lockPath = path.join(projectDir, ".vibe-diagnosis", "active_port.json");
   let port = defaultPort;
-  let shouldSpawn = !baseInUse;
+  let shouldSpawn = true;
 
-  if (baseInUse) {
-    // 2. 사용 중이라면, 순서대로 1씩 증가시켜서 빈 포트(7701, 7702...)를 찾아내는 똑똑한 방식을 작동시킵니다!
-    port = isExplicitPort ? defaultPort : await findFreePort(defaultPort);
-    
-    // 만약 새로 찾은 포트가 비어있다면, 그 포트로 대시보드 서버를 새로 켜주어야 합니다.
-    const targetInUse = await isPortInUse(port);
-    shouldSpawn = !targetInUse;
+  if (!isExplicitPort && fs.existsSync(lockPath)) {
+    try {
+      const lock = JSON.parse(fs.readFileSync(lockPath, "utf8"));
+      if (lock && lock.port) {
+        const inUse = await isPortInUse(lock.port);
+        if (inUse) {
+          port = lock.port;
+          shouldSpawn = false;
+        }
+      }
+    } catch (e) {
+      // Safe skip
+    }
   }
 
-  const url = `http://localhost:${port}`;
-
   if (shouldSpawn) {
+    const baseInUse = await isPortInUse(defaultPort);
+    port = defaultPort;
+    if (baseInUse) {
+      port = isExplicitPort ? defaultPort : await findFreePort(defaultPort);
+    }
+
     try {
       const candidates = [
         "C:\\Users\\lemai\\AppData\\Roaming\\npm\\node_modules\\vibe-diagnosis\\bin\\vibe-diag.js",
@@ -114,7 +122,6 @@ async function autoStartDashboardIfNeeded(projectDir, defaultPort = 7700, isExpl
         ? [vibeDiagBin, "dashboard", "--cwd", projectDir, "--port", String(port)]
         : ["dashboard", "--cwd", projectDir, "--port", String(port)];
 
-      // 윈도우 환경에서도 세션이 닫혀도 죽지 않도록 독립 분리 구동을 유지합니다.
       const child = spawn(spawnCmd, spawnArgs, {
         windowsHide: true,
         detached: true,
@@ -128,6 +135,7 @@ async function autoStartDashboardIfNeeded(projectDir, defaultPort = 7700, isExpl
     await new Promise((resolve) => setTimeout(resolve, 1000));
   }
 
+  const url = `http://localhost:${port}`;
   openBrowser(url);
   return port;
 }

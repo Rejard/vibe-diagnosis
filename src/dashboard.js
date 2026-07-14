@@ -192,6 +192,79 @@ function startDashboard(projectDir, port = 7700) {
       return;
     }
 
+    if (req.method === 'GET' && url.pathname === '/api/milestones') {
+      const dbPath = path.join(projectDir, '.vibe-diagnosis', 'milestones.json');
+      let milestones = [];
+      if (fs.existsSync(dbPath)) {
+        try {
+          milestones = JSON.parse(fs.readFileSync(dbPath, 'utf8') || '[]');
+        } catch (e) {
+          milestones = [];
+        }
+      }
+      sendJson(res, milestones);
+      return;
+    }
+
+    if (req.method === 'POST' && url.pathname === '/api/milestones') {
+      try {
+        const body = await readBody(req);
+        const dbPath = path.join(projectDir, '.vibe-diagnosis', 'milestones.json');
+        let milestones = [];
+        if (fs.existsSync(dbPath)) {
+          try {
+            milestones = JSON.parse(fs.readFileSync(dbPath, 'utf8') || '[]');
+          } catch (e) {
+            milestones = [];
+          }
+        }
+        
+        const newMilestone = {
+          id: 'ms-' + Date.now(),
+          timestamp: new Date().toISOString(),
+          title: body.title || '새 마일스톤',
+          redErrors: parseInt(body.redErrors, 10) || 0,
+          partialPassRate: parseInt(body.partialPassRate, 10) || 0,
+          finalStatus: body.finalStatus || 'OK',
+          notes: body.notes || ''
+        };
+
+        milestones.unshift(newMilestone);
+        fs.writeFileSync(dbPath, JSON.stringify(milestones, null, 2), 'utf8');
+        sendJson(res, { success: true, milestone: newMilestone });
+      } catch (err) {
+        sendJson(res, { error: err.message }, 500);
+      }
+      return;
+    }
+
+    if (req.method === 'DELETE' && url.pathname === '/api/milestones') {
+      try {
+        const id = url.searchParams.get('id');
+        if (!id) {
+          sendJson(res, { error: 'id parameter is required' }, 400);
+          return;
+        }
+
+        const dbPath = path.join(projectDir, '.vibe-diagnosis', 'milestones.json');
+        let milestones = [];
+        if (fs.existsSync(dbPath)) {
+          try {
+            milestones = JSON.parse(fs.readFileSync(dbPath, 'utf8') || '[]');
+          } catch (e) {
+            milestones = [];
+          }
+        }
+
+        const filtered = milestones.filter(m => m.id !== id);
+        fs.writeFileSync(dbPath, JSON.stringify(filtered, null, 2), 'utf8');
+        sendJson(res, { success: true });
+      } catch (err) {
+        sendJson(res, { error: err.message }, 500);
+      }
+      return;
+    }
+
     if (req.method === 'GET' && url.pathname === '/api/metrics') {
       try {
         const list = listDiagnosticMeta(projectDir);
@@ -267,6 +340,21 @@ function startDashboard(projectDir, port = 7700) {
   });
 
   server.listen(port, () => {
+    // 기동 시 포트 락 파일(.vibe-diagnosis/active_port.json) 생성 및 저장
+    try {
+      const fs = require('fs');
+      const lockDir = path.join(projectDir, '.vibe-diagnosis');
+      if (fs.existsSync(lockDir)) {
+        fs.writeFileSync(path.join(lockDir, 'active_port.json'), JSON.stringify({
+          port,
+          pid: process.pid,
+          timestamp: new Date().toISOString()
+        }, null, 2), 'utf8');
+      }
+    } catch (e) {
+      // Safe skip if lock file write fails
+    }
+
     const url = `http://localhost:${port}`;
     console.log(`\n  \x1b[36m🩺 Vibe Diagnosis Dashboard\x1b[0m`);
     console.log(`  \x1b[90m${'─'.repeat(40)}\x1b[0m`);

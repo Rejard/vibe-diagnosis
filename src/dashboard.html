@@ -302,6 +302,175 @@ header{display:flex;align-items:center;justify-content:space-between;padding:20p
     grid-template-columns: 1fr;
   }
 }
+
+/* Milestone Archive Style Overhauls */
+.milestones-section {
+  margin-top: 35px;
+}
+.milestone-board {
+  display: grid;
+  grid-template-columns: 1.2fr 1.8fr;
+  gap: 20px;
+  margin-top: 15px;
+}
+@media(max-width: 860px) {
+  .milestone-board {
+    grid-template-columns: 1fr;
+  }
+}
+.milestone-form-card, .milestone-list-card {
+  background: var(--surface-glass);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 20px;
+  box-shadow: var(--shadow);
+  backdrop-filter: blur(12px);
+}
+.milestone-form-card h3, .milestone-list-card h3 {
+  margin: 0 0 15px 0;
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--text-heading);
+  background: linear-gradient(135deg, #fff, var(--text3));
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.form-group label {
+  font-size: 11px;
+  color: var(--text3);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+.form-group input, .form-group textarea, .form-group select {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  color: var(--text-body);
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  outline: none;
+  transition: all 0.2s ease;
+}
+.form-group input:focus, .form-group textarea:focus, .form-group select:focus {
+  border-color: var(--accent2);
+  box-shadow: 0 0 0 2px rgba(99,102,241,0.2);
+}
+.form-row {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1.2fr;
+  gap: 10px;
+}
+.milestone-timeline {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+  max-height: 380px;
+  overflow-y: auto;
+  padding-right: 5px;
+}
+.milestone-timeline::-webkit-scrollbar {
+  width: 5px;
+}
+.milestone-timeline::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 4px;
+}
+.empty-timeline {
+  color: var(--text3);
+  font-size: 12px;
+  text-align: center;
+  padding: 40px 10px;
+}
+.milestone-card {
+  background: rgba(255,255,255,0.02);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 15px;
+  position: relative;
+  transition: all 0.2s ease;
+}
+.milestone-card:hover {
+  border-color: rgba(99,102,241,0.4);
+  transform: translateY(-2px);
+}
+.milestone-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 8px;
+}
+.milestone-card-title {
+  font-weight: 600;
+  font-size: 13px;
+  color: var(--text-heading);
+}
+.milestone-card-time {
+  font-size: 10px;
+  color: var(--text3);
+}
+.milestone-badges {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+.ms-badge {
+  font-size: 9px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+.ms-badge-red {
+  background: rgba(239,68,68,0.1);
+  color: var(--err);
+  border: 1px solid rgba(239,68,68,0.2);
+}
+.ms-badge-rate {
+  background: rgba(99,102,241,0.1);
+  color: var(--accent2);
+  border: 1px solid rgba(99,102,241,0.2);
+}
+.ms-badge-ok {
+  background: rgba(16,185,129,0.1);
+  color: var(--ok);
+  border: 1px solid rgba(16,185,129,0.2);
+}
+.ms-badge-warn {
+  background: rgba(245,158,11,0.1);
+  color: var(--warn);
+  border: 1px solid rgba(245,158,11,0.2);
+}
+.milestone-notes {
+  font-size: 11.5px;
+  color: var(--text2);
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+.milestone-delete {
+  position: absolute;
+  top: 15px;
+  right: 15px;
+  background: none;
+  border: none;
+  color: var(--text3);
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  padding: 2px;
+  transition: color 0.2s ease;
+  display: none;
+}
+.milestone-card:hover .milestone-delete {
+  display: block;
+}
+.milestone-delete:hover {
+  color: var(--err);
+}
 </style>
 </head>
 <body>
@@ -420,6 +589,51 @@ header{display:flex;align-items:center;justify-content:space-between;padding:20p
   <div class="errors-section">
     <div class="section-title">Error Patterns <span class="count" id="errorCount">0</span></div>
     <ul class="error-list" id="errorList"></ul>
+  </div>
+
+  <!-- TDD Milestone Archive Section -->
+  <div class="milestones-section">
+    <div class="section-title">✍️ TDD Milestone Archive <span class="count" id="milestoneCount">0</span></div>
+    
+    <div class="milestone-board">
+      <div class="milestone-form-card">
+        <h3>Record New TDD Milestone</h3>
+        <div class="form-group">
+          <label for="msTitle">Milestone Title</label>
+          <input type="text" id="msTitle" placeholder="e.g. Tetris Rotation Bug Resolved">
+        </div>
+        <div class="form-row">
+          <div class="form-group">
+            <label for="msRedErrors">Initial RED Errors</label>
+            <input type="number" id="msRedErrors" placeholder="0" min="0">
+          </div>
+          <div class="form-group">
+            <label for="msPassRate">Pass Rate (%)</label>
+            <input type="number" id="msPassRate" placeholder="100" min="0" max="100">
+          </div>
+          <div class="form-group">
+            <label for="msStatus">Status</label>
+            <select id="msStatus">
+              <option value="OK">OK</option>
+              <option value="WARNING">WARN</option>
+              <option value="ERROR">FAIL</option>
+            </select>
+          </div>
+        </div>
+        <div class="form-group">
+          <label for="msNotes">Qualitative Notes / Retrospective</label>
+          <textarea id="msNotes" placeholder="Write qualitative findings, compile resolutions, and what AI achieved..." rows="3"></textarea>
+        </div>
+        <button class="btn-save" style="width:100%; margin-top:12px; height:38px;" onclick="saveMilestone()">✍️ Archive Milestone</button>
+      </div>
+
+      <div class="milestone-list-card">
+        <h3>TDD Milestone Chronology</h3>
+        <div class="milestone-timeline" id="milestoneTimeline">
+          <div class="empty-timeline">No milestones archived yet. Document your first engineering milestone above!</div>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 
@@ -943,9 +1157,105 @@ function closeModal(event) {
   }
 }
 
+async function loadMilestones() {
+  try {
+    const res = await fetch(API + '/api/milestones');
+    const milestones = await res.json();
+    document.getElementById('milestoneCount').textContent = milestones.length;
+    
+    const container = document.getElementById('milestoneTimeline');
+    if (milestones.length === 0) {
+      container.innerHTML = '<div class="empty-timeline">No milestones archived yet. Document your first engineering milestone above!</div>';
+      return;
+    }
+
+    container.innerHTML = milestones.map(m => {
+      const dateStr = new Date(m.timestamp).toLocaleDateString() + ' ' + new Date(m.timestamp).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'});
+      const statusClass = 'ms-badge-' + m.finalStatus.toLowerCase();
+      return `
+        <div class="milestone-card">
+          <button class="milestone-delete" onclick="deleteMilestone('${m.id}')">&times;</button>
+          <div class="milestone-card-header">
+            <span class="milestone-card-title">${escapeHtml(m.title)}</span>
+            <span class="milestone-card-time">${dateStr}</span>
+          </div>
+          <div class="milestone-badges">
+            <span class="ms-badge ms-badge-red">🔴 RED Errors: ${m.redErrors}</span>
+            <span class="ms-badge ms-badge-rate">📈 Pass Rate: ${m.partialPassRate}%</span>
+            <span class="ms-badge ${statusClass}">🏁 Status: ${m.finalStatus}</span>
+          </div>
+          ${m.notes ? `<div class="milestone-notes">${escapeHtml(m.notes)}</div>` : ''}
+        </div>
+      `;
+    }).join('');
+  } catch (err) {
+    console.error('Failed to load milestones:', err);
+  }
+}
+
+async function saveMilestone() {
+  const title = document.getElementById('msTitle').value.trim();
+  const redErrors = document.getElementById('msRedErrors').value;
+  const partialPassRate = document.getElementById('msPassRate').value;
+  const finalStatus = document.getElementById('msStatus').value;
+  const notes = document.getElementById('msNotes').value.trim();
+
+  if (!title) {
+    showToast('Milestone title is required', 'error');
+    return;
+  }
+
+  try {
+    const res = await fetch(API + '/api/milestones', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title, redErrors, partialPassRate, finalStatus, notes })
+    });
+    const result = await res.json();
+    if (result.success) {
+      showToast('Milestone archived successfully! 🏆', 'success');
+      
+      // Reset Form Fields
+      document.getElementById('msTitle').value = '';
+      document.getElementById('msRedErrors').value = '';
+      document.getElementById('msPassRate').value = '';
+      document.getElementById('msNotes').value = '';
+      
+      await loadMilestones();
+    } else {
+      showToast('Error archiving: ' + result.error, 'error');
+    }
+  } catch (err) {
+    showToast('API connection failed', 'error');
+  }
+}
+
+async function deleteMilestone(id) {
+  if (!confirm('Are you sure you want to permanently delete this milestone?')) return;
+  try {
+    const res = await fetch(API + `/api/milestones?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+    const result = await res.json();
+    if (result.success) {
+      showToast('Milestone deleted', 'success');
+      await loadMilestones();
+    }
+  } catch (err) {
+    showToast('Delete failed', 'error');
+  }
+}
+
+function escapeHtml(str) {
+  if (!str) return '';
+  return str.replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+}
+
 async function init() {
   document.getElementById('projectName').textContent = window.location.host;
-  await Promise.all([loadDiagnostics(), loadErrors(), loadByokConfig()]);
+  await Promise.all([loadDiagnostics(), loadErrors(), loadByokConfig(), loadMilestones()]);
   await Promise.all([loadHeuristicMetrics(), loadTimelineHistory()]);
 }
 

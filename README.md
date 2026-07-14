@@ -4,7 +4,7 @@ Self-diagnosis and self-healing framework for AI-assisted coding projects. Place
 
 [한국어 README](./README.ko.md)
 
-> 🚀 **Latest Version: 1.3.0** (Featuring Qualitative & Quantitative QC Scoreboards & TDD Timeline SVG Trackers)
+> 🚀 **Latest Version: 1.3.1** (Featuring TDD Milestone Archives & Multi-project Port Lock Safety)
 
 ---
 
@@ -20,18 +20,21 @@ Starting from version 1.3.0, the framework goes beyond pass/fail states to calcu
 
 ---
 
-## 📋 Ready-to-Copy Agent Prompts (One-Click Drag)
+## 📋 Ready-to-Copy Agent Prompts (Choose ONE Scenario)
 
-Simply drag and copy these single-block prompts to instantly instruct your AI agent to align with the TDD loop.
+> 💡 **Important**: Do not copy all three prompts at once! Select and copy only the **single prompt** below that matches your current development phase.
 
+### 🆕 [Scenario A] Starting a New Feature / Game from Scratch (Enforce TDD)
 ```text
 Initialize Vibe-Diagnosis (init_diagnostics) and write a lightweight `.diag.js` script to mechanically verify the core success criteria for [Feature/Game Name] BEFORE writing any implementation code. Show me the failing (FAIL) test first, then implement the code piece-by-piece, running diagnostics continuously until everything is green. Finally, launch the dashboard (open_dashboard).
 ```
 
+### 🔍 [Scenario B] Checking if Existing Features still Work (Pre-development Diagnostic)
 ```text
 Run diagnostics (run_diagnostics) first on this project to verify that the existing base-line features are completely green and intact. Show me the dashboard local URL, and then let's proceed to the next development task.
 ```
 
+### 🔧 [Scenario C] Fixing Failing Diagnostics via MCP (Autonomous AI Healing)
 ```text
 If there are any failing (FAIL) diagnostics, invoke the AI self-healing (heal_all) tool to analyze and fix the implementation automatically. Once resolved, run the suite again to update the TDD Timeline and Build Success Predictor.
 ```
@@ -83,7 +86,7 @@ Add this JSON block into your AI agent's MCP configuration panel and restart the
 
 ---
 
-## 📊 1.3.0 Next-Gen Telemetry Dashboard
+## 📊 1.3.1 Next-Gen Telemetry Dashboard
 
 Open `http://localhost:7700` to find a premium Glassmorphism cockpit summarizing your code health:
 
@@ -95,6 +98,11 @@ Open `http://localhost:7700` to find a premium Glassmorphism cockpit summarizing
    - **UI Layer Integrity**: Parses CSS layouts to compute flex/grid viewport adaptability, awarding grades from **A+ to F**.
    - **Asset Independence**: Scans for hardcoded external URLs and Web Audio synthesis hookups, awarding a **GOLD Badge** for pure offline execution.
    - **Dead-Code Debt Index**: Detects unreferenced local bindings to display code cleanliness metrics.
+3. **✍️ TDD Milestone Archive (NEW in v1.3.1)**:
+   - Input retrospective notes and initial error/success ratios manually inside a dedicated Glassmorphism input form.
+   - Saves records inside your repo at `.vibe-diagnosis/milestones.json` for a beautiful, scrollable engineering chronology!
+4. **🔒 Port Lock Cache (NEW in v1.3.1)**:
+   - Prevents backend process duplicate spawning by binding your current repo to an allocated port recorded at `.vibe-diagnosis/active_port.json`. Perfect for working with multiple vibe-coding workspaces simultaneously!
 
 ---
 
