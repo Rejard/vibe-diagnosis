@@ -4,7 +4,7 @@ Self-diagnosis and self-healing framework for AI-assisted coding projects. Place
 
 [한국어 README](./README.ko.md)
 
-> 🚀 **Latest Version: 1.3.1** (Featuring TDD Milestone Archives & Multi-project Port Lock Safety)
+> 🚀 **Latest Version: 1.3.2** (Featuring Interactive Diagnostic Card-Linked Charts with Smooth SVG Transitions)
 
 ---
 
@@ -86,13 +86,14 @@ Add this JSON block into your AI agent's MCP configuration panel and restart the
 
 ---
 
-## 📊 1.3.1 Next-Gen Telemetry Dashboard
+## 📊 1.3.2 Next-Gen Telemetry Dashboard
 
 Open `http://localhost:7700` to find a premium Glassmorphism cockpit summarizing your code health:
 
 1. **📈 TDD Timeline Tracker**:
    - Renders a lightweight, high-fidelity SVG line chart showing pass rate progression from initial RED failures to the final GREEN success.
    - Summarizes the active **TDD Cycle** (total minutes elapsed in fixing the bugs).
+   - **Card-Linked Interactive Filter (NEW in v1.3.2)**: Click on any diagnostic card (e.g., `task-001-runner`) to isolate and filter the SVG line chart. It dynamically transitions to draw only that card's specific timeline progression (0% ➔ 50% ➔ 100%), with a beautiful filled gradient. Clicking the active filter badge in the header instantly resets the view to global average metrics.
 2. **🛡️ QC & Prevention Scoreboard (Static Code Analysis)**:
    - **Build Success Predictor**: Gauges test coverage and system configuration to predict overall compile safety (%).
    - **UI Layer Integrity**: Parses CSS layouts to compute flex/grid viewport adaptability, awarding grades from **A+ to F**.

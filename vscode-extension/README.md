@@ -9,13 +9,13 @@
 
 ---
 
-## 🚀 Key Features (Version 1.3.1 Upgraded)
+## 🚀 Key Features (Version 1.3.2 Upgraded)
 
 * **AI Agent Self-Diagnosis**: Enforces AI coding assistants (Cursor, Windsurf, Gemini/Antigravity) to prove their code works through mechanical `.diag.js` scripts.
-* **📈 TDD Timeline Tracker**: Renders dynamic SVG charts showing the path from initial failure (RED) to final success (GREEN), including a timer showing how fast bugs were resolved.
+* **📈 TDD Timeline Tracker (v1.3.2 Card Filter)**: Renders dynamic SVG charts showing the path from initial failure (RED) to final success (GREEN). Now supports **interactive card-linking**—click on any diagnostic card to dynamically isolate and filter the timeline to only show that test rule's growth trajectory with smooth transitions.
 * **🛡️ QC & Prevention Scoreboard**: Renders high-fidelity telemetry containing overall Build Success Predictor, Responsive UI CSS grade (A+ to F), Asset Independence GOLD Badges, and Dead-Code Debt metrics.
-* **✍️ TDD Milestone Archive (v1.3.1 NEW)**: Save qualitative retrospective findings, compile success stories, and write notes inside a premium local Glassmorphism DB board.
-* **🔒 Port Lock Safety (v1.3.1 NEW)**: Prevents process duplicate spawning and coordinates individual ports across multiple workspace sessions seamlessly.
+* **✍️ TDD Milestone Archive**: Save qualitative retrospective findings, compile success stories, and write notes inside a premium local Glassmorphism DB board.
+* **🔒 Port Lock Safety**: Prevents process duplicate spawning and coordinates individual ports across multiple workspace sessions seamlessly.
 * **AI-Powered Self-Healing (BYOK)**: Supports OpenAI, Anthropic, Gemini, and OpenRouter. Let the AI diagnose failures and auto-repair them on the fly!
 * **Command Palette Integration**: Easily initialize, run, and launch the dashboard directly from VS Code (`Ctrl+Shift+P`).
 * **Active Status Bar Indicators**: Monitor your workspace's health at a glance.

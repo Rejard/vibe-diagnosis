@@ -1,6 +1,17 @@
 # Change Log
 
-## 1.2.7 (Current)
+## 1.3.2 (Current)
+- **Added**: Interactive Diagnostic Card Click Integration (specific rules or test cards can now be clicked in the dashboard to dynamically isolate and transition the SVG TDD timeline chart to that rule's specific growth curve, with full backward compatibility).
+- **Added**: Dashboard chart filter reset trigger badge integrated into the live title bar.
+
+## 1.3.1
+- **Added**: TDD Milestone Chronology Board (saves qualitative retrospect summaries and notes inside a local glassmorphic DB).
+- **Added**: Port Lock Safety Control (avoids node background server duplicate spawning by pinning repos to cached port locks in `.vibe-diagnosis/active_port.json`).
+
+## 1.3.0
+- **Added**: Next-Gen Analytics Telemetry Dashboard featuring pass rate SVG charts, Responsive UI Layout CSS Grade (A+ to F), Asset Independence GOLD badge checks, and Dead-code Debt indices.
+
+## 1.2.7
 - **Added**: Agent-driven workflow rules (auto-registers `.agents/AGENTS.md`, `.cursorrules`, and `.windsurfrules` with pre-defined TDD guidelines to enforce quality constraints across multiple AI coding assistants).
 - **Enhanced**: Strict self-diagnosis constraints embedded directly within the MCP tool descriptions (enforcing AI agents to run `init_diagnostics` and `list_diagnostics` as the non-negotiable 1st step of any feature implementation).
 - **Improved**: Deep documentation rewrite for the VS Code Marketplace and Open VSX (added beautiful bilingual Korean & English user guides for seamless onboarding).
