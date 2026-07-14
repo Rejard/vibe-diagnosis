@@ -1,39 +1,45 @@
-# Vibe Diagnosis for VS Code
+# Vibe Diagnosis
 
-Run project self-diagnosis from VS Code and view the result in a local dashboard.
+Vibe Diagnosis helps you and your coding agent check a project, find problems, and open a local results dashboard.
 
-## Quick start
+## The easy way: ask your coding agent
 
-1. Open your project folder in VS Code.
-2. Open the Command Palette with `Ctrl+Shift+P`.
-3. Run `Vibe Diagnosis: Init` once.
-4. Add or edit `.diag.js` files in `.vibe-diagnosis/diagnostics/`.
-5. Run `Vibe Diagnosis: Run` to check the project.
+Open your project in VS Code, then copy this message to your coding agent:
+
+```text
+Set up Vibe Diagnosis for this project. Add the diagnostics this project needs, run the self-diagnosis, and start the local dashboard so I can review the results in my browser.
+```
+
+If the project needs checks that are not in the example diagnostics, ask the agent to add them:
+
+```text
+Add useful Vibe Diagnosis checks for this project. Create diagnostics for the important parts of the app, then run them and explain any failures.
+```
+
+Your agent needs permission to run terminal commands in the project. If it cannot run commands, use the VS Code commands below.
 
 ## Open the dashboard
 
-Run `Vibe Diagnosis: Open Dashboard` from the Command Palette. It starts the local dashboard server and opens it in your browser.
+Run **Vibe Diagnosis: Open Dashboard** from the Command Palette (`Ctrl+Shift+P`). It starts the local dashboard server and opens the result in your browser.
 
-The normal address is `http://localhost:7700`. If it is already in use, Vibe Diagnosis uses the next free local port.
+The usual address is `http://localhost:7700`. Do not open the address until the command has started the server. If port 7700 is busy, Vibe Diagnosis uses another free local port.
 
-Do not assume a localhost URL is ready just because it was shown. Wait for the browser to open, or run the command again if the server did not start.
-
-## Commands
+## VS Code commands
 
 | Command | What it does |
 |---|---|
-| `Vibe Diagnosis: Init` | Creates `.vibe-diagnosis/` and an example diagnostic |
-| `Vibe Diagnosis: Run` | Runs all diagnostics and shows the result |
-| `Vibe Diagnosis: Run (JSON)` | Prints diagnostic results as JSON |
+| `Vibe Diagnosis: Init` | Creates `.vibe-diagnosis/` and an example check |
+| `Vibe Diagnosis: Run` | Runs all project checks |
+| `Vibe Diagnosis: Run (JSON)` | Shows the results as JSON |
 | `Vibe Diagnosis: Open Dashboard` | Starts and opens the local dashboard |
-| `Vibe Diagnosis: Auto Repair` | Repairs a selected failed diagnostic when BYOK is configured |
+| `Vibe Diagnosis: Auto Repair` | Lets you review an AI repair when BYOK is configured |
 
-## AI repair is optional
+## Optional AI repair
 
-The dashboard can use your own API key for repair. Supported providers are OpenAI, Anthropic, Google Gemini, and OpenRouter. Review any repair before keeping it.
+You can connect your own OpenAI, Anthropic, Google Gemini, or OpenRouter API key for repair suggestions. Always review a repair before keeping it.
 
-## Links
+## More help
 
-- [GitHub documentation](https://github.com/Rejard/vibe-diagnosis)
+- [Full GitHub guide](https://github.com/Rejard/vibe-diagnosis)
 - [CLI package](https://www.npmjs.com/package/vibe-diagnosis)
 - [MCP server package](https://www.npmjs.com/package/vibe-diagnosis-mcp)
