@@ -10,7 +10,7 @@ const { runHeuristicMetrics } = require('./analyzer');
 
 const HTML_PATH = path.join(__dirname, 'dashboard.html');
 
-function logSessionHistory(projectDir, passRate, status) {
+function logSessionHistory(projectDir, passRate, status, cardResults) {
   const historyDir = path.join(projectDir, '.vibe-diagnosis');
   if (!fs.existsSync(historyDir)) {
     fs.mkdirSync(historyDir, { recursive: true });
@@ -30,7 +30,8 @@ function logSessionHistory(projectDir, passRate, status) {
   history.push({
     timestamp: new Date().toISOString(),
     passRate: Math.round(passRate * 100),
-    status: status
+    status: status,
+    cardResults: cardResults || []
   });
   fs.writeFileSync(historyFile, JSON.stringify(history, null, 2), 'utf-8');
 }
@@ -169,7 +170,8 @@ function startDashboard(projectDir, port = 7700) {
         
         // Log to session history
         const passRate = summary.total > 0 ? summary.ok / summary.total : 1.0;
-        logSessionHistory(projectDir, passRate, overallStatus);
+        const cardResults = results.map(r => ({ id: r.id, status: r.status }));
+        logSessionHistory(projectDir, passRate, overallStatus, cardResults);
 
         sendJson(res, { results, summary, overallStatus, healthPercent });
       } catch (err) {

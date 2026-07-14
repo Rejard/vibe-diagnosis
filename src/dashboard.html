@@ -98,8 +98,10 @@ header{display:flex;align-items:center;justify-content:space-between;padding:20p
 .card{
   background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
   padding:20px;transition:all .3s ease;position:relative;overflow:hidden;
+  cursor:pointer;
 }
 .card:hover{border-color:var(--surface3);transform:translateY(-2px);box-shadow:0 8px 32px rgba(0,0,0,.3)}
+.card.selected{border-color:var(--accent2);box-shadow:0 0 16px rgba(108,92,231,.4);background:rgba(108,92,231,.05)}
 .card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;border-radius:var(--radius) var(--radius) 0 0}
 .card.status-ok::before{background:var(--ok)}
 .card.status-warning::before{background:var(--warn)}
@@ -520,7 +522,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:20p
     <!-- TDD Timeline Widget -->
     <div class="widget">
       <div class="widget-header">
-        <span class="widget-title">📈 TDD Timeline Tracker (RED ➔ GREEN)</span>
+        <span class="widget-title" id="chartTitleCaption">📈 TDD Timeline Tracker (RED ➔ GREEN)</span>
         <span class="widget-subtitle" id="timelineDuration">No session history</span>
       </div>
       <div class="timeline-container">
@@ -655,6 +657,38 @@ let lastResults = {};
 let byokConfigured = false;
 let repairStates = {};
 
+let selectedCardId = null;
+let selectedCardName = null;
+
+function selectDiagnosticCard(cardId, cardName, event) {
+  if (event && (event.target.closest('button') || event.target.closest('.card-actions'))) {
+    return;
+  }
+  if (selectedCardId === cardId) {
+    selectedCardId = null;
+    selectedCardName = null;
+  } else {
+    selectedCardId = cardId;
+    selectedCardName = cardName;
+  }
+  loadTimelineHistory();
+  updateCardsSelection();
+}
+
+function updateCardsSelection() {
+  document.querySelectorAll('.card').forEach(el => {
+    el.classList.remove('selected');
+  });
+  if (selectedCardId) {
+    document.querySelectorAll('.card').forEach(el => {
+      const idEl = el.querySelector('.card-id');
+      if (idEl && idEl.textContent.trim() === selectedCardId) {
+        el.classList.add('selected');
+      }
+    });
+  }
+}
+
 async function fetchList() {
   const res = await fetch(API + '/api/list');
   return res.json();
@@ -722,8 +756,9 @@ function createCard(diag, result) {
     `;
   }
 
+  const isSelected = selectedCardId === diag.id ? 'selected' : '';
   return `
-    <div class="card status-${status}">
+    <div class="card status-${status} ${isSelected}" onclick="selectDiagnosticCard('${diag.id}', '${diag.name || diag.id}', event)">
       <div class="card-header">
         <div>
           <div class="card-name">${diag.name || diag.id}</div>
@@ -997,18 +1032,17 @@ async function loadHeuristicMetrics() {
 async function loadTimelineHistory() {
   try {
     const res = await fetch(API + '/api/history');
-    const history = await res.json();
+    const fullHistory = await res.json();
     const svg = document.getElementById('timelineSvg');
     const emptyText = document.getElementById('timelineEmptyText');
     const durationSub = document.getElementById('timelineDuration');
+    const chartTitle = document.getElementById('chartTitleCaption');
 
-    if (!history || history.length === 0) {
+    if (!fullHistory || fullHistory.length === 0) {
       if (emptyText) emptyText.style.display = 'block';
       durationSub.textContent = 'No session history';
       return;
     }
-
-    if (emptyText) emptyText.style.display = 'none';
 
     svg.querySelectorAll('.dynamic-draw').forEach(el => el.remove());
 
@@ -1019,11 +1053,49 @@ async function loadTimelineHistory() {
     const graphWidth = width - padding.left - padding.right;
     const graphHeight = height - padding.top - padding.bottom;
 
-    const pointsCount = history.length;
+    let displayHistory = [];
+    if (selectedCardId) {
+      fullHistory.forEach(h => {
+        if (h.cardResults) {
+          const cardRes = h.cardResults.find(cr => cr.id === selectedCardId);
+          if (cardRes) {
+            let passRateVal = 0;
+            if (cardRes.status === 'OK') passRateVal = 100;
+            else if (cardRes.status === 'WARNING') passRateVal = 50;
+            displayHistory.push({
+              ...h,
+              passRate: passRateVal,
+              status: cardRes.status
+            });
+          }
+        }
+      });
+      if (chartTitle) {
+        chartTitle.innerHTML = `📉 TDD Timeline Tracker <span style="font-size:11px;color:var(--accent2);background:rgba(108,92,231,0.15);padding:2px 8px;border-radius:4px;margin-left:8px;cursor:pointer;" onclick="selectDiagnosticCard(null, null, event)" title="Click to Reset Filter">Filter: ${selectedCardName} &times;</span>`;
+      }
+    } else {
+      displayHistory = fullHistory;
+      if (chartTitle) {
+        chartTitle.innerHTML = `📈 TDD Timeline Tracker <span style="font-size:11px;color:var(--text3);margin-left:8px;">All Cards Average</span>`;
+      }
+    }
+
+    if (displayHistory.length === 0) {
+      if (emptyText) {
+        emptyText.textContent = `No history for [${selectedCardName}] yet.`;
+        emptyText.style.display = 'block';
+      }
+      durationSub.textContent = 'Selected rule has no runs';
+      return;
+    }
+
+    if (emptyText) emptyText.style.display = 'none';
+
+    const pointsCount = displayHistory.length;
     const points = [];
 
     for (let i = 0; i < pointsCount; i++) {
-      const h = history[i];
+      const h = displayHistory[i];
       const x = padding.left + (pointsCount > 1 ? (i / (pointsCount - 1)) * graphWidth : graphWidth / 2);
       const y = padding.top + graphHeight - ((h.passRate / 100) * graphHeight);
       points.push({ x, y, data: h });
@@ -1126,15 +1198,15 @@ async function loadTimelineHistory() {
       svg.appendChild(circle);
     });
 
-    const firstRed = history.find(h => h.status === 'ERROR');
-    const lastGreen = history[history.length - 1].status === 'OK';
-    if (firstRed && lastGreen && history[history.length - 1].timestamp !== firstRed.timestamp) {
+    const firstRed = displayHistory.find(h => h.status === 'ERROR');
+    const lastGreen = displayHistory[displayHistory.length - 1].status === 'OK';
+    if (firstRed && lastGreen && displayHistory[displayHistory.length - 1].timestamp !== firstRed.timestamp) {
       const t1 = new Date(firstRed.timestamp);
-      const t2 = new Date(history[history.length - 1].timestamp);
+      const t2 = new Date(displayHistory[displayHistory.length - 1].timestamp);
       const diffMin = Math.round((t2 - t1) / 1000 / 60);
       durationSub.textContent = `TDD Cycle: Fixed all bugs within ${diffMin}m 🟢`;
     } else {
-      durationSub.textContent = `Active Session: ${history.length} runs recorded`;
+      durationSub.textContent = `Active Session: ${displayHistory.length} runs recorded`;
     }
 
   } catch (err) {
