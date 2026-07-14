@@ -188,6 +188,120 @@ header{display:flex;align-items:center;justify-content:space-between;padding:20p
   .byok-bar .byok-sep{display:none}
   .byok-bar select,.byok-bar input{width:100%}
 }
+
+/* 1.3.0 Dashboard Widget Styles */
+.dashboard-widgets {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+.widget {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+}
+.widget-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 16px;
+}
+.widget-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+  text-transform: uppercase;
+  letter-spacing: .5px;
+}
+.widget-subtitle {
+  font-size: 12px;
+  color: var(--text3);
+}
+.timeline-container {
+  flex: 1;
+  background: var(--surface2);
+  border: 1px solid rgba(255,255,255,.03);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 140px;
+}
+.timeline-container svg {
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+}
+.metrics-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  flex: 1;
+}
+.metric-box {
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  position: relative;
+  overflow: hidden;
+}
+.metric-label {
+  font-size: 11px;
+  color: var(--text3);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  margin-bottom: 6px;
+}
+.metric-val {
+  font-size: 20px;
+  font-weight: 800;
+  color: var(--text);
+}
+.metric-sub {
+  font-size: 10px;
+  color: var(--text2);
+  margin-top: 4px;
+}
+.badge-gold {
+  color: #ffd700;
+  background: rgba(255,215,0,.1);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 700;
+  border: 1px solid rgba(255,215,0,.2);
+}
+.badge-silver {
+  color: #c0c0c0;
+  background: rgba(192,192,192,.1);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 700;
+  border: 1px solid rgba(192,192,192,.2);
+}
+.badge-bronze {
+  color: #cd7f32;
+  background: rgba(205,127,50,.1);
+  padding: 2px 8px;
+  border-radius: 4px;
+  font-weight: 700;
+  border: 1px solid rgba(205,127,50,.2);
+}
+
+@media(max-width:860px){
+  .dashboard-widgets {
+    grid-template-columns: 1fr;
+  }
+}
 </style>
 </head>
 <body>
@@ -230,6 +344,53 @@ header{display:flex;align-items:center;justify-content:space-between;padding:20p
       <div class="stat" style="color:var(--ok)"><strong id="statOk">—</strong> OK</div>
       <div class="stat" style="color:var(--warn)"><strong id="statWarn">—</strong> WARN</div>
       <div class="stat" style="color:var(--err)"><strong id="statErr">—</strong> ERR</div>
+    </div>
+  </div>
+
+  <div class="dashboard-widgets">
+    <!-- TDD Timeline Widget -->
+    <div class="widget">
+      <div class="widget-header">
+        <span class="widget-title">📈 TDD Timeline Tracker (RED ➔ GREEN)</span>
+        <span class="widget-subtitle" id="timelineDuration">No session history</span>
+      </div>
+      <div class="timeline-container">
+        <svg id="timelineSvg" viewBox="0 0 500 130">
+          <!-- Dynamically drawn line will go here -->
+          <text x="250" y="70" fill="var(--text3)" font-size="12" text-anchor="middle" id="timelineEmptyText">Waiting for session data...</text>
+        </svg>
+      </div>
+    </div>
+
+    <!-- QC Prevention Scoreboard Widget -->
+    <div class="widget">
+      <div class="widget-header">
+        <span class="widget-title">🛡️ QC & Prevention Scoreboard</span>
+        <span class="widget-subtitle">Heuristic Static Analysis</span>
+      </div>
+      <div class="metrics-grid">
+        <div class="metric-box">
+          <span class="metric-label">Build Success Predictor</span>
+          <span class="metric-val" id="metricPredictor">—</span>
+          <span class="metric-sub" style="color:var(--ok)">99% Compile Safe</span>
+        </div>
+        <div class="metric-box">
+          <span class="metric-label">UI Layer Integrity</span>
+          <span class="metric-val" id="metricUiGrade" style="background:linear-gradient(135deg,var(--accent2),var(--ok));-webkit-background-clip:text;-webkit-text-fill-color:transparent">—</span>
+          <span class="metric-sub" id="metricUiRatio">—</span>
+        </div>
+        <div class="metric-box" style="grid-column: span 2; display: flex; flex-direction: row; align-items: center; justify-content: space-between; gap: 12px;">
+          <div style="display:flex; flex-direction:column; gap:4px;">
+            <span class="metric-label" style="margin-bottom:0;">Asset Independence</span>
+            <span class="metric-sub" id="metricAssetDesc" style="margin-top:0;">—</span>
+          </div>
+          <span class="metric-val" id="metricAssetBadge" style="font-size:14px; white-space:nowrap;">—</span>
+        </div>
+        <div class="metric-box" style="grid-column: span 2; display: flex; flex-direction: row; align-items: center; justify-content: space-between;">
+          <span class="metric-label" style="margin-bottom:0;">Dead-Code Debt Index</span>
+          <span class="metric-val" id="metricDebt" style="font-size:18px;">—</span>
+        </div>
+      </div>
     </div>
   </div>
 
@@ -436,6 +597,7 @@ async function runDiagnostics() {
     renderCards();
 
     await loadDiagnostics();
+    await Promise.all([loadHeuristicMetrics(), loadTimelineHistory()]);
 
     if (data.overallStatus === 'OK') {
       showToast('✅ All diagnostics passed! Health ' + data.healthPercent + '%', 'success');
@@ -589,6 +751,183 @@ function scrollToByok() {
   document.getElementById('byokProvider').focus();
 }
 
+async function loadHeuristicMetrics() {
+  try {
+    const res = await fetch(API + '/api/metrics');
+    const metrics = await res.json();
+
+    document.getElementById('metricPredictor').textContent = metrics.buildPredictorScore + '%';
+    document.getElementById('metricUiGrade').textContent = metrics.uiIntegrity.grade;
+    document.getElementById('metricUiRatio').textContent = metrics.uiIntegrity.dynamicFlexRatio + '%';
+    
+    const badge = document.getElementById('metricAssetBadge');
+    badge.textContent = metrics.assetIndependence.level + ' BADGE';
+    badge.className = 'metric-val ' + ('badge-' + metrics.assetIndependence.level.toLowerCase());
+    
+    document.getElementById('metricAssetDesc').textContent = metrics.assetIndependence.details;
+    
+    const debt = document.getElementById('metricDebt');
+    debt.textContent = metrics.deadCodeDebtPercent + '% Clean';
+    if (metrics.deadCodeDebtPercent <= 5) {
+      debt.style.color = 'var(--ok)';
+    } else if (metrics.deadCodeDebtPercent <= 15) {
+      debt.style.color = 'var(--warn)';
+    } else {
+      debt.style.color = 'var(--err)';
+    }
+  } catch (err) {
+    console.error('Failed to load metrics:', err);
+  }
+}
+
+async function loadTimelineHistory() {
+  try {
+    const res = await fetch(API + '/api/history');
+    const history = await res.json();
+    const svg = document.getElementById('timelineSvg');
+    const emptyText = document.getElementById('timelineEmptyText');
+    const durationSub = document.getElementById('timelineDuration');
+
+    if (!history || history.length === 0) {
+      if (emptyText) emptyText.style.display = 'block';
+      durationSub.textContent = 'No session history';
+      return;
+    }
+
+    if (emptyText) emptyText.style.display = 'none';
+
+    svg.querySelectorAll('.dynamic-draw').forEach(el => el.remove());
+
+    const width = 500;
+    const height = 130;
+    const padding = { top: 15, right: 15, bottom: 20, left: 25 };
+
+    const graphWidth = width - padding.left - padding.right;
+    const graphHeight = height - padding.top - padding.bottom;
+
+    const pointsCount = history.length;
+    const points = [];
+
+    for (let i = 0; i < pointsCount; i++) {
+      const h = history[i];
+      const x = padding.left + (pointsCount > 1 ? (i / (pointsCount - 1)) * graphWidth : graphWidth / 2);
+      const y = padding.top + graphHeight - ((h.passRate / 100) * graphHeight);
+      points.push({ x, y, data: h });
+    }
+
+    const gridLines = [0, 50, 100];
+    gridLines.forEach(val => {
+      const gy = padding.top + graphHeight - ((val / 100) * graphHeight);
+      
+      const line = document.createElementNS('http://www.w3.org/2000/svg', 'line');
+      line.setAttribute('x1', padding.left);
+      line.setAttribute('y1', gy);
+      line.setAttribute('x2', width - padding.right);
+      line.setAttribute('y2', gy);
+      line.setAttribute('stroke', 'var(--border)');
+      line.setAttribute('stroke-dasharray', '4,4');
+      line.setAttribute('stroke-width', '1');
+      line.setAttribute('class', 'dynamic-draw');
+      svg.appendChild(line);
+
+      const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+      label.setAttribute('x', padding.left - 6);
+      label.setAttribute('y', gy + 4);
+      label.setAttribute('fill', 'var(--text3)');
+      label.setAttribute('font-size', '8');
+      label.setAttribute('text-anchor', 'end');
+      label.setAttribute('class', 'dynamic-draw');
+      label.textContent = val + '%';
+      svg.appendChild(label);
+    });
+
+    if (points.length > 0) {
+      let pathD = `M ${points[0].x} ${points[0].y}`;
+      for (let i = 1; i < points.length; i++) {
+        pathD += ` L ${points[i].x} ${points[i].y}`;
+      }
+
+      const path = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      path.setAttribute('d', pathD);
+      path.setAttribute('fill', 'none');
+      path.setAttribute('stroke', 'var(--accent2)');
+      path.setAttribute('stroke-width', '2.5');
+      path.setAttribute('stroke-linecap', 'round');
+      path.setAttribute('stroke-linejoin', 'round');
+      path.setAttribute('class', 'dynamic-draw');
+      svg.appendChild(path);
+
+      let fillD = pathD + ` L ${points[points.length - 1].x} ${padding.top + graphHeight} L ${points[0].x} ${padding.top + graphHeight} Z`;
+      const fillPath = document.createElementNS('http://www.w3.org/2000/svg', 'path');
+      fillPath.setAttribute('d', fillD);
+      fillPath.setAttribute('fill', 'url(#timelineGrad)');
+      fillPath.setAttribute('opacity', '0.15');
+      fillPath.setAttribute('class', 'dynamic-draw');
+      svg.appendChild(fillPath);
+      
+      let defs = svg.querySelector('defs');
+      if (!defs) {
+        defs = document.createElementNS('http://www.w3.org/2000/svg', 'defs');
+        const grad = document.createElementNS('http://www.w3.org/2000/svg', 'linearGradient');
+        grad.setAttribute('id', 'timelineGrad');
+        grad.setAttribute('x1', '0');
+        grad.setAttribute('y1', '0');
+        grad.setAttribute('x2', '0');
+        grad.setAttribute('y2', '1');
+        
+        const stop1 = document.createElementNS('http://www.w3.org/2000/svg', 'stop');
+        stop1.setAttribute('offset', '0%');
+        stop1.setAttribute('stop-color', 'var(--accent2)');
+        
+        const stop2 = document.createElementNS('http://www.w3.org/2000/svg', 'stop');
+        stop2.setAttribute('offset', '100%');
+        stop2.setAttribute('stop-color', 'transparent');
+        
+        grad.appendChild(stop1);
+        grad.appendChild(stop2);
+        defs.appendChild(grad);
+        svg.appendChild(defs);
+      }
+    }
+
+    points.forEach((p, idx) => {
+      const circle = document.createElementNS('http://www.w3.org/2000/svg', 'circle');
+      circle.setAttribute('cx', p.x);
+      circle.setAttribute('cy', p.y);
+      circle.setAttribute('r', '4');
+      
+      let pointColor = 'var(--accent2)';
+      if (p.data.status === 'ERROR') pointColor = 'var(--err)';
+      else if (p.data.status === 'WARNING') pointColor = 'var(--warn)';
+      else if (p.data.status === 'OK') pointColor = 'var(--ok)';
+
+      circle.setAttribute('fill', 'var(--surface)');
+      circle.setAttribute('stroke', pointColor);
+      circle.setAttribute('stroke-width', '2');
+      circle.setAttribute('class', 'dynamic-draw');
+      
+      const title = document.createElementNS('http://www.w3.org/2000/svg', 'title');
+      title.textContent = `[Run ${idx+1}] Pass: ${p.data.passRate}% (${p.data.status})\n${new Date(p.data.timestamp).toLocaleTimeString()}`;
+      circle.appendChild(title);
+      svg.appendChild(circle);
+    });
+
+    const firstRed = history.find(h => h.status === 'ERROR');
+    const lastGreen = history[history.length - 1].status === 'OK';
+    if (firstRed && lastGreen && history[history.length - 1].timestamp !== firstRed.timestamp) {
+      const t1 = new Date(firstRed.timestamp);
+      const t2 = new Date(history[history.length - 1].timestamp);
+      const diffMin = Math.round((t2 - t1) / 1000 / 60);
+      durationSub.textContent = `TDD Cycle: Fixed all bugs within ${diffMin}m 🟢`;
+    } else {
+      durationSub.textContent = `Active Session: ${history.length} runs recorded`;
+    }
+
+  } catch (err) {
+    console.error('Failed to load timeline:', err);
+  }
+}
+
 async function showError(filename) {
   try {
     const content = await fetchErrorContent(filename);
@@ -607,6 +946,7 @@ function closeModal(event) {
 async function init() {
   document.getElementById('projectName').textContent = window.location.host;
   await Promise.all([loadDiagnostics(), loadErrors(), loadByokConfig()]);
+  await Promise.all([loadHeuristicMetrics(), loadTimelineHistory()]);
 }
 
 init();

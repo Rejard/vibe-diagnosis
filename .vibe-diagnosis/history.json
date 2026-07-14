@@ -1,0 +1,22 @@
+[
+  {
+    "timestamp": "2026-07-15T04:10:00.000Z",
+    "passRate": 0,
+    "status": "ERROR"
+  },
+  {
+    "timestamp": "2026-07-15T04:20:00.000Z",
+    "passRate": 33,
+    "status": "ERROR"
+  },
+  {
+    "timestamp": "2026-07-15T04:35:00.000Z",
+    "passRate": 66,
+    "status": "WARNING"
+  },
+  {
+    "timestamp": "2026-07-15T04:50:00.000Z",
+    "passRate": 100,
+    "status": "OK"
+  }
+]

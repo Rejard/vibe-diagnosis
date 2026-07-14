@@ -6,8 +6,35 @@ const { validateDiagnosticModule } = require('./schema');
 const { getByokConfig, saveByokConfig } = require('./config-manager');
 const { repairDiagnostic } = require('./repairer');
 const { listProviders } = require('./ai-provider');
+const { runHeuristicMetrics } = require('./analyzer');
 
 const HTML_PATH = path.join(__dirname, 'dashboard.html');
+
+function logSessionHistory(projectDir, passRate, status) {
+  const historyDir = path.join(projectDir, '.vibe-diagnosis');
+  if (!fs.existsSync(historyDir)) {
+    fs.mkdirSync(historyDir, { recursive: true });
+  }
+  const historyFile = path.join(historyDir, 'history.json');
+  let history = [];
+  if (fs.existsSync(historyFile)) {
+    try {
+      history = JSON.parse(fs.readFileSync(historyFile, 'utf-8'));
+    } catch (err) {
+      history = [];
+    }
+  }
+  if (history.length >= 100) {
+    history.shift();
+  }
+  history.push({
+    timestamp: new Date().toISOString(),
+    passRate: Math.round(passRate * 100),
+    status: status
+  });
+  fs.writeFileSync(historyFile, JSON.stringify(history, null, 2), 'utf-8');
+}
+
 
 function listDiagnosticMeta(projectDir) {
   const files = discoverDiagnostics(projectDir);
@@ -139,7 +166,42 @@ function startDashboard(projectDir, port = 7700) {
         };
         const overallStatus = summary.error > 0 ? 'ERROR' : summary.warning > 0 ? 'WARNING' : 'OK';
         const healthPercent = summary.total > 0 ? Math.round((summary.ok / summary.total) * 100) : 100;
+        
+        // Log to session history
+        const passRate = summary.total > 0 ? summary.ok / summary.total : 1.0;
+        logSessionHistory(projectDir, passRate, overallStatus);
+
         sendJson(res, { results, summary, overallStatus, healthPercent });
+      } catch (err) {
+        sendJson(res, { error: err.message }, 500);
+      }
+      return;
+    }
+
+    if (req.method === 'GET' && url.pathname === '/api/history') {
+      const historyFile = path.join(projectDir, '.vibe-diagnosis', 'history.json');
+      let history = [];
+      if (fs.existsSync(historyFile)) {
+        try {
+          history = JSON.parse(fs.readFileSync(historyFile, 'utf-8'));
+        } catch (err) {
+          history = [];
+        }
+      }
+      sendJson(res, history);
+      return;
+    }
+
+    if (req.method === 'GET' && url.pathname === '/api/metrics') {
+      try {
+        const list = listDiagnosticMeta(projectDir);
+        const total = list.length;
+        const passed = lastRunResults.length > 0
+          ? lastRunResults.filter(r => r.status === 'OK').length
+          : list.filter(d => d.valid).length;
+
+        const metrics = runHeuristicMetrics(projectDir, total, passed);
+        sendJson(res, metrics);
       } catch (err) {
         sendJson(res, { error: err.message }, 500);
       }
