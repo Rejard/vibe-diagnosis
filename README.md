@@ -20,6 +20,22 @@ Starting from version 1.3.0, the framework goes beyond pass/fail states to calcu
 
 ---
 
+## 🧮 Live Example (Experience Immediately)
+
+This repository includes a pre-configured calculator project under `examples/calculator` so you can instantly experience Vibe-Diagnosis and visual telemetry. Clone this project and run the command below to see it in action!
+
+```bash
+# 1. Clone the repository and install dependencies
+git clone https://github.com/Rejard/vibe-diagnosis.git
+cd vibe-diagnosis
+npm install
+
+# 2. Run the pre-configured calculator example instantly!
+npm run test:example
+```
+
+---
+
 ## 📋 Ready-to-Copy Agent Prompts (Choose ONE Scenario)
 
 > 💡 **Important**: Do not copy all three prompts at once! Select and copy only the **single prompt** below that matches your current development phase.
