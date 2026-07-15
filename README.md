@@ -4,6 +4,10 @@ Self-diagnosis and self-healing framework for AI-assisted coding projects. Place
 
 ## 1.4.0 Safe Repair Workflow
 
+### 1.4.1 patch
+
+Repair validation now clears target-project module cache before each diagnostic, ensuring post-repair checks evaluate changed code rather than stale Node.js imports. The repository also includes a deterministic safe-repair lab that proves regression detection and rollback.
+
 Failed diagnostics can now produce a reviewable repair plan before files are changed. In the dashboard or through MCP, inspect the proposed file changes and diff preview, review the risk level, then explicitly approve application. The repair reruns the full diagnostic suite; AI file changes are rolled back when the target remains unhealthy or a previously healthy diagnostic regresses. Plan creation, approval, validation, regression, and rollback events are retained locally in `.vibe-diagnosis/repair-history.json`.
 
 Use `plan_repair` and `apply_repair_plan` for this approval-based workflow. `repair_diagnostic` and `heal_all` remain available for backwards-compatible automated repair.

@@ -9,6 +9,10 @@
 
 ## 1.4.0 Safe Repair Workflow
 
+### 1.4.1 patch
+
+Post-repair validation now reloads target-project modules before each diagnostic so the dashboard evaluates changed code instead of stale Node.js imports. A deterministic safe-repair lab is included in the repository for regression-and-rollback verification.
+
 The dashboard now offers a review-first repair flow: create a plan for a failed diagnostic, inspect risk and file-level diff previews, then approve the repair. Full diagnostics run after application; AI file changes are rolled back if the target remains unhealthy or a previously healthy diagnostic regresses. The Incident History panel retains local plan, validation, regression, and rollback events.
 
 The VS Code **Auto Repair** command remains a backwards-compatible immediate repair command. For review and explicit approval, open the dashboard and use **Plan Repair**, or use MCP tools `plan_repair` and `apply_repair_plan`.

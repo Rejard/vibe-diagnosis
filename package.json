@@ -1,6 +1,6 @@
 {
   "name": "vibe-diagnosis",
-  "version": "1.4.0",
+  "version": "1.4.1",
   "description": "Self-diagnosis framework for vibe coding projects",
   "main": "src/runner.js",
   "bin": {

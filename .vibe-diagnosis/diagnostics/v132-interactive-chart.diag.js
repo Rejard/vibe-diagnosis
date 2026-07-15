@@ -16,17 +16,17 @@ module.exports = {
       const mcpPkg = JSON.parse(fs.readFileSync(path.join(projectDir, 'mcp-server/package.json'), 'utf-8'));
       const vsPkg = JSON.parse(fs.readFileSync(path.join(projectDir, 'vscode-extension/package.json'), 'utf-8'));
 
-      if (rootPkg.version !== '1.4.0') {
-        errors.push(`Root package.json version is ${rootPkg.version}, expected 1.4.0`);
+      if (rootPkg.version !== '1.4.1') {
+        errors.push(`Root package.json version is ${rootPkg.version}, expected 1.4.1`);
       }
-      if (mcpPkg.version !== '1.4.0') {
-        errors.push(`MCP package.json version is ${mcpPkg.version}, expected 1.4.0`);
+      if (mcpPkg.version !== '1.4.1') {
+        errors.push(`MCP package.json version is ${mcpPkg.version}, expected 1.4.1`);
       }
-      if (mcpPkg.dependencies['vibe-diagnosis'] !== '^1.4.0') {
-        errors.push(`MCP package.json dependency 'vibe-diagnosis' version is ${mcpPkg.dependencies['vibe-diagnosis']}, expected ^1.4.0`);
+      if (mcpPkg.dependencies['vibe-diagnosis'] !== '^1.4.1') {
+        errors.push(`MCP package.json dependency 'vibe-diagnosis' version is ${mcpPkg.dependencies['vibe-diagnosis']}, expected ^1.4.1`);
       }
-      if (vsPkg.version !== '1.4.0') {
-        errors.push(`VSCode package.json version is ${vsPkg.version}, expected 1.4.0`);
+      if (vsPkg.version !== '1.4.1') {
+        errors.push(`VSCode package.json version is ${vsPkg.version}, expected 1.4.1`);
       }
     } catch (err) {
       errors.push(`Failed to read package.json files: ${err.message}`);
