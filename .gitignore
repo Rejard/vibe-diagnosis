@@ -6,7 +6,7 @@ node_modules/
 .vibe-diagnosis/active_port.json
 .vibe-diagnosis/milestones.json
 .vibe-diagnosis/config.json
-.vibe-diagnosis/history/
+.vibe-diagnosis/history.json
 
 # Keep our core TDD diagnostics tracked since this is the vibe-diagnosis engine repository!
 !.vibe-diagnosis/diagnostics/
