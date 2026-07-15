@@ -8,6 +8,7 @@ module.exports = {
   linkedTask: 'v1.4.0 safe repair, incident history, and dashboard UX',
   async run({ projectDir }) {
     const repairer = fs.readFileSync(path.join(projectDir, 'src', 'repairer.js'), 'utf8');
+    const runner = fs.readFileSync(path.join(projectDir, 'src', 'runner.js'), 'utf8');
     const dashboard = fs.readFileSync(path.join(projectDir, 'src', 'dashboard.js'), 'utf8');
     const html = fs.readFileSync(path.join(projectDir, 'src', 'dashboard.html'), 'utf8');
     const mcp = fs.readFileSync(path.join(projectDir, 'mcp-server', 'index.js'), 'utf8');
@@ -18,6 +19,7 @@ module.exports = {
       ['repair plan creation', repairer.includes('createRepairPlan')],
       ['approved plan application', repairer.includes('applyRepairPlan')],
       ['repair audit history', repairer.includes('repair-history.json')],
+      ['fresh module validation', runner.includes('clearProjectRequireCache')],
       ['repair plan API', dashboard.includes("'/api/repair/plan'")],
       ['repair apply API', dashboard.includes("'/api/repair/apply'")],
       ['incident API', dashboard.includes("'/api/incidents'")],

@@ -1,0 +1,5 @@
+.vibe-diagnosis/repair-plans/
+.vibe-diagnosis/repair-history.json
+.vibe-diagnosis/active_port.json
+.vibe-diagnosis/history.json
+.vibe-diagnosis/config.json

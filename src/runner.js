@@ -5,6 +5,15 @@ const { validateDiagnosticModule, validateResult } = require('./schema');
 const DIAG_DIR = '.vibe-diagnosis/diagnostics';
 const DIAG_PATTERN = /\.diag\.js$/;
 
+function clearProjectRequireCache(projectDir) {
+  const projectRoot = path.resolve(projectDir) + path.sep;
+  for (const modulePath of Object.keys(require.cache)) {
+    if (modulePath.startsWith(projectRoot)) {
+      delete require.cache[modulePath];
+    }
+  }
+}
+
 function discoverDiagnostics(projectDir) {
   const diagPath = path.join(projectDir, DIAG_DIR);
 
@@ -47,6 +56,7 @@ async function runDiagnostics(projectDir) {
       let mod;
 
       try {
+        clearProjectRequireCache(projectDir);
         delete require.cache[require.resolve(filePath)];
         mod = require(filePath);
       } catch (err) {
@@ -127,4 +137,4 @@ async function runDiagnostics(projectDir) {
   return results;
 }
 
-module.exports = { runDiagnostics, discoverDiagnostics };
+module.exports = { runDiagnostics, discoverDiagnostics, clearProjectRequireCache };

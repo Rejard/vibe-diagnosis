@@ -8,6 +8,16 @@ Failed diagnostics can now produce a reviewable repair plan before files are cha
 
 Use `plan_repair` and `apply_repair_plan` for this approval-based workflow. `repair_diagnostic` and `heal_all` remain available for backwards-compatible automated repair.
 
+### Verify it safely
+
+The repository includes [`examples/safe-repair-lab`](./examples/safe-repair-lab), a disposable project with one deliberate failure and one regression guard. Use it to validate a review-and-approve repair without touching an application project:
+
+```bash
+node bin/vibe-diag.js dashboard --cwd examples/safe-repair-lab --port 7721
+```
+
+Configure BYOK, run the diagnostics, review **Plan Repair**, and approve it. For a deterministic rollback check, run `node examples/safe-repair-lab/verify-rollback.cjs`.
+
 [한국어 README](./README.ko.md)
 
 > 🚀 **Latest Version: 1.3.3** (Featuring Dashboard Server Shutdown Controls, Automated Full-Folder .gitignore Isolation, and Interactive SVG Telemetry Charts)
