@@ -9,11 +9,11 @@
 
 ---
 
-## 🚀 Key Features (Version 1.3.2 Upgraded)
+## 🚀 Key Features (Version 1.3.3 Upgraded)
 
 * **AI Agent Self-Diagnosis**: Enforces AI coding assistants (Cursor, Windsurf, Gemini/Antigravity) to prove their code works through mechanical `.diag.js` scripts.
-* **📈 TDD Timeline Tracker (v1.3.2 Card Filter)**: Renders dynamic SVG charts showing the path from initial failure (RED) to final success (GREEN). Now supports **interactive card-linking**—click on any diagnostic card to dynamically isolate and filter the timeline to only show that test rule's growth trajectory with smooth transitions.
-* **🛡️ QC & Prevention Scoreboard**: Renders high-fidelity telemetry containing overall Build Success Predictor, Responsive UI CSS grade (A+ to F), Asset Independence GOLD Badges, and Dead-Code Debt metrics.
+* **📈 TDD Timeline Tracker & Shutdown Controls (v1.3.3 Upgraded)**: Renders dynamic SVG charts showing the path from failure (RED) to success (GREEN). Includes **interactive card-linking** to filter SVG charts with smooth transitions, plus **원클릭 서버 종료 (Server Shutdown Control)** on the web cockpit or terminal to free up memory immediately.
+* **🛡️ QC & Prevention Scoreboard & Isolation**: Renders overall Build Success Predictor, Responsive UI CSS viewport grades, Asset Independence, and Dead-Code Debt metrics. Now features **automated full-folder .gitignore isolation** on initialization to secure all local QC metrics from leaking to Git.
 * **✍️ TDD Milestone Archive**: Save qualitative retrospective findings, compile success stories, and write notes inside a premium local Glassmorphism DB board.
 * **🔒 Port Lock Safety**: Prevents process duplicate spawning and coordinates individual ports across multiple workspace sessions seamlessly.
 * **AI-Powered Self-Healing (BYOK)**: Supports OpenAI, Anthropic, Gemini, and OpenRouter. Let the AI diagnose failures and auto-repair them on the fly!

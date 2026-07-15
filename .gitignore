@@ -2,4 +2,4 @@ node_modules/
 .DS_Store
 *.log
 *.vsix
-.vibe-diagnosis/config.json
+.vibe-diagnosis/

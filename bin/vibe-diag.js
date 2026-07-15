@@ -149,6 +149,10 @@ async function main() {
       await handleRepair();
       break;
     }
+    case 'stop': {
+      await handleStop();
+      break;
+    }
     default: {
       const pkg = require('../package.json');
       console.log(`\n  Vibe Diagnosis v${pkg.version}\n`);
@@ -163,6 +167,7 @@ async function main() {
       console.log('    vibe-diag repair <diagId>      Auto-repair a specific diagnostic with AI');
       console.log('    vibe-diag repair --all         Auto-repair all failing diagnostics');
       console.log('    vibe-diag heal                 Auto-heal all failing diagnostics (local or AI)');
+      console.log('    vibe-diag stop                 Stop the running web dashboard');
       console.log('    vibe-diag --cwd <path>        Run in specified directory\n');
     }
   }
@@ -294,6 +299,32 @@ async function handleRepair() {
   console.log(`  Repaired: ${successCount}/${targets.length}`);
   if (successCount < targets.length) process.exitCode = 1;
   console.log('');
+}
+
+async function handleStop() {
+  const fs = require('fs');
+  const lockPath = path.join(targetDir, '.vibe-diagnosis', 'active_port.json');
+  if (!fs.existsSync(lockPath)) {
+    console.log('\n  \x1b[33m⚠️ No running dashboard found.\x1b[0m\n');
+    return;
+  }
+  try {
+    const lock = JSON.parse(fs.readFileSync(lockPath, 'utf8'));
+    if (lock && lock.pid) {
+      try {
+        process.kill(lock.pid, 'SIGTERM');
+        console.log(`\n  \x1b[32m✅ Terminated dashboard process (PID: ${lock.pid})\x1b[0m`);
+      } catch (e) {
+        console.log(`\n  \x1b[33m⚠️ Process (PID: ${lock.pid}) is already stopped.\x1b[0m`);
+      }
+    }
+    if (fs.existsSync(lockPath)) {
+      fs.unlinkSync(lockPath);
+    }
+    console.log('  \x1b[32m✅ Removed active_port.json lock file.\x1b[0m\n');
+  } catch (e) {
+    console.error('\n  \x1b[31m❌ Error stopping dashboard:\x1b[0m', e.message);
+  }
 }
 
 main().catch(err => {

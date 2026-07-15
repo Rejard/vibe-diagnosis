@@ -224,7 +224,7 @@ function startDashboard(projectDir, port = 7700) {
         const newMilestone = {
           id: 'ms-' + Date.now(),
           timestamp: new Date().toISOString(),
-          title: body.title || '새 마일스톤',
+          title: body.title || 'New Milestone',
           redErrors: parseInt(body.redErrors, 10) || 0,
           partialPassRate: parseInt(body.partialPassRate, 10) || 0,
           finalStatus: body.finalStatus || 'OK',
@@ -331,6 +331,28 @@ function startDashboard(projectDir, port = 7700) {
         }
 
         sendJson(res, result);
+      } catch (err) {
+        sendJson(res, { error: err.message }, 500);
+      }
+      return;
+    }
+
+    if (req.method === 'POST' && url.pathname === '/api/shutdown') {
+      try {
+        sendJson(res, { success: true, message: 'Dashboard is shutting down...' });
+
+        const lockFile = path.join(projectDir, '.vibe-diagnosis', 'active_port.json');
+        if (fs.existsSync(lockFile)) {
+          try {
+            fs.unlinkSync(lockFile);
+          } catch (e) {
+            // Safe ignore
+          }
+        }
+
+        setTimeout(() => {
+          process.exit(0);
+        }, 500);
       } catch (err) {
         sendJson(res, { error: err.message }, 500);
       }

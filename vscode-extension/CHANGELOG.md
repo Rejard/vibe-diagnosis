@@ -1,6 +1,11 @@
 # Change Log
 
-## 1.3.2 (Current)
+## 1.3.3 (Current)
+- **Added**: One-click Dashboard Server Shutdown Control (safely close the background server and release port 7700 resources from both the web interface and CLI).
+- **Added**: Stop command (`stop_dashboard` MCP tool & `vibe-diag stop` CLI) integration for seamless developer-led resource management.
+- **Added**: Automated full-folder `.gitignore` isolation to guarantee local tests and runtime temp configs are kept entirely separate from public Git repositories.
+
+## 1.3.2
 - **Added**: Interactive Diagnostic Card Click Integration (specific rules or test cards can now be clicked in the dashboard to dynamically isolate and transition the SVG TDD timeline chart to that rule's specific growth curve, with full backward compatibility).
 - **Added**: Dashboard chart filter reset trigger badge integrated into the live title bar.
 

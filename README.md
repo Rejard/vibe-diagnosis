@@ -4,7 +4,7 @@ Self-diagnosis and self-healing framework for AI-assisted coding projects. Place
 
 [한국어 README](./README.ko.md)
 
-> 🚀 **Latest Version: 1.3.2** (Featuring Interactive Diagnostic Card-Linked Charts with Smooth SVG Transitions)
+> 🚀 **Latest Version: 1.3.3** (Featuring Dashboard Server Shutdown Controls, Automated Full-Folder .gitignore Isolation, and Interactive SVG Telemetry Charts)
 
 ---
 
@@ -86,7 +86,7 @@ Add this JSON block into your AI agent's MCP configuration panel and restart the
 
 ---
 
-## 📊 1.3.2 Next-Gen Telemetry Dashboard
+## 📊 1.3.3 Next-Gen Telemetry Dashboard
 
 Open `http://localhost:7700` to find a premium Glassmorphism cockpit summarizing your code health:
 
@@ -103,7 +103,10 @@ Open `http://localhost:7700` to find a premium Glassmorphism cockpit summarizing
    - Input retrospective notes and initial error/success ratios manually inside a dedicated Glassmorphism input form.
    - Saves records inside your repo at `.vibe-diagnosis/milestones.json` for a beautiful, scrollable engineering chronology!
 4. **🔒 Port Lock Cache (NEW in v1.3.1)**:
-   - Prevents backend process duplicate spawning by binding your current repo to an allocated port recorded at `.vibe-diagnosis/active_port.json`. Perfect for working with multiple vibe-coding workspaces simultaneously!
+   - Prevents duplicate backend process spawns by binding your current repo to an allocated port recorded at `.vibe-diagnosis/active_port.json`. Perfect for working with multiple vibe-coding workspaces simultaneously!
+5. **🛑 Server Shutdown Controls (NEW in v1.3.3)**:
+   - Close the background dashboard server with a single click inside the web interface or via the CLI to instantly free up port 7700 and memory resources.
+   - **Automated .gitignore Isolation (NEW in v1.3.3)**: Initializing vibe-diagnosis automatically ignores the entire `.vibe-diagnosis/` folder, ensuring no local tests or temp configs are accidentally uploaded to GitHub.
 
 ---
 
@@ -113,7 +116,8 @@ Open `http://localhost:7700` to find a premium Glassmorphism cockpit summarizing
 npx -y vibe-diagnosis init                  # 1. Initialize diagnostic workspace & create boilerplate
 npx -y vibe-diagnosis run                   # 2. Run all diagnostics and spin up the private web server
 npx -y vibe-diagnosis dashboard             # 3. Fire up the dashboard GUI server stand-alone
-npx -y vibe-diagnosis heal                  # 4. Trigger bulk AI self-healing repairs for failed tests
+npx -y vibe-diagnosis stop                  # 4. Stop the active background dashboard server cleanly
+npx -y vibe-diagnosis heal                  # 5. Trigger bulk AI self-healing repairs for failed tests
 ```
 
 ---
@@ -126,6 +130,7 @@ npx -y vibe-diagnosis heal                  # 4. Trigger bulk AI self-healing re
 | `list_diagnostics` | Discovers and validates all written `.diag.js` files |
 | `run_diagnostics` | Runs all diagnostic checks and records data history |
 | `open_dashboard` | Launches the local dashboard web interface |
+| `stop_dashboard` | Shuts down the active dashboard server and frees up port resources |
 | `repair_diagnostic` | Runs autonomous AI debugging on a specific failing test |
 | `heal_all` | Runs sequential bulk AI self-healing routines across all failed tests |
 | `read_error_pattern` | Loads known common error resolution knowledge |

@@ -39,7 +39,7 @@ const { repairDiagnostic } = core.repairer;
 
 const server = new McpServer({
   name: "vibe-diagnosis",
-  version: "1.2.1",
+  version: "1.3.3",
 });
 
 function isPortInUse(port) {

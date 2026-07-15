@@ -5,7 +5,7 @@ module.exports = {
   id: 'v132-interactive-chart-diagnostic',
   name: 'v1.3.2 Interactive Chart Validation',
   layer: 'SYSTEM',
-  linkedTask: 'v1.3.2 진단 카드 클릭 연동형 차트 기능 및 버전 싱크 검증',
+  linkedTask: 'v1.3.2 Diagnostic Card Click-Linked Chart Functionality & Version Sync Verification',
   
   async run({ projectDir }) {
     const errors = [];
@@ -16,17 +16,17 @@ module.exports = {
       const mcpPkg = JSON.parse(fs.readFileSync(path.join(projectDir, 'mcp-server/package.json'), 'utf-8'));
       const vsPkg = JSON.parse(fs.readFileSync(path.join(projectDir, 'vscode-extension/package.json'), 'utf-8'));
 
-      if (rootPkg.version !== '1.3.2') {
-        errors.push(`Root package.json version is ${rootPkg.version}, expected 1.3.2`);
+      if (rootPkg.version !== '1.3.3') {
+        errors.push(`Root package.json version is ${rootPkg.version}, expected 1.3.3`);
       }
-      if (mcpPkg.version !== '1.3.2') {
-        errors.push(`MCP package.json version is ${mcpPkg.version}, expected 1.3.2`);
+      if (mcpPkg.version !== '1.3.3') {
+        errors.push(`MCP package.json version is ${mcpPkg.version}, expected 1.3.3`);
       }
-      if (mcpPkg.dependencies['vibe-diagnosis'] !== '^1.3.2') {
-        errors.push(`MCP package.json dependency 'vibe-diagnosis' version is ${mcpPkg.dependencies['vibe-diagnosis']}, expected ^1.3.2`);
+      if (mcpPkg.dependencies['vibe-diagnosis'] !== '^1.3.3') {
+        errors.push(`MCP package.json dependency 'vibe-diagnosis' version is ${mcpPkg.dependencies['vibe-diagnosis']}, expected ^1.3.3`);
       }
-      if (vsPkg.version !== '1.3.2') {
-        errors.push(`VSCode package.json version is ${vsPkg.version}, expected 1.3.2`);
+      if (vsPkg.version !== '1.3.3') {
+        errors.push(`VSCode package.json version is ${vsPkg.version}, expected 1.3.3`);
       }
     } catch (err) {
       errors.push(`Failed to read package.json files: ${err.message}`);

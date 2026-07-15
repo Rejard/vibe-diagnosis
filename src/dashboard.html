@@ -473,6 +473,103 @@ header{display:flex;align-items:center;justify-content:space-between;padding:20p
 .milestone-delete:hover {
   color: var(--err);
 }
+
+.btn-shutdown {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 14px;
+  background: rgba(255, 61, 113, 0.1);
+  color: #ff3d71;
+  border: 1px solid rgba(255, 61, 113, 0.25);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: 'Inter', sans-serif;
+}
+.btn-shutdown:hover {
+  background: var(--err);
+  color: #fff;
+  border-color: var(--err);
+  box-shadow: 0 0 12px rgba(255, 61, 113, 0.4);
+  transform: translateY(-1px);
+}
+.btn-shutdown:active {
+  transform: translateY(0);
+}
+
+.shutdown-overlay {
+  display: none;
+  position: fixed;
+  inset: 0;
+  background: rgba(5, 5, 8, 0.95);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+  z-index: 9999;
+  align-items: center;
+  justify-content: center;
+  animation: fadeIn 0.4s ease both;
+}
+.shutdown-overlay.active {
+  display: flex;
+}
+.shutdown-card {
+  background: rgba(20, 20, 30, 0.6);
+  border: 1px solid rgba(255, 61, 113, 0.2);
+  border-radius: 24px;
+  padding: 40px;
+  text-align: center;
+  max-width: 480px;
+  width: 90%;
+  box-shadow: 0 20px 50px rgba(0, 0, 0, 0.5), inset 0 0 30px rgba(255, 61, 113, 0.05);
+}
+.shutdown-badge {
+  display: inline-block;
+  padding: 6px 16px;
+  background: rgba(255, 61, 113, 0.15);
+  color: #ff3d71;
+  border-radius: 30px;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 1px;
+  margin-bottom: 24px;
+  border: 1px solid rgba(255, 61, 113, 0.25);
+}
+.shutdown-card h2 {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text);
+  margin-bottom: 12px;
+}
+.shutdown-card p {
+  font-size: 14px;
+  color: var(--text2);
+  margin-bottom: 8px;
+}
+.shutdown-card p.subtext {
+  font-size: 12px;
+  color: var(--text3);
+  margin-top: 16px;
+  margin-bottom: 24px;
+}
+.btn-close-tab {
+  padding: 10px 24px;
+  background: var(--surface2);
+  border: 1px solid var(--border);
+  color: var(--text2);
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.btn-close-tab:hover {
+  background: var(--surface3);
+  color: var(--text);
+  border-color: var(--text3);
+}
 </style>
 </head>
 <body>
@@ -487,6 +584,9 @@ header{display:flex;align-items:center;justify-content:space-between;padding:20p
       </div>
     </div>
     <div class="header-right">
+      <button class="btn-shutdown" id="btnShutdown" title="대시보드 서버 종료">
+        <span class="shutdown-icon">🛑</span> 서버 끄기
+      </button>
       <div class="ai-status" id="aiStatus" onclick="scrollToByok()">
         <span class="ai-dot"></span>
         <span>🤖</span>
@@ -1332,6 +1432,48 @@ async function init() {
 }
 
 init();
+
+const btnShutdown = document.getElementById('btnShutdown');
+const shutdownOverlay = document.getElementById('shutdownOverlay');
+
+if (btnShutdown) {
+  btnShutdown.addEventListener('click', async () => {
+    if (!confirm('정말로 자가진단 대시보드 서버를 종료하시겠습니까?')) {
+      return;
+    }
+    
+    try {
+      btnShutdown.disabled = true;
+      btnShutdown.innerText = '종료 중...';
+      
+      const response = await fetch('/api/shutdown', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' }
+      });
+      
+      if (response.ok) {
+        shutdownOverlay.classList.add('active');
+        showToast('서버가 안전하게 종료되었습니다.', 'success');
+      } else {
+        throw new Error('서버 종료 실패');
+      }
+    } catch (err) {
+      btnShutdown.disabled = false;
+      btnShutdown.innerHTML = '<span class="shutdown-icon">🛑</span> 서버 끄기';
+      showToast('서버 종료 중 에러가 발생했습니다: ' + err.message, 'error');
+    }
+  });
+}
 </script>
+
+<div class="shutdown-overlay" id="shutdownOverlay">
+  <div class="shutdown-card">
+    <div class="shutdown-badge">🛑 SHUTDOWN COMPLETE</div>
+    <h2>자가진단 대시보드 서버가 정상 종료되었습니다</h2>
+    <p>포트 7700 및 프로세스 자원이 안전하게 해제되었습니다.</p>
+    <p class="subtext">이제 이 브라우저 탭을 닫으셔도 좋습니다.</p>
+    <button class="btn-close-tab" onclick="window.close()">창 닫기</button>
+  </div>
+</div>
 </body>
 </html>

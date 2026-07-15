@@ -76,14 +76,19 @@ function getResolvedByok(projectDir) {
 
 function ensureGitignore(projectDir) {
   const gitignorePath = path.join(projectDir, '.gitignore');
-  const entry = '.vibe-diagnosis/config.json';
+  const entry = '.vibe-diagnosis/';
 
   let content = '';
   if (fs.existsSync(gitignorePath)) {
     content = fs.readFileSync(gitignorePath, 'utf-8');
   }
 
-  if (content.split('\n').some(line => line.trim() === entry)) return;
+  const alreadyIgnored = content.split('\n').some(line => {
+    const trimmed = line.trim();
+    return trimmed === entry || trimmed === '.vibe-diagnosis' || trimmed === '.vibe-diagnosis/config.json';
+  });
+
+  if (alreadyIgnored) return;
 
   const newline = content.length > 0 && !content.endsWith('\n') ? '\n' : '';
   fs.writeFileSync(gitignorePath, content + newline + entry + '\n', 'utf-8');
