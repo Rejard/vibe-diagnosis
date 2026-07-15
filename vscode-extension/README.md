@@ -7,6 +7,12 @@
 > **"Never write code without a safety net."**
 > Bring the discipline of Test-Driven Development (TDD) directly into your AI-assisted "vibe coding" sessions. Keep your agent grounded, prevent regressions, and automatically self-heal bugs before you even notice them.
 
+## 1.4.0 Safe Repair Workflow
+
+The dashboard now offers a review-first repair flow: create a plan for a failed diagnostic, inspect risk and file-level diff previews, then approve the repair. Full diagnostics run after application; AI file changes are rolled back if the target remains unhealthy or a previously healthy diagnostic regresses. The Incident History panel retains local plan, validation, regression, and rollback events.
+
+The VS Code **Auto Repair** command remains a backwards-compatible immediate repair command. For review and explicit approval, open the dashboard and use **Plan Repair**, or use MCP tools `plan_repair` and `apply_repair_plan`.
+
 ---
 
 ## 🚀 Key Features (Version 1.3.3 Upgraded)
@@ -16,7 +22,7 @@
 * **🛡️ QC & Prevention Scoreboard & Isolation**: Renders overall Build Success Predictor, Responsive UI CSS viewport grades, Asset Independence, and Dead-Code Debt metrics. Now features **automated full-folder .gitignore isolation** on initialization to secure all local QC metrics from leaking to Git.
 * **✍️ TDD Milestone Archive**: Save qualitative retrospective findings, compile success stories, and write notes inside a premium local Glassmorphism DB board.
 * **🔒 Port Lock Safety**: Prevents process duplicate spawning and coordinates individual ports across multiple workspace sessions seamlessly.
-* **AI-Powered Self-Healing (BYOK)**: Supports OpenAI, Anthropic, Gemini, and OpenRouter. Let the AI diagnose failures and auto-repair them on the fly!
+* **AI-Powered Self-Healing (BYOK)**: Supports OpenAI, Anthropic, Gemini, and OpenRouter. Use the dashboard's review-first repair plan for risk and diff inspection, or the backwards-compatible Auto Repair command for immediate repair.
 * **Command Palette Integration**: Easily initialize, run, and launch the dashboard directly from VS Code (`Ctrl+Shift+P`).
 * **Active Status Bar Indicators**: Monitor your workspace's health at a glance.
 
