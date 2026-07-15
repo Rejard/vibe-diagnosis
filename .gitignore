@@ -2,4 +2,11 @@ node_modules/
 .DS_Store
 *.log
 *.vsix
-.vibe-diagnosis/
+# Ignore local port locks, qualitative retrospectives, configs, and history logs
+.vibe-diagnosis/active_port.json
+.vibe-diagnosis/milestones.json
+.vibe-diagnosis/config.json
+.vibe-diagnosis/history/
+
+# Keep our core TDD diagnostics tracked since this is the vibe-diagnosis engine repository!
+!.vibe-diagnosis/diagnostics/
