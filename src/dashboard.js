@@ -4,7 +4,7 @@ const path = require('path');
 const { runDiagnostics, discoverDiagnostics } = require('./runner');
 const { validateDiagnosticModule } = require('./schema');
 const { getByokConfig, saveByokConfig } = require('./config-manager');
-const { repairDiagnostic } = require('./repairer');
+const { repairDiagnostic, createRepairPlan, applyRepairPlan, readAudit } = require('./repairer');
 const { listProviders } = require('./ai-provider');
 const { runHeuristicMetrics } = require('./analyzer');
 
@@ -334,6 +334,53 @@ function startDashboard(projectDir, port = 7700) {
       } catch (err) {
         sendJson(res, { error: err.message }, 500);
       }
+      return;
+    }
+
+    if (req.method === 'POST' && url.pathname === '/api/repair/plan') {
+      try {
+        const body = await readBody(req);
+        const diagId = body.diagId;
+        if (!diagId) {
+          sendJson(res, { error: 'diagId is required' }, 400);
+          return;
+        }
+        const diagResult = lastRunResults.find(result => result.id === diagId);
+        if (!diagResult) {
+          sendJson(res, { error: `No recent result found for "${diagId}". Run diagnostics first.` }, 404);
+          return;
+        }
+        if (diagResult.status === 'OK') {
+          sendJson(res, { error: `Diagnostic "${diagId}" is already OK.` }, 400);
+          return;
+        }
+        const plan = await createRepairPlan(projectDir, diagResult, lastRunResults);
+        sendJson(res, { success: true, plan });
+      } catch (err) {
+        sendJson(res, { error: err.message }, 500);
+      }
+      return;
+    }
+
+    if (req.method === 'POST' && url.pathname === '/api/repair/apply') {
+      try {
+        const body = await readBody(req);
+        if (!body.planId) {
+          sendJson(res, { error: 'planId is required' }, 400);
+          return;
+        }
+        const result = await applyRepairPlan(projectDir, body.planId, { approved: body.approved === true });
+        if (result.result && result.result.rerunResults) lastRunResults = result.result.rerunResults;
+        sendJson(res, { success: result.result.success, repair: result });
+      } catch (err) {
+        sendJson(res, { error: err.message }, 400);
+      }
+      return;
+    }
+
+    if (req.method === 'GET' && url.pathname === '/api/incidents') {
+      const incidents = readAudit(projectDir);
+      sendJson(res, incidents);
       return;
     }
 

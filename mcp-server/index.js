@@ -35,11 +35,11 @@ const core = loadCore();
 const { runDiagnostics, discoverDiagnostics } = core.runner;
 const { validateDiagnosticModule } = core.schema;
 const { initialize } = core.init;
-const { repairDiagnostic } = core.repairer;
+const { repairDiagnostic, createRepairPlan, applyRepairPlan, readAudit } = core.repairer;
 
 const server = new McpServer({
   name: "vibe-diagnosis",
-  version: "1.3.3",
+  version: "1.4.1",
 });
 
 function isPortInUse(port) {
@@ -277,6 +277,52 @@ server.tool(
       };
     }
   }
+);
+
+server.tool(
+  "plan_repair",
+  "Create a reviewable repair plan for one failed diagnostic. Returns root-cause context, risk level, changed files, and diff previews without modifying project files.",
+  {
+    projectDir: z.string().describe("Absolute path to the project root directory"),
+    diagId: z.string().describe("Failed diagnostic ID to analyze"),
+  },
+  async ({ projectDir, diagId }) => {
+    try {
+      const results = await runDiagnostics(projectDir);
+      const target = results.find(result => result.id === diagId);
+      if (!target) throw new Error(`Diagnostic "${diagId}" not found.`);
+      if (target.status === "OK") throw new Error(`Diagnostic "${diagId}" is already healthy.`);
+      const plan = await createRepairPlan(projectDir, target, results);
+      return { content: [{ type: "text", text: JSON.stringify(plan, null, 2) }] };
+    } catch (err) {
+      return { content: [{ type: "text", text: `Error creating repair plan: ${err.message}` }], isError: true };
+    }
+  }
+);
+
+server.tool(
+  "apply_repair_plan",
+  "Apply an explicitly reviewed repair plan, rerun all diagnostics, detect regressions, and roll back AI file changes when validation fails.",
+  {
+    projectDir: z.string().describe("Absolute path to the project root directory"),
+    planId: z.string().describe("Repair plan ID returned by plan_repair"),
+    approved: z.boolean().describe("Set true only after reviewing the risk and diff"),
+  },
+  async ({ projectDir, planId, approved }) => {
+    try {
+      const result = await applyRepairPlan(projectDir, planId, { approved });
+      return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    } catch (err) {
+      return { content: [{ type: "text", text: `Error applying repair plan: ${err.message}` }], isError: true };
+    }
+  }
+);
+
+server.tool(
+  "list_incidents",
+  "Read the local repair incident history, including plans, approvals, validation results, regressions, and rollbacks.",
+  { projectDir: z.string().describe("Absolute path to the project root directory") },
+  async ({ projectDir }) => ({ content: [{ type: "text", text: JSON.stringify(readAudit(projectDir), null, 2) }] })
 );
 
 server.tool(

@@ -2,6 +2,26 @@
 
 Self-diagnosis and self-healing framework for AI-assisted coding projects. Place lightweight diagnostic scripts (`.diag.js`) alongside your code, run the engine, and visualize qualitative/quantitative QC metrics and TDD timeline graphs in real-time.
 
+## 1.4.0 Safe Repair Workflow
+
+### 1.4.1 patch
+
+Repair validation now clears target-project module cache before each diagnostic, ensuring post-repair checks evaluate changed code rather than stale Node.js imports. The repository also includes a deterministic safe-repair lab that proves regression detection and rollback.
+
+Failed diagnostics can now produce a reviewable repair plan before files are changed. In the dashboard or through MCP, inspect the proposed file changes and diff preview, review the risk level, then explicitly approve application. The repair reruns the full diagnostic suite; AI file changes are rolled back when the target remains unhealthy or a previously healthy diagnostic regresses. Plan creation, approval, validation, regression, and rollback events are retained locally in `.vibe-diagnosis/repair-history.json`.
+
+Use `plan_repair` and `apply_repair_plan` for this approval-based workflow. `repair_diagnostic` and `heal_all` remain available for backwards-compatible automated repair.
+
+### Verify it safely
+
+The repository includes [`examples/safe-repair-lab`](./examples/safe-repair-lab), a disposable project with one deliberate failure and one regression guard. Use it to validate a review-and-approve repair without touching an application project:
+
+```bash
+node bin/vibe-diag.js dashboard --cwd examples/safe-repair-lab --port 7721
+```
+
+Configure BYOK, run the diagnostics, review **Plan Repair**, and approve it. For a deterministic rollback check, run `node examples/safe-repair-lab/verify-rollback.cjs`.
+
 [한국어 README](./README.ko.md)
 
 > 🚀 **Latest Version: 1.3.3** (Featuring Dashboard Server Shutdown Controls, Automated Full-Folder .gitignore Isolation, and Interactive SVG Telemetry Charts)
@@ -70,7 +90,7 @@ Create a rules config file in your project root corresponding to your AI workspa
 ## Vibe Diagnosis Rules (Self-Diagnosis Guidelines)
 - Before writing any feature or fixing a bug, always create/modify a corresponding `.diag.js` file under `.vibe-diagnosis/diagnostics/` to verify requirements (TDD methodology).
 - Run run_diagnostics during implementation and at completion phases to mechanically prove that everything operates flawlessly.
-- If a diagnostic check fails, attempt auto-repairing using repair_diagnostic or heal_all tools.
+- If a diagnostic check fails, prefer `plan_repair` to inspect the proposed change, then use `apply_repair_plan` only after review. `repair_diagnostic` and `heal_all` remain backwards-compatible automated repair options.
 - Upon completion, always invoke open_dashboard to verify health status, ensure all tests are green (OK), and present the telemetry summary to the user.
 ```
 
@@ -149,6 +169,9 @@ npx -y vibe-diagnosis heal                  # 5. Trigger bulk AI self-healing re
 | `stop_dashboard` | Shuts down the active dashboard server and frees up port resources |
 | `repair_diagnostic` | Runs autonomous AI debugging on a specific failing test |
 | `heal_all` | Runs sequential bulk AI self-healing routines across all failed tests |
+| `plan_repair` | Creates a reviewable repair plan with risk and diff previews without changing files |
+| `apply_repair_plan` | Applies an approved plan, validates all diagnostics, and rolls back failed AI changes |
+| `list_incidents` | Reads the local repair plan, validation, regression, and rollback history |
 | `read_error_pattern` | Loads known common error resolution knowledge |
 | `write_error_pattern` | Documents new recursive error patterns in markdown |
 

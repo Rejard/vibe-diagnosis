@@ -1,0 +1,6 @@
+{
+  "name": "safe-repair-lab",
+  "private": true,
+  "version": "1.0.0",
+  "description": "Disposable fixture for validating Vibe Diagnosis 1.4.0 safe repair behavior"
+}
