@@ -64,8 +64,8 @@ The extension automatically creates workspace quality rules for major AI assista
 > **"안전망 없는 코딩은 이제 그만."**
 > AI 에이전트와 협업하는 "바이브 코딩" 환경에 TDD(테스트 주도 개발)의 엄격함을 불어넣으세요.
 >
-> 🚀 **v1.5.0 핵심 고도화**:
-> 1. **거대 UI 파일 누락 방지(Omission Protection)**: 500줄/800줄 초과 거대 UI 파일의 AI 수정 중 코드 상실 방지 스캐너 탑재.
+> 🚀 **v1.5.1 핵심 고도화**:
+> 1. **거대 파일 가변 임계값 누락 방지(Adaptive Omission Protection)**: UI 파일 300줄 이상, 백엔드/로직 파일 600줄 이상 시 AI 수정 중 코드 상실 방지 경고(WARNING) 스캐너 탑재.
 > 2. **심볼 Diff 감시기 (`check_symbol_diff`)**: AI 코드 변경 시 지워진 JSX UI 태그, Export 심볼, 수식 함수 정밀 추적.
 > 3. **카트리지 모듈화 청사진 (`recommend_cartridge_split`)**: 거대 컴포넌트의 소형 카트리지 자동 분리 가이드 제공.
 > 4. **AI 소스 코드 자동 원복 (`repair_omission`)**: 필수 UI 태그 상실 시 로컬 백업(.bak) 또는 git 스냅샷을 활용한 자동 원복.
