@@ -1,6 +1,15 @@
 # Change Log
 
-## 1.3.3 (Current)
+## 1.5.0 (Current)
+- **Added**: Monolithic UI Component Omission Protection (scanner detects files over 500/800 lines to emit WARNINGs before AI rewrites).
+- **Added**: Symbol Diff Guard (`check_symbol_diff`) to track lost JSX UI card tags, export symbols, and formula functions before and after code modifications.
+- **Added**: Cartridge Splitter Blueprint (`recommend_cartridge_split`) to generate modular sub-cartridge splitting guides for monolithic UI files.
+- **Added**: Auto-Revert Repair (`repair_omission`) to restore lost UI blocks automatically from `.bak` backups or git snapshots.
+- **Added**: AI Context Sync (`sync_ai_context`) to persist goals and diagnostic state to `.vibe-diagnosis/active_context.json` for seamless handover between AI sessions.
+- **Added**: Background Build Verifier (`verify_build_safety`) to confirm 0 compilation errors before task completion.
+- **Added**: Agent Rules Injector (`sync_agent_rules`) to auto-inject self-diagnosis guidelines into `.cursorrules`, `AGENTS.md`, and `CLAUDE.md`.
+
+## 1.3.3
 - **Added**: One-click Dashboard Server Shutdown Control (safely close the background server and release port 7700 resources from both the web interface and CLI).
 - **Added**: Stop command (`stop_dashboard` MCP tool & `vibe-diag stop` CLI) integration for seamless developer-led resource management.
 - **Added**: Automated full-folder `.gitignore` isolation to guarantee local tests and runtime temp configs are kept entirely separate from public Git repositories.

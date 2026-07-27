@@ -58,11 +58,43 @@ function initialize(targetDir) {
   const exampleDest = path.join(diagnosticsDir, 'example.diag.js');
   fs.copyFileSync(exampleSrc, exampleDest);
 
+  const monoUiScannerSrc = path.join(TEMPLATE_DIR, 'monolithic_ui_scanner.diag.js');
+  if (fs.existsSync(monoUiScannerSrc)) {
+    fs.copyFileSync(monoUiScannerSrc, path.join(diagnosticsDir, 'monolithic_ui_scanner.diag.js'));
+  }
+
+  const cartridgeIntegritySrc = path.join(TEMPLATE_DIR, 'cartridge_integrity_template.diag.js');
+  if (fs.existsSync(cartridgeIntegritySrc)) {
+    fs.copyFileSync(cartridgeIntegritySrc, path.join(diagnosticsDir, 'cartridge_integrity_template.diag.js'));
+  }
+
   const errorPatternSrc = path.join(TEMPLATE_DIR, 'error-pattern.md');
   const errorPatternDest = path.join(errorPatternsDir, 'ERR_000_template.md');
   fs.copyFileSync(errorPatternSrc, errorPatternDest);
 
+  const omissionPatternSrc = path.join(TEMPLATE_DIR, 'PATTERN_UI_BLOCK_OMISSION.md');
+  if (fs.existsSync(omissionPatternSrc)) {
+    fs.copyFileSync(omissionPatternSrc, path.join(errorPatternsDir, 'PATTERN_UI_BLOCK_OMISSION.md'));
+  }
+
   ensureGitignore(targetDir);
+
+  try {
+    const { ensureAgentRules } = require('./rules-injector');
+    ensureAgentRules(targetDir);
+  } catch (e) {
+    // Safe skip if module load fails
+  }
+
+  try {
+    const { saveAiContext } = require('./context-manager');
+    saveAiContext(targetDir, {
+      currentGoal: 'Project Initialized with Vibe Diagnosis MCP',
+      lastTask: 'init_diagnostics'
+    });
+  } catch (e) {
+    // Safe skip
+  }
 
   const mcpAdded = setupGeminiMcp(targetDir);
 
@@ -71,10 +103,14 @@ function initialize(targetDir) {
   console.log('  Created:');
   console.log('    .vibe-diagnosis/');
   console.log('    ├── config.json');
+  console.log('    ├── active_context.json');
   console.log('    ├── diagnostics/');
-  console.log('    │   └── example.diag.js');
+  console.log('    │   ├── example.diag.js');
+  console.log('    │   ├── monolithic_ui_scanner.diag.js');
+  console.log('    │   └── cartridge_integrity_template.diag.js');
   console.log('    └── error-patterns/');
-  console.log('        └── ERR_000_template.md');
+  console.log('        ├── ERR_000_template.md');
+  console.log('        └── PATTERN_UI_BLOCK_OMISSION.md');
 
   if (mcpAdded) {
     console.log('');

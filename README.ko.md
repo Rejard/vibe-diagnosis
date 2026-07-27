@@ -4,7 +4,7 @@ AI 코딩 프로젝트를 위한 자가진단 및 자가치유 프레임워크�
 
 [English README](./README.md)
 
-> 🚀 **최신 버전: 1.3.3** (대시보드 서버 수동 종료 제어, .gitignore 전역 폴더 자동 격리 및 인터랙티브 SVG 차트 탑재)
+> 🚀 **최신 버전: 1.5.0** (바이브 코딩 UI/기능 누락 방지 Omission Protection, 심볼 Diff 감시기, 카트리지 자동 분리 청사진, AI 세션 메모리 핸드오버 및 백그라운드 빌드 검증 탑재)
 
 ---
 
@@ -121,6 +121,16 @@ AI 코딩 에이전트의 MCP 설정 파일에 아래 JSON 코드를 마우스�
 5. **🛑 대시보드 서버 종료 제어 (v1.3.3 신규)**:
    - 더 이상 대시보드가 불필요하거나 메모리/포트 점유를 해제하고 싶을 때, 웹 대시보드 화면 내에서 한 번의 클릭 또는 터미널 명령어를 통해 백그라운드 서버 프로세스를 깔끔히 수동 정지시킬 수 있습니다.
    - **.gitignore 전역 폴더 자동 격리 (v1.3.3 신규)**: 자가진단 MCP 초기화(`init`) 실행 시, `.gitignore`에 자동으로 `.vibe-diagnosis/` 폴더 전체를 무시하도록 추가하여 나만의 테스트 소스나 로컬 임시 환경 정보가 깃허브에 우발적으로 공유되는 사고를 차단합니다.
+6. **🚨 바이브 코딩 UI/기능 누락 방지 (v1.5.0 신규)**:
+   - **Monolithic File Scanner**: 500줄/800줄 이상 거대 컴포넌트 감지 시 AI 수정 중 코드 상실 위험 사전 경고(`WARNING`).
+   - **Cartridge Integrity Check**: 필수 UI 카드가 오버라이트되어 삭제되는 상실 사고 무결성 검증.
+   - **Symbol Diff Guard (`check_symbol_diff`)**: 코드 변경 전/후 지워진 JSX UI 태그, Export 심볼, 수식 함수 정밀 추적.
+   - **Cartridge Splitter Blueprint (`recommend_cartridge_split`)**: 거대 컴포넌트를 소형 카트리지로 자동 분리하는 모듈화 청사진 제공.
+   - **Auto-Revert Repair (`repair_omission`)**: 필수 UI 태그 상실 시 로컬 백업(`.bak`) 또는 git 스냅샷을 통한 이전 상태 자동 원복.
+7. **🧠 AI-Native 완결성 & 세션 승계 (v1.5.0 신규)**:
+   - **AI Context Handover (`sync_ai_context`)**: `.vibe-diagnosis/active_context.json`에 AI 작업 목표와 상태를 영속화하여 대화 세션 교체 시 완벽 승계.
+   - **Build Safety Verifier (`verify_build_safety`)**: AI 작업 종료 직전 백그라운드 빌드(`npm run build` 등) 자가검증으로 compilation error 0개 체크.
+   - **Agent Rules Injector (`sync_agent_rules`)**: `.cursorrules`, `AGENTS.md` 등에 자가진단 실행 필수 수칙 자동 주입.
 
 ---
 
@@ -151,9 +161,16 @@ npx -y vibe-diagnosis heal                  # 5. 실패한 테스트 전체 AI �
 | `heal_all` | 실패한 모든 진단을 순차적으로 일괄 수리 및 치료 |
 | `read_error_pattern` | 자주 발생하는 에러 패턴 지식 정보 조회 |
 | `write_error_pattern` | 신규 또는 반복 오류에 대한 대응 패턴 마크다운 저장 |
+| `check_symbol_diff` | **(v1.5.0)** 코드 수정 전/후 상실된 JSX 카드 태그, export 심볼, 수식 함수 자동 추적 감시 |
+| `recommend_cartridge_split` | **(v1.5.0)** 500줄 초과 거대 UI 컴포넌트의 소형 카트리지 모듈화 분리 청사진 자동 생성 |
+| `repair_omission` | **(v1.5.0)** 필수 UI 태그 상실 시 백업(.bak) 또는 git 스냅샷을 활용한 소스 코드 자동 원복 |
+| `sync_ai_context` | **(v1.5.0)** AI 작업 목표 및 진단 메모리를 영속화하여 대화 세션 간 완벽 승계 |
+| `verify_build_safety` | **(v1.5.0)** 백그라운드 빌드/구문 자가검증으로 컴파일 에러 0개 확인 |
+| `sync_agent_rules` | **(v1.5.0)** AI 규칙 파일(.cursorrules, AGENTS.md)에 자가진단 수행 수칙 자동 동기화 |
 
 ---
 
 ## 🤝 라이선스
 
 [Apache License 2.0](./LICENSE)
+

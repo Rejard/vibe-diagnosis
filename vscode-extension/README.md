@@ -9,13 +9,13 @@
 
 ---
 
-## 🚀 Key Features (Version 1.3.3 Upgraded)
+## 🚀 Key Features (Version 1.5.0 Upgraded)
 
+* **🚨 Monolithic Component Omission Protection (v1.5.0 NEW)**: Scans 500/800+ line UI files to issue WARNINGs against block deletion during AI rewrites. Includes Symbol Diff Tracking (`check_symbol_diff`), Cartridge Splitter Blueprints (`recommend_cartridge_split`), and Auto-Revert Repairs (`repair_omission`).
+* **🧠 AI-Native Completeness & Session Handover (v1.5.0 NEW)**: Synchronizes AI task context and diagnostic state via `.vibe-diagnosis/active_context.json` for seamless handover between AI sessions (`sync_ai_context`). Includes background compilation verification (`verify_build_safety`) and automatic rule injection (`sync_agent_rules`).
 * **AI Agent Self-Diagnosis**: Enforces AI coding assistants (Cursor, Windsurf, Gemini/Antigravity) to prove their code works through mechanical `.diag.js` scripts.
-* **📈 TDD Timeline Tracker & Shutdown Controls (v1.3.3 Upgraded)**: Renders dynamic SVG charts showing the path from failure (RED) to success (GREEN). Includes **interactive card-linking** to filter SVG charts with smooth transitions, plus **원클릭 서버 종료 (Server Shutdown Control)** on the web cockpit or terminal to free up memory immediately.
-* **🛡️ QC & Prevention Scoreboard & Isolation**: Renders overall Build Success Predictor, Responsive UI CSS viewport grades, Asset Independence, and Dead-Code Debt metrics. Now features **automated full-folder .gitignore isolation** on initialization to secure all local QC metrics from leaking to Git.
-* **✍️ TDD Milestone Archive**: Save qualitative retrospective findings, compile success stories, and write notes inside a premium local Glassmorphism DB board.
-* **🔒 Port Lock Safety**: Prevents process duplicate spawning and coordinates individual ports across multiple workspace sessions seamlessly.
+* **📈 TDD Timeline Tracker & Shutdown Controls**: Renders dynamic SVG charts showing the path from failure (RED) to success (GREEN). Includes interactive card-linking to filter SVG charts with smooth transitions, plus server shutdown controls.
+* **🛡️ QC & Prevention Scoreboard & Isolation**: Renders overall Build Success Predictor, Responsive UI CSS viewport grades, Asset Independence, and Dead-Code Debt metrics with automated `.gitignore` isolation.
 * **AI-Powered Self-Healing (BYOK)**: Supports OpenAI, Anthropic, Gemini, and OpenRouter. Let the AI diagnose failures and auto-repair them on the fly!
 * **Command Palette Integration**: Easily initialize, run, and launch the dashboard directly from VS Code (`Ctrl+Shift+P`).
 * **Active Status Bar Indicators**: Monitor your workspace's health at a glance.
@@ -62,7 +62,15 @@ The extension automatically creates workspace quality rules for major AI assista
 ## 🌐 공식 한국어 가이드 (Official Korean Guide)
 
 > **"안전망 없는 코딩은 이제 그만."**
-> AI 에이전트와 협업하는 "바이브 코딩" 환경에 TDD(테스트 주도 개발)의 엄격함을 불어넣으세요. 에이전트의 허풍을 객관적으로 검증하고, 대시보드에서 **TDD 타임라인 그래프**와 **정적 UI 반응성 등급**, **미사용 코드 부채 지수** 등을 아름답게 가시화합니다.
+> AI 에이전트와 협업하는 "바이브 코딩" 환경에 TDD(테스트 주도 개발)의 엄격함을 불어넣으세요.
+>
+> 🚀 **v1.5.0 핵심 고도화**:
+> 1. **거대 UI 파일 누락 방지(Omission Protection)**: 500줄/800줄 초과 거대 UI 파일의 AI 수정 중 코드 상실 방지 스캐너 탑재.
+> 2. **심볼 Diff 감시기 (`check_symbol_diff`)**: AI 코드 변경 시 지워진 JSX UI 태그, Export 심볼, 수식 함수 정밀 추적.
+> 3. **카트리지 모듈화 청사진 (`recommend_cartridge_split`)**: 거대 컴포넌트의 소형 카트리지 자동 분리 가이드 제공.
+> 4. **AI 소스 코드 자동 원복 (`repair_omission`)**: 필수 UI 태그 상실 시 로컬 백업(.bak) 또는 git 스냅샷을 활용한 자동 원복.
+> 5. **AI 세션 메모리 승계 (`sync_ai_context`)**: AI 목표 및 진단 메모리를 저장하여 대화 세션 교체 시 완벽 승계.
+> 6. **백그라운드 빌드 자가검증 (`verify_build_safety`)**: AI 작업 종료 전 백그라운드 컴파일 실행으로 오류 0개 검증.
 
 ### 📋 에이전트 지시 프롬프트 템플릿 (상황별 택1 복사)
 

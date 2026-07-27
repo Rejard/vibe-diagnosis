@@ -4,7 +4,7 @@ Self-diagnosis and self-healing framework for AI-assisted coding projects. Place
 
 [한국어 README](./README.ko.md)
 
-> 🚀 **Latest Version: 1.3.3** (Featuring Dashboard Server Shutdown Controls, Automated Full-Folder .gitignore Isolation, and Interactive SVG Telemetry Charts)
+> 🚀 **Latest Version: 1.5.0** (Featuring Omission Protection for Monolithic Components, Symbol Diff Guard, Cartridge Splitter Blueprint, AI Context Sync, and Background Build Verifier)
 
 ---
 
@@ -123,6 +123,16 @@ Open `http://localhost:7700` to find a premium Glassmorphism cockpit summarizing
 5. **🛑 Server Shutdown Controls (NEW in v1.3.3)**:
    - Close the background dashboard server with a single click inside the web interface or via the CLI to instantly free up port 7700 and memory resources.
    - **Automated .gitignore Isolation (NEW in v1.3.3)**: Initializing vibe-diagnosis automatically ignores the entire `.vibe-diagnosis/` folder, ensuring no local tests or temp configs are accidentally uploaded to GitHub.
+6. **🚨 Monolithic Component Omission Protection (NEW in v1.5.0)**:
+   - **Monolithic File Scanner**: Scans UI files exceeding 500/800 lines to emit `WARNING` flags against accidental block deletion during AI rewrites.
+   - **Cartridge Integrity Check**: Guarantees required sub-components are not overwritten or dropped.
+   - **Symbol Diff Guard (`check_symbol_diff`)**: Tracks lost JSX UI card tags, export symbols, and formula functions before and after AI modifications.
+   - **Cartridge Splitter Blueprint (`recommend_cartridge_split`)**: Parses monolithic files to generate modular sub-cartridge component blueprints.
+   - **Auto-Revert Repair (`repair_omission`)**: Restores deleted UI blocks automatically from `.bak` backups or git snapshots.
+7. **🧠 AI-Native Completeness & Session Handover (NEW in v1.5.0)**:
+   - **AI Context Sync (`sync_ai_context`)**: Persists current goals and diagnostic state to `.vibe-diagnosis/active_context.json` for seamless handover between AI sessions.
+   - **Build Safety Verifier (`verify_build_safety`)**: Runs background compilation (`npm run build`, etc.) to confirm 0 build or syntax errors before finishing tasks.
+   - **Agent Rules Injector (`sync_agent_rules`)**: Auto-injects self-testing rules into `.cursorrules`, `AGENTS.md`, and `CLAUDE.md`.
 
 ---
 
@@ -151,9 +161,16 @@ npx -y vibe-diagnosis heal                  # 5. Trigger bulk AI self-healing re
 | `heal_all` | Runs sequential bulk AI self-healing routines across all failed tests |
 | `read_error_pattern` | Loads known common error resolution knowledge |
 | `write_error_pattern` | Documents new recursive error patterns in markdown |
+| `check_symbol_diff` | **(v1.5.0)** Tracks lost JSX UI card tags, export symbols, and formula functions after code edits |
+| `recommend_cartridge_split` | **(v1.5.0)** Generates modular sub-cartridge splitting blueprints for monolithic UI files |
+| `repair_omission` | **(v1.5.0)** Auto-reverts lost UI symbols from local backups (.bak) or git snapshot |
+| `sync_ai_context` | **(v1.5.0)** Persists and syncs AI goals and diagnostic state for seamless session handover |
+| `verify_build_safety` | **(v1.5.0)** Runs background build/syntax checks to confirm 0 compilation errors |
+| `sync_agent_rules` | **(v1.5.0)** Auto-injects self-diagnosis guidelines into AI agent rules files |
 
 ---
 
 ## 🤝 License
 
 [Apache License 2.0](./LICENSE)
+

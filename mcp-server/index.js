@@ -19,6 +19,11 @@ function loadCore() {
       init: require("vibe-diagnosis/src/init"),
       repairer: require("vibe-diagnosis/src/repairer"),
       dashboard: require("vibe-diagnosis/src/dashboard"),
+      symbolGuard: require("vibe-diagnosis/src/symbol-guard"),
+      cartridgeSplitter: require("vibe-diagnosis/src/cartridge-splitter"),
+      contextManager: require("vibe-diagnosis/src/context-manager"),
+      buildVerifier: require("vibe-diagnosis/src/build-verifier"),
+      rulesInjector: require("vibe-diagnosis/src/rules-injector"),
     };
   } catch {
     return {
@@ -27,6 +32,11 @@ function loadCore() {
       init: require("../src/init"),
       repairer: require("../src/repairer"),
       dashboard: require("../src/dashboard"),
+      symbolGuard: require("../src/symbol-guard"),
+      cartridgeSplitter: require("../src/cartridge-splitter"),
+      contextManager: require("../src/context-manager"),
+      buildVerifier: require("../src/build-verifier"),
+      rulesInjector: require("../src/rules-injector"),
     };
   }
 }
@@ -35,11 +45,11 @@ const core = loadCore();
 const { runDiagnostics, discoverDiagnostics } = core.runner;
 const { validateDiagnosticModule } = core.schema;
 const { initialize } = core.init;
-const { repairDiagnostic } = core.repairer;
+const { repairDiagnostic, autoRevertOrRepairOmission } = core.repairer;
 
 const server = new McpServer({
   name: "vibe-diagnosis",
-  version: "1.3.3",
+  version: "1.5.0",
 });
 
 function isPortInUse(port) {
@@ -487,6 +497,113 @@ server.tool(
         content: [{ type: "text", text: `Error opening dashboard: ${err.message}` }],
         isError: true,
       };
+    }
+  }
+);
+
+server.tool(
+  "check_symbol_diff",
+  "Analyze loss of JSX UI card tags, export symbols, and formula functions after code modification. Trigger: 심볼 차이 검사, check symbol diff",
+  {
+    projectDir: z.string().describe("Absolute path to project root"),
+    relativeFilePath: z.string().describe("Relative path to target file"),
+  },
+  async ({ projectDir, relativeFilePath }) => {
+    try {
+      const result = core.symbolGuard.analyzeSymbolDiff(projectDir, relativeFilePath);
+      return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    } catch (err) {
+      return { content: [{ type: "text", text: `Error checking symbol diff: ${err.message}` }], isError: true };
+    }
+  }
+);
+
+server.tool(
+  "recommend_cartridge_split",
+  "Generate a modular cartridge splitting blueprint for a monolithic UI component. Trigger: 카트리지 분리 추천, recommend cartridge split",
+  {
+    projectDir: z.string().describe("Absolute path to project root"),
+    relativeFilePath: z.string().describe("Relative path to monolithic UI file"),
+  },
+  async ({ projectDir, relativeFilePath }) => {
+    try {
+      const blueprint = core.cartridgeSplitter.generateCartridgeBlueprint(projectDir, relativeFilePath);
+      return { content: [{ type: "text", text: JSON.stringify(blueprint, null, 2) }] };
+    } catch (err) {
+      return { content: [{ type: "text", text: `Error generating blueprint: ${err.message}` }], isError: true };
+    }
+  }
+);
+
+server.tool(
+  "repair_omission",
+  "Auto-revert or repair lost UI symbols from local backups (.bak) or git snapshot. Trigger: 누락 복구, repair omission",
+  {
+    projectDir: z.string().describe("Absolute path to project root"),
+    relativeFilePath: z.string().describe("Relative path to file with lost symbols"),
+  },
+  async ({ projectDir, relativeFilePath }) => {
+    try {
+      const result = core.repairer.autoRevertOrRepairOmission(projectDir, relativeFilePath);
+      return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    } catch (err) {
+      return { content: [{ type: "text", text: `Error repairing omission: ${err.message}` }], isError: true };
+    }
+  }
+);
+
+server.tool(
+  "sync_ai_context",
+  "Save or read AI session context and active diagnostic state for seamless agent session handover. Trigger: 컨텍스트 동기화, sync ai context",
+  {
+    projectDir: z.string().describe("Absolute path to project root"),
+    action: z.enum(["read", "save"]).describe("Action to perform: 'read' or 'save'"),
+    currentGoal: z.string().optional().describe("Current task goal when saving context"),
+    lastTask: z.string().optional().describe("Last completed task name when saving context"),
+  },
+  async ({ projectDir, action, currentGoal, lastTask }) => {
+    try {
+      if (action === "read") {
+        const ctx = core.contextManager.readAiContext(projectDir);
+        return { content: [{ type: "text", text: JSON.stringify(ctx, null, 2) }] };
+      } else {
+        const saved = core.contextManager.saveAiContext(projectDir, { currentGoal, lastTask });
+        return { content: [{ type: "text", text: JSON.stringify(saved, null, 2) }] };
+      }
+    } catch (err) {
+      return { content: [{ type: "text", text: `Error managing context: ${err.message}` }], isError: true };
+    }
+  }
+);
+
+server.tool(
+  "verify_build_safety",
+  "Run background build and compilation verification to ensure 0 syntax or bundle errors. Trigger: 빌드 자가검증, verify build safety",
+  {
+    projectDir: z.string().describe("Absolute path to project root"),
+  },
+  async ({ projectDir }) => {
+    try {
+      const res = await core.buildVerifier.verifyBuildSafety(projectDir);
+      return { content: [{ type: "text", text: JSON.stringify(res, null, 2) }] };
+    } catch (err) {
+      return { content: [{ type: "text", text: `Error verifying build: ${err.message}` }], isError: true };
+    }
+  }
+);
+
+server.tool(
+  "sync_agent_rules",
+  "Inject Vibe Diagnosis self-testing guidelines automatically into AI rule files (.cursorrules, AGENTS.md, etc.). Trigger: 에이전트 규칙 동기화, sync agent rules",
+  {
+    projectDir: z.string().describe("Absolute path to project root"),
+  },
+  async ({ projectDir }) => {
+    try {
+      const res = core.rulesInjector.ensureAgentRules(projectDir);
+      return { content: [{ type: "text", text: JSON.stringify(res, null, 2) }] };
+    } catch (err) {
+      return { content: [{ type: "text", text: `Error injecting rules: ${err.message}` }], isError: true };
     }
   }
 );

@@ -211,9 +211,103 @@ function runHeuristicMetrics(projectDir, totalDiags = 0, passedDiags = 0) {
   };
 }
 
+function loadConfig(projectDir) {
+  try {
+    const cfgPath = path.join(projectDir, '.vibe-diagnosis', 'config.json');
+    if (fs.existsSync(cfgPath)) {
+      return JSON.parse(fs.readFileSync(cfgPath, 'utf-8'));
+    }
+  } catch {}
+  return {};
+}
+
+function analyzeMonolithicUiFiles(projectDir, customConfig) {
+  const config = customConfig || loadConfig(projectDir);
+  const monolithicThresholdLines = config.monolithicThresholdLines || 500;
+  const criticalThresholdLines = config.criticalThresholdLines || 800;
+
+  const uiFiles = findFiles(projectDir, ['.jsx', '.tsx', '.vue', '.svelte', '.html']);
+  const warnings = [];
+
+  const blockRegex = /(?:<(?:[A-Z]\w*)?(?:Card|Section|Block|Tab|Panel|View|Tile)\b|class(?:Name)?=["'][^"']*\b(?:card|section|block|tab-pane|panel)\b|<section\b|<article\b)/gi;
+
+  for (const file of uiFiles) {
+    try {
+      const content = fs.readFileSync(file, 'utf-8');
+      const lines = content.split('\n').length;
+      const blockMatches = content.match(blockRegex) || [];
+      const blockCount = blockMatches.length;
+
+      const relPath = path.relative(projectDir, file);
+
+      if (lines >= criticalThresholdLines || (lines >= monolithicThresholdLines && blockCount >= 4)) {
+        warnings.push(
+          `⚠️ \`${relPath}\` (${lines} lines, ${blockCount} UI block elements): High risk of UI block omission during AI vibe coding. Recommending immediate modularization into cartridge components under components/cartridges/.`
+        );
+      }
+    } catch {}
+  }
+
+  return {
+    warnings,
+    scannedFilesCount: uiFiles.length
+  };
+}
+
+function analyzeCartridgeIntegrity(projectDir, customConfig) {
+  const config = customConfig || loadConfig(projectDir);
+  const errors = [];
+
+  const cartridgeDir = path.join(projectDir, 'src', 'components', 'cartridges');
+  const altCartridgeDir = path.join(projectDir, 'components', 'cartridges');
+
+  const requiredCartridges = config.requiredCartridges || [];
+  const requiredSymbols = config.requiredSymbols || [];
+
+  for (const req of requiredCartridges) {
+    const found = [cartridgeDir, altCartridgeDir].some(dir => {
+      if (!fs.existsSync(dir)) return false;
+      const files = fs.readdirSync(dir);
+      return files.some(f => f.toLowerCase().includes(req.toLowerCase()));
+    });
+
+    if (!found) {
+      errors.push(`🚨 Required cartridge component "${req}" is missing or deleted from components/cartridges/`);
+    }
+  }
+
+  const allSourceFiles = findFiles(projectDir, ['.jsx', '.tsx', '.js', '.ts']);
+  for (const sym of requiredSymbols) {
+    let symFound = false;
+    for (const file of allSourceFiles) {
+      try {
+        const content = fs.readFileSync(file, 'utf-8');
+        if (content.includes(sym)) {
+          symFound = true;
+          break;
+        }
+      } catch {}
+    }
+
+    if (!symFound) {
+      errors.push(`🚨 Required symbol or JSX tag "${sym}" is missing across project source files`);
+    }
+  }
+
+  return {
+    errors,
+    details: errors.length === 0
+      ? 'All cartridge components and required symbols verified.'
+      : `Detected ${errors.length} integrity violations.`
+  };
+}
+
 module.exports = {
   analyzeCss,
   analyzeAssets,
   analyzeDeadCode,
-  runHeuristicMetrics
+  runHeuristicMetrics,
+  analyzeMonolithicUiFiles,
+  analyzeCartridgeIntegrity
 };
+

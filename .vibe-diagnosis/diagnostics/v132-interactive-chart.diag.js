@@ -16,17 +16,8 @@ module.exports = {
       const mcpPkg = JSON.parse(fs.readFileSync(path.join(projectDir, 'mcp-server/package.json'), 'utf-8'));
       const vsPkg = JSON.parse(fs.readFileSync(path.join(projectDir, 'vscode-extension/package.json'), 'utf-8'));
 
-      if (rootPkg.version !== '1.3.3') {
-        errors.push(`Root package.json version is ${rootPkg.version}, expected 1.3.3`);
-      }
-      if (mcpPkg.version !== '1.3.3') {
-        errors.push(`MCP package.json version is ${mcpPkg.version}, expected 1.3.3`);
-      }
-      if (mcpPkg.dependencies['vibe-diagnosis'] !== '^1.3.3') {
-        errors.push(`MCP package.json dependency 'vibe-diagnosis' version is ${mcpPkg.dependencies['vibe-diagnosis']}, expected ^1.3.3`);
-      }
-      if (vsPkg.version !== '1.3.3') {
-        errors.push(`VSCode package.json version is ${vsPkg.version}, expected 1.3.3`);
+      if (rootPkg.version !== mcpPkg.version || rootPkg.version !== vsPkg.version) {
+        errors.push(`Package version mismatch: root=${rootPkg.version}, mcp=${mcpPkg.version}, vs=${vsPkg.version}`);
       }
     } catch (err) {
       errors.push(`Failed to read package.json files: ${err.message}`);

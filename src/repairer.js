@@ -303,4 +303,48 @@ async function repairDiagnostic(projectDir, diagResult) {
   }
 }
 
-module.exports = { repairDiagnostic };
+function autoRevertOrRepairOmission(projectDir, relativeFilePath) {
+  const targetPath = path.resolve(projectDir, relativeFilePath || '');
+  if (!fs.existsSync(targetPath)) {
+    return {
+      restored: false,
+      restoredFilePath: relativeFilePath,
+      details: `Target file not found: ${relativeFilePath}`
+    };
+  }
+
+  const backupPath = targetPath + BACKUP_EXT;
+  if (fs.existsSync(backupPath)) {
+    fs.copyFileSync(backupPath, targetPath);
+    return {
+      restored: true,
+      restoredFilePath: relativeFilePath,
+      details: `Successfully restored ${relativeFilePath} from local backup (${BACKUP_EXT}).`
+    };
+  }
+
+  try {
+    const { execSync } = require('child_process');
+    execSync(`git checkout -- "${relativeFilePath}"`, {
+      cwd: projectDir,
+      windowsHide: true
+    });
+    return {
+      restored: true,
+      restoredFilePath: relativeFilePath,
+      details: `Successfully reverted ${relativeFilePath} to clean HEAD state via git.`
+    };
+  } catch (gitErr) {
+    return {
+      restored: false,
+      restoredFilePath: relativeFilePath,
+      details: `Failed to revert file. No .bak backup found and git revert failed: ${gitErr.message}`
+    };
+  }
+}
+
+module.exports = {
+  repairDiagnostic,
+  autoRevertOrRepairOmission
+};
+
