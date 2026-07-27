@@ -46,7 +46,7 @@ module.exports = {
 
     return {
       status: 'OK',
-      details: 'All UI components satisfy safety length thresholds (under 500 lines or well modularized).'
+      details: 'All UI components (under 300 lines) and backend files (under 600 lines) satisfy adaptive safety thresholds.'
     };
   }
 };

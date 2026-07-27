@@ -45,7 +45,7 @@ module.exports = {
       fs.mkdirSync(testDir, { recursive: true });
 
       const lines = [];
-      for (let i = 1; i <= 550; i++) {
+      for (let i = 1; i <= 350; i++) {
         lines.push(`// line ${i}`);
       }
       lines.push('<Card title="Card 1" />');
@@ -56,7 +56,7 @@ module.exports = {
 
       const monoScan = analyzer.analyzeMonolithicUiFiles(testDir);
       if (!monoScan.warnings || monoScan.warnings.length === 0) {
-        return { status: 'ERROR', details: 'analyzeMonolithicUiFiles failed to detect 550-line file with 4 cards' };
+        return { status: 'ERROR', details: 'analyzeMonolithicUiFiles failed to detect 350-line UI file (threshold 300)' };
       }
 
       if (!monoScan.warnings[0].includes('BigTestComponent.jsx')) {

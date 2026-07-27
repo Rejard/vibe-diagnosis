@@ -4,7 +4,7 @@ AI 코딩 프로젝트를 위한 자가진단 및 자가치유 프레임워크�
 
 [English README](./README.md)
 
-> 🚀 **최신 버전: 1.5.0** (바이브 코딩 UI/기능 누락 방지 Omission Protection, 심볼 Diff 감시기, 카트리지 자동 분리 청사진, AI 세션 메모리 핸드오버 및 백그라운드 빌드 검증 탑재)
+> 🚀 **최신 버전: 1.5.1** (UI 파일 300줄 / 로직 파일 600줄 가변 임계값 Adaptive Threshold 보완 및 누락 방지 스캐너 고도화)
 
 ---
 
@@ -121,8 +121,8 @@ AI 코딩 에이전트의 MCP 설정 파일에 아래 JSON 코드를 마우스�
 5. **🛑 대시보드 서버 종료 제어 (v1.3.3 신규)**:
    - 더 이상 대시보드가 불필요하거나 메모리/포트 점유를 해제하고 싶을 때, 웹 대시보드 화면 내에서 한 번의 클릭 또는 터미널 명령어를 통해 백그라운드 서버 프로세스를 깔끔히 수동 정지시킬 수 있습니다.
    - **.gitignore 전역 폴더 자동 격리 (v1.3.3 신규)**: 자가진단 MCP 초기화(`init`) 실행 시, `.gitignore`에 자동으로 `.vibe-diagnosis/` 폴더 전체를 무시하도록 추가하여 나만의 테스트 소스나 로컬 임시 환경 정보가 깃허브에 우발적으로 공유되는 사고를 차단합니다.
-6. **🚨 바이브 코딩 UI/기능 누락 방지 (v1.5.0 신규)**:
-   - **Monolithic File Scanner**: 500줄/800줄 이상 거대 컴포넌트 감지 시 AI 수정 중 코드 상실 위험 사전 경고(`WARNING`).
+6. **🚨 바이브 코딩 UI/기능 누락 방지 (v1.5.1 고도화)**:
+   - **Monolithic File Adaptive Scanner**: UI 파일(`*.jsx`, `*.tsx`, `*.vue`)은 **300줄 이상**, 백엔드/로직 파일(`*.js`, `*.ts`, `*.py`)은 **600줄 이상** 시 AI 수정 중 코드 상실 위험 사전 경고(`WARNING`).
    - **Cartridge Integrity Check**: 필수 UI 카드가 오버라이트되어 삭제되는 상실 사고 무결성 검증.
    - **Symbol Diff Guard (`check_symbol_diff`)**: 코드 변경 전/후 지워진 JSX UI 태그, Export 심볼, 수식 함수 정밀 추적.
    - **Cartridge Splitter Blueprint (`recommend_cartridge_split`)**: 거대 컴포넌트를 소형 카트리지로 자동 분리하는 모듈화 청사진 제공.

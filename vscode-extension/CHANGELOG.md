@@ -1,6 +1,9 @@
 # Change Log
 
-## 1.5.0 (Current)
+## 1.5.1 (Current)
+- **Enhanced**: Adaptive Monolithic Component Omission Protection (UI files: 300+ lines warning, Backend/Logic files: 600+ lines warning).
+
+## 1.5.0
 - **Added**: Monolithic UI Component Omission Protection (scanner detects files over 500/800 lines to emit WARNINGs before AI rewrites).
 - **Added**: Symbol Diff Guard (`check_symbol_diff`) to track lost JSX UI card tags, export symbols, and formula functions before and after code modifications.
 - **Added**: Cartridge Splitter Blueprint (`recommend_cartridge_split`) to generate modular sub-cartridge splitting guides for monolithic UI files.

@@ -9,9 +9,9 @@
 
 ---
 
-## 🚀 Key Features (Version 1.5.0 Upgraded)
+## 🚀 Key Features (Version 1.5.1 Upgraded)
 
-* **🚨 Monolithic Component Omission Protection (v1.5.0 NEW)**: Scans 500/800+ line UI files to issue WARNINGs against block deletion during AI rewrites. Includes Symbol Diff Tracking (`check_symbol_diff`), Cartridge Splitter Blueprints (`recommend_cartridge_split`), and Auto-Revert Repairs (`repair_omission`).
+* **🚨 Adaptive Monolithic Component Omission Protection (v1.5.1 NEW)**: Scans UI files (`*.jsx`, `*.tsx`, `*.vue`) at 300+ lines and Backend files (`*.js`, `*.ts`, `*.py`) at 600+ lines to issue WARNINGs before AI rewrites. Includes Symbol Diff Tracking (`check_symbol_diff`), Cartridge Splitter Blueprints (`recommend_cartridge_split`), and Auto-Revert Repairs (`repair_omission`).
 * **🧠 AI-Native Completeness & Session Handover (v1.5.0 NEW)**: Synchronizes AI task context and diagnostic state via `.vibe-diagnosis/active_context.json` for seamless handover between AI sessions (`sync_ai_context`). Includes background compilation verification (`verify_build_safety`) and automatic rule injection (`sync_agent_rules`).
 * **AI Agent Self-Diagnosis**: Enforces AI coding assistants (Cursor, Windsurf, Gemini/Antigravity) to prove their code works through mechanical `.diag.js` scripts.
 * **📈 TDD Timeline Tracker & Shutdown Controls**: Renders dynamic SVG charts showing the path from failure (RED) to success (GREEN). Includes interactive card-linking to filter SVG charts with smooth transitions, plus server shutdown controls.

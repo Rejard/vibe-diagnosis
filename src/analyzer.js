@@ -223,14 +223,16 @@ function loadConfig(projectDir) {
 
 function analyzeMonolithicUiFiles(projectDir, customConfig) {
   const config = customConfig || loadConfig(projectDir);
-  const monolithicThresholdLines = config.monolithicThresholdLines || 500;
-  const criticalThresholdLines = config.criticalThresholdLines || 800;
+  const uiThreshold = config.uiThresholdLines || 300;
+  const logicThreshold = config.logicThresholdLines || 600;
 
   const uiFiles = findFiles(projectDir, ['.jsx', '.tsx', '.vue', '.svelte', '.html']);
-  const warnings = [];
+  const logicFiles = findFiles(projectDir, ['.js', '.ts', '.py', '.go', '.java', '.cs']);
 
+  const warnings = [];
   const blockRegex = /(?:<(?:[A-Z]\w*)?(?:Card|Section|Block|Tab|Panel|View|Tile)\b|class(?:Name)?=["'][^"']*\b(?:card|section|block|tab-pane|panel)\b|<section\b|<article\b)/gi;
 
+  // 1. Scan UI components (Adaptive Threshold: >= 300 lines)
   for (const file of uiFiles) {
     try {
       const content = fs.readFileSync(file, 'utf-8');
@@ -240,9 +242,24 @@ function analyzeMonolithicUiFiles(projectDir, customConfig) {
 
       const relPath = path.relative(projectDir, file);
 
-      if (lines >= criticalThresholdLines || (lines >= monolithicThresholdLines && blockCount >= 4)) {
+      if (lines >= uiThreshold) {
         warnings.push(
-          `⚠️ \`${relPath}\` (${lines} lines, ${blockCount} UI block elements): High risk of UI block omission during AI vibe coding. Recommending immediate modularization into cartridge components under components/cartridges/.`
+          `⚠️ \`${relPath}\` (${lines} lines, ${blockCount} UI block elements): UI component exceeds adaptive threshold (${uiThreshold} lines). High risk of UI block omission during AI vibe coding. Recommending modularization into cartridge components under components/cartridges/.`
+        );
+      }
+    } catch {}
+  }
+
+  // 2. Scan Logic & Backend files (Adaptive Threshold: >= 600 lines)
+  for (const file of logicFiles) {
+    try {
+      const content = fs.readFileSync(file, 'utf-8');
+      const lines = content.split('\n').length;
+      const relPath = path.relative(projectDir, file);
+
+      if (lines >= logicThreshold) {
+        warnings.push(
+          `⚠️ \`${relPath}\` (${lines} lines): Backend/Logic file exceeds adaptive threshold (${logicThreshold} lines). High risk of logic regression during AI edits. Consider splitting into modular cartridges.`
         );
       }
     } catch {}
@@ -250,7 +267,7 @@ function analyzeMonolithicUiFiles(projectDir, customConfig) {
 
   return {
     warnings,
-    scannedFilesCount: uiFiles.length
+    scannedFilesCount: uiFiles.length + logicFiles.length
   };
 }
 

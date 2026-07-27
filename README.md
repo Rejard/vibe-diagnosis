@@ -4,7 +4,7 @@ Self-diagnosis and self-healing framework for AI-assisted coding projects. Place
 
 [한국어 README](./README.ko.md)
 
-> 🚀 **Latest Version: 1.5.0** (Featuring Omission Protection for Monolithic Components, Symbol Diff Guard, Cartridge Splitter Blueprint, AI Context Sync, and Background Build Verifier)
+> 🚀 **Latest Version: 1.5.1** (Featuring Adaptive Monolithic File Thresholds: UI files 300+ lines / Logic files 600+ lines, Symbol Diff Guard, Cartridge Splitter Blueprint, and AI Context Sync)
 
 ---
 
@@ -123,8 +123,8 @@ Open `http://localhost:7700` to find a premium Glassmorphism cockpit summarizing
 5. **🛑 Server Shutdown Controls (NEW in v1.3.3)**:
    - Close the background dashboard server with a single click inside the web interface or via the CLI to instantly free up port 7700 and memory resources.
    - **Automated .gitignore Isolation (NEW in v1.3.3)**: Initializing vibe-diagnosis automatically ignores the entire `.vibe-diagnosis/` folder, ensuring no local tests or temp configs are accidentally uploaded to GitHub.
-6. **🚨 Monolithic Component Omission Protection (NEW in v1.5.0)**:
-   - **Monolithic File Scanner**: Scans UI files exceeding 500/800 lines to emit `WARNING` flags against accidental block deletion during AI rewrites.
+6. **🚨 Monolithic Component Omission Protection (v1.5.1 Enhanced)**:
+   - **Monolithic Adaptive Scanner**: Scans UI files (`*.jsx`, `*.tsx`, `*.vue`) exceeding **300 lines** and Logic/Backend files (`*.js`, `*.ts`, `*.py`) exceeding **600 lines** to emit WARNINGs against accidental block omission during AI rewrites.
    - **Cartridge Integrity Check**: Guarantees required sub-components are not overwritten or dropped.
    - **Symbol Diff Guard (`check_symbol_diff`)**: Tracks lost JSX UI card tags, export symbols, and formula functions before and after AI modifications.
    - **Cartridge Splitter Blueprint (`recommend_cartridge_split`)**: Parses monolithic files to generate modular sub-cartridge component blueprints.
