@@ -7,9 +7,23 @@ import { createRequire } from "module";
 import fs from "fs";
 import path from "path";
 import net from "net";
-import { exec, spawn } from "child_process";
-
 const require = createRequire(import.meta.url);
+
+const rawStdoutWrite = process.stdout.write.bind(process.stdout);
+process.stdout.write = (chunk, encoding, cb) => {
+  const str = typeof chunk === "string" ? chunk : chunk?.toString("utf8") || "";
+  if (!str.includes('"jsonrpc"')) {
+    return process.stderr.write(chunk, encoding, cb);
+  }
+  return rawStdoutWrite(chunk, encoding, cb);
+};
+console.log = (...args) => {
+  process.stderr.write(args.map(a => typeof a === "object" ? JSON.stringify(a) : String(a)).join(" ") + "\n");
+};
+console.info = console.log;
+console.warn = (...args) => {
+  process.stderr.write("[WARN] " + args.map(a => typeof a === "object" ? JSON.stringify(a) : String(a)).join(" ") + "\n");
+};
 
 function loadCore() {
   try {

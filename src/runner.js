@@ -81,7 +81,14 @@ async function runDiagnostics(projectDir) {
       }
 
       try {
-        const result = await mod.run({ projectDir, db });
+        const origLog = console.log;
+        console.log = (...a) => process.stderr.write(a.map(x => typeof x === 'object' ? JSON.stringify(x) : String(x)).join(' ') + '\n');
+        let result;
+        try {
+          result = await mod.run({ projectDir, db });
+        } finally {
+          console.log = origLog;
+        }
         const resultError = validateResult(result, mod.id);
 
         if (resultError) {
