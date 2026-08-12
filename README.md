@@ -16,6 +16,8 @@ Self-diagnosis and self-healing framework for AI-assisted coding projects. Place
 - Repairs always begin with a reviewable plan. Inspect the risk and complete diff preview, then call `apply_repair_plan` with explicit approval. High-risk areas require a separate approval and failed validation or regressions are rolled back.
 - Agent integration now requires `complete_task_diagnostics` immediately before a development task is reported complete. It runs the full suite without filters, cache, or dashboard; ordinary `run_diagnostics` also keeps the dashboard off unless explicitly requested.
 - `stop_dashboard` is available through MCP and CLI and uses the project dashboard's local shutdown token instead of terminating an arbitrary recorded PID.
+- BYOK API keys are sent only to the selected provider for repair planning. Prefer `VIBE_DIAG_API_KEY`; dashboard-entered keys are stored only in ignored `.vibe-diagnosis/byok.local.json`, never in the shareable config or package.
+- Avoid `vibe-diag config set apiKey ...` on shared machines because command arguments can remain in shell history. Use the environment variable or the local dashboard instead.
 
 ---
 

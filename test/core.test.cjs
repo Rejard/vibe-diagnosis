@@ -10,6 +10,7 @@ const { selectDiagnostics } = require('../src/selector');
 const { applyRepairPlan, autoRevertOrRepairOmission } = require('../src/repairer');
 const { upsertRules } = require('../src/rules-injector');
 const { initialize } = require('../src/init');
+const { saveByokConfig, getByokConfig, getResolvedByok } = require('../src/config-manager');
 
 function project() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'vibe-diag-'));
@@ -151,6 +152,29 @@ test('initialization refreshes agent rules for an existing diagnostic project', 
   assert.match(fs.readFileSync(path.join(root, 'AGENTS.md'), 'utf8'), /complete_task_diagnostics/);
   assert.match(fs.readFileSync(path.join(root, 'GEMINI.md'), 'utf8'), /complete_task_diagnostics/);
   assert.ok(fs.existsSync(path.join(root, '.gemini', 'settings.json')));
+});
+
+test('BYOK secrets stay in an ignored local file instead of shareable config', t => {
+  const root = project();
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  saveByokConfig(root, { provider: 'openai', apiKey: 'local-test-key-123456', model: 'test-model' });
+  const config = JSON.parse(fs.readFileSync(path.join(root, '.vibe-diagnosis', 'config.json'), 'utf8'));
+  const local = JSON.parse(fs.readFileSync(path.join(root, '.vibe-diagnosis', 'byok.local.json'), 'utf8'));
+  assert.equal(config.byok.apiKey, '');
+  assert.equal(local.apiKey, 'local-test-key-123456');
+  assert.equal(getResolvedByok(root).apiKey, 'local-test-key-123456');
+  assert.match(getByokConfig(root, { maskKey: true }).apiKey, /\*\*\*\*/);
+  assert.match(fs.readFileSync(path.join(root, '.gitignore'), 'utf8'), /^\.vibe-diagnosis\/$/m);
+});
+
+test('legacy BYOK secrets migrate out of config on first read', t => {
+  const root = project();
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const configPath = path.join(root, '.vibe-diagnosis', 'config.json');
+  fs.writeFileSync(configPath, JSON.stringify({ byok: { provider: 'gemini', apiKey: 'legacy-local-test-key', model: 'test-model' } }), 'utf8');
+  assert.equal(getResolvedByok(root).apiKey, 'legacy-local-test-key');
+  assert.equal(JSON.parse(fs.readFileSync(configPath, 'utf8')).byok.apiKey, '');
+  assert.equal(JSON.parse(fs.readFileSync(path.join(root, '.vibe-diagnosis', 'byok.local.json'), 'utf8')).apiKey, 'legacy-local-test-key');
 });
 
 test('omission repair creates a plan without changing the file', async t => {

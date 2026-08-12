@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 
 const CONFIG_FILE = 'config.json';
+const BYOK_LOCAL_FILE = 'byok.local.json';
 const DIAG_ROOT = '.vibe-diagnosis';
 
 const DEFAULT_CONFIG = {
@@ -18,6 +19,35 @@ const DEFAULT_CONFIG = {
 
 function configPath(projectDir) {
   return path.join(projectDir, DIAG_ROOT, CONFIG_FILE);
+}
+
+function byokLocalPath(projectDir) {
+  return path.join(projectDir, DIAG_ROOT, BYOK_LOCAL_FILE);
+}
+
+function loadLocalByok(projectDir) {
+  try { return JSON.parse(fs.readFileSync(byokLocalPath(projectDir), 'utf8')); } catch { return {}; }
+}
+
+function saveLocalByok(projectDir, byok) {
+  const target = byokLocalPath(projectDir);
+  fs.mkdirSync(path.dirname(target), { recursive: true });
+  fs.writeFileSync(target, JSON.stringify({ apiKey: byok.apiKey || '' }, null, 2) + '\n', { encoding: 'utf8', mode: 0o600 });
+}
+
+function loadByokSources(projectDir) {
+  const config = loadConfig(projectDir);
+  const local = loadLocalByok(projectDir);
+  if (config.byok.apiKey) {
+    ensureGitignore(projectDir);
+    if (!local.apiKey) {
+      local.apiKey = config.byok.apiKey;
+      saveLocalByok(projectDir, local);
+    }
+    config.byok.apiKey = '';
+    saveConfig(projectDir, config);
+  }
+  return { config, local };
 }
 
 function loadConfig(projectDir) {
@@ -41,21 +71,23 @@ function saveConfig(projectDir, config) {
 
 function saveByokConfig(projectDir, byok) {
   const config = loadConfig(projectDir);
-  config.byok = { ...config.byok, ...byok };
-  saveConfig(projectDir, config);
+  const local = loadLocalByok(projectDir);
+  const suppliedKey = typeof byok.apiKey === 'string' && !byok.apiKey.includes('****')
+    ? byok.apiKey
+    : local.apiKey || config.byok.apiKey;
   ensureGitignore(projectDir);
+  config.byok = { ...config.byok, ...byok, apiKey: '' };
+  saveLocalByok(projectDir, { apiKey: suppliedKey || '' });
+  saveConfig(projectDir, config);
   return config;
 }
 
 function getByokConfig(projectDir, { maskKey = false } = {}) {
-  const config = loadConfig(projectDir);
-  const byok = resolveByokWithEnv(config.byok);
+  const { config, local } = loadByokSources(projectDir);
+  const byok = resolveByokWithEnv({ ...config.byok, apiKey: local.apiKey || config.byok.apiKey || '' });
 
   if (maskKey && byok.apiKey) {
-    const key = byok.apiKey;
-    byok.apiKey = key.length > 8
-      ? key.slice(0, 4) + '****' + key.slice(-4)
-      : '****';
+    byok.apiKey = '****';
   }
 
   return byok;
@@ -70,8 +102,8 @@ function resolveByokWithEnv(byok) {
 }
 
 function getResolvedByok(projectDir) {
-  const config = loadConfig(projectDir);
-  return resolveByokWithEnv(config.byok);
+  const { config, local } = loadByokSources(projectDir);
+  return resolveByokWithEnv({ ...config.byok, apiKey: local.apiKey || config.byok.apiKey || '' });
 }
 
 function ensureGitignore(projectDir) {

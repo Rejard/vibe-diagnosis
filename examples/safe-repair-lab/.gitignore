@@ -3,6 +3,8 @@
 .vibe-diagnosis/runs/
 .vibe-diagnosis/cache.json
 .vibe-diagnosis/active_port.json
+.vibe-diagnosis/active_context.json
 .vibe-diagnosis/config.json
+.vibe-diagnosis/byok.local.json
 .vibe-diagnosis/history.json
 .vibe-diagnosis/milestones.json

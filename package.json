@@ -16,11 +16,12 @@
     "README.ko.md"
   ],
   "scripts": {
-    "test": "node --test test/*.test.cjs && node bin/vibe-diag.js run --json",
+    "test": "node --test test/*.test.cjs && node scripts/scan-secrets.cjs && node bin/vibe-diag.js run --json",
     "test:unit": "node --test test/*.test.cjs",
     "test:example": "node bin/vibe-diag.js run --cwd examples/calculator --json",
     "test:rollback": "node examples/safe-repair-lab/verify-rollback.cjs",
-    "test:packed": "node scripts/verify-packed-install.cjs"
+    "test:packed": "node scripts/verify-packed-install.cjs",
+    "test:secrets": "node scripts/scan-secrets.cjs"
   },
   "dependencies": {
     "acorn": "^8.15.0"
