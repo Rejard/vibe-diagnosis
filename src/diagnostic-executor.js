@@ -1,6 +1,7 @@
 const path = require('path');
 const { fork, spawn } = require('child_process');
 const { normalizeEvidence } = require('./evidence');
+const { redactValue } = require('./redaction');
 
 const DEFAULT_TIMEOUT_MS = 120000;
 const MAX_OUTPUT_BYTES = 1024 * 1024;
@@ -85,15 +86,15 @@ async function executeDiagnostic(projectDir, filePath, options = {}) {
   const firstResult = attemptToResult(filePath, first);
   const attempts = [{ ...first.execution, classification: firstResult.classification, status: firstResult.status }];
   if (!['RUNNER_ERROR', 'TIMEOUT'].includes(firstResult.classification) || options.retryInfrastructure === false) {
-    return { ...firstResult, attempts };
+    return redactValue({ ...firstResult, attempts });
   }
   const second = await runAttempt(projectDir, filePath, options);
   const secondResult = attemptToResult(filePath, second);
   attempts.push({ ...second.execution, classification: secondResult.classification, status: secondResult.status });
   if (secondResult.status === 'OK') {
-    return { ...secondResult, status: 'WARNING', classification: 'FLAKY', details: `Passed on isolated retry after ${firstResult.classification}: ${firstResult.details}`, attempts, firstFailure: firstResult };
+    return redactValue({ ...secondResult, status: 'WARNING', classification: 'FLAKY', details: `Passed on isolated retry after ${firstResult.classification}: ${firstResult.details}`, attempts, firstFailure: firstResult });
   }
-  return { ...secondResult, attempts, firstFailure: firstResult };
+  return redactValue({ ...secondResult, attempts, firstFailure: firstResult });
 }
 
 module.exports = { executeDiagnostic, runAttempt, DEFAULT_TIMEOUT_MS };

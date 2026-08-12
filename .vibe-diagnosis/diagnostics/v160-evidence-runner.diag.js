@@ -11,7 +11,7 @@ module.exports = {
   blocksRelease: true,
   confidence: 1,
   tags: ['runner', 'contract', 'release'],
-  files: ['src/runner.js', 'src/diagnostic-executor.js', 'src/run-summary.js', 'src/assertions.js', 'src/rules-injector.js', 'src/dashboard-control.js', 'mcp-server/index.js'],
+  files: ['src/runner.js', 'src/diagnostic-executor.js', 'src/run-summary.js', 'src/assertions.js', 'src/rules-injector.js', 'src/dashboard-control.js', 'src/dashboard.js', 'src/path-policy.js', 'src/redaction.js', 'mcp-server/index.js'],
   cache: true,
   async run({ projectDir }) {
     const runner = require(path.join(projectDir, 'src', 'runner'));
@@ -20,6 +20,8 @@ module.exports = {
     const assertions = require(path.join(projectDir, 'src', 'assertions'));
     const repairer = require(path.join(projectDir, 'src', 'repairer'));
     const dashboardControl = require(path.join(projectDir, 'src', 'dashboard-control'));
+    const pathPolicy = require(path.join(projectDir, 'src', 'path-policy'));
+    const redaction = require(path.join(projectDir, 'src', 'redaction'));
     const required = [
       [runner, 'runDiagnosticsReport'],
       [runner, 'runCompletionDiagnostics'],
@@ -31,15 +33,17 @@ module.exports = {
       [repairer, 'createRepairPlan'],
       [repairer, 'applyRepairPlan'],
       [dashboardControl, 'stopDashboard'],
+      [pathPolicy, 'resolveWithin'],
+      [redaction, 'redactValue'],
     ];
     const missing = required.filter(([owner, name]) => typeof owner[name] !== 'function').map(([, name]) => name);
     if (missing.length) return { status: 'ERROR', details: `Missing V1.6 contracts: ${missing.join(', ')}` };
-    const gate = summary.summarizeResults([{ id: 'critical', status: 'ERROR', severity: 'CRITICAL', blocksRelease: true, blocksLiveTrading: false, scope: 'RELEASE', evidence: [] }]);
+    const gate = summary.summarizeResults([{ id: 'critical', status: 'ERROR', severity: 'CRITICAL', blocksRelease: true, blocksLiveTrading: false, gateDeclarations: { release: true, liveTrading: true }, scope: 'RELEASE', evidence: [] }]);
     if (gate.gates.releaseStatus !== 'RELEASE_BLOCKED') return { status: 'ERROR', details: 'Critical release blocker was not enforced.' };
     return {
       status: 'OK',
-      details: 'Isolated runner, evidence summary, semantic assertions, and approval-first repair contracts are available.',
-      evidence: [{ type: 'TEST', summary: 'V1.6 public contracts loaded and release gate behavior executed.', verifiedAt: new Date().toISOString() }],
+      details: 'Isolated runner, guarded paths, redacted evidence, semantic assertions, and approval-first repair contracts are available.',
+      evidence: [{ type: 'TEST', summary: 'V1.6 public contracts, guarded paths, redaction, and release gate behavior executed.', verifiedAt: new Date().toISOString() }],
     };
   },
 };

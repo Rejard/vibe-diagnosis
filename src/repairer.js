@@ -6,6 +6,7 @@ const { chat } = require('./ai-provider');
 const { getResolvedByok } = require('./config-manager');
 const { runDiagnosticsReport, discoverDiagnostics, clearProjectRequireCache } = require('./runner');
 const { captureEnvironment } = require('./environment');
+const { redactString, redactValue } = require('./redaction');
 
 const SYSTEM_PROMPT = `You are a code repair specialist. Return only JSON with a summary and complete proposed file contents. Fix the functional root cause. Never weaken, delete, or bypass diagnostics and never insert text solely to satisfy a source-string check. Do not modify live trading, authentication, database schema/data, credentials, deployment, or runtime settings unless the plan explicitly marks those files high risk.`;
 const HIGH_RISK = /(^|\/)(\.env|auth|credentials?|secrets?|database|db|schema|migrations?|deploy|runtime|trading|orders?|wallet|payments?)(\/|\.|$)|(?:package-lock|pnpm-lock|yarn\.lock)/i;
@@ -95,7 +96,7 @@ function collectContext(projectDir, diagnostic) {
 }
 
 function promptFor(context) {
-  return `DIAGNOSTIC FAILURE\n${JSON.stringify(context.diagnostic, null, 2)}\n\nDIAGNOSTIC SOURCE\n${context.diagnosticSource || 'unavailable'}\n\nPACKAGE\n${JSON.stringify(context.packageJson, null, 2)}\n\nReturn {"summary":"...","files":[{"path":"...","content":"complete file"}]}.`;
+  return `DIAGNOSTIC FAILURE\n${JSON.stringify(redactValue(context.diagnostic), null, 2)}\n\nDIAGNOSTIC SOURCE\n${redactString(context.diagnosticSource || 'unavailable')}\n\nPACKAGE\n${JSON.stringify(redactValue(context.packageJson), null, 2)}\n\nReturn {"summary":"...","files":[{"path":"...","content":"complete file"}]}.`;
 }
 
 function prepareFiles(projectDir, proposed) {

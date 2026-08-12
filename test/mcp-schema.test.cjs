@@ -9,6 +9,8 @@ test('MCP exposes V1.6 report filters and approval-first repair tools', async ()
   const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'vibe-mcp-completion-'));
   fs.mkdirSync(path.join(projectDir, '.vibe-diagnosis', 'diagnostics'), { recursive: true });
   fs.writeFileSync(path.join(projectDir, '.vibe-diagnosis', 'diagnostics', 'ok.diag.js'), `module.exports={id:'ok',name:'ok',layer:'TASK',async run(){return {status:'OK',details:'verified'}}}`, 'utf8');
+  const marker = path.join(projectDir, 'module-loaded.txt').replace(/\\/g, '\\\\');
+  fs.writeFileSync(path.join(projectDir, '.vibe-diagnosis', 'diagnostics', 'metadata.diag.js'), `require('fs').writeFileSync('${marker}','loaded');module.exports={id:'metadata',name:'metadata',layer:'TASK',async run(){return {status:'OK'}}}`, 'utf8');
   const child = spawn(process.execPath, ['index.js'], { cwd: path.join(__dirname, '..', 'mcp-server'), stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true });
   let buffer = '';
   const pending = new Map();
@@ -42,12 +44,20 @@ test('MCP exposes V1.6 report filters and approval-first repair tools', async ()
     const applyProperties = tools.get('apply_repair_plan').inputSchema.properties;
     assert.ok(applyProperties.approved);
     assert.ok(applyProperties.approvedHighRisk);
+    assert.equal(tools.get('list_diagnostics').annotations.readOnlyHint, true);
+    assert.equal(tools.get('apply_repair_plan').annotations.destructiveHint, true);
+    assert.equal(tools.get('plan_repair').annotations.openWorldHint, true);
+    const metadata = await request('tools/call', { name: 'list_diagnostics', arguments: { projectDir } });
+    assert.equal(metadata.result.isError, undefined);
+    assert.equal(fs.existsSync(path.join(projectDir, 'module-loaded.txt')), false);
+    const rulesBefore = fs.existsSync(path.join(projectDir, 'AGENTS.md')) ? fs.readFileSync(path.join(projectDir, 'AGENTS.md'), 'utf8') : null;
     const completed = await request('tools/call', { name: 'complete_task_diagnostics', arguments: { projectDir } });
     const report = JSON.parse(completed.result.content[0].text);
     assert.equal(report.completion.eligible, true);
     assert.equal(report.completion.dashboardRequired, false);
     assert.equal(fs.existsSync(path.join(projectDir, '.vibe-diagnosis', 'active_port.json')), false);
-    assert.match(fs.readFileSync(path.join(projectDir, 'AGENTS.md'), 'utf8'), /complete_task_diagnostics/);
+    const rulesAfter = fs.existsSync(path.join(projectDir, 'AGENTS.md')) ? fs.readFileSync(path.join(projectDir, 'AGENTS.md'), 'utf8') : null;
+    assert.equal(rulesAfter, rulesBefore);
   } finally {
     child.kill();
     fs.rmSync(projectDir, { recursive: true, force: true });

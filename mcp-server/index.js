@@ -41,6 +41,8 @@ function loadCore() {
       buildVerifier: require("vibe-diagnosis/src/build-verifier"),
       rulesInjector: require("vibe-diagnosis/src/rules-injector"),
       diagnosticAudit: require("vibe-diagnosis/src/diagnostic-audit"),
+      selector: require("vibe-diagnosis/src/selector"),
+      pathPolicy: require("vibe-diagnosis/src/path-policy"),
     };
   } catch {
     return {
@@ -56,13 +58,14 @@ function loadCore() {
       buildVerifier: require("../src/build-verifier"),
       rulesInjector: require("../src/rules-injector"),
       diagnosticAudit: require("../src/diagnostic-audit"),
+      selector: require("../src/selector"),
+      pathPolicy: require("../src/path-policy"),
     };
   }
 }
 
 const core = loadCore();
 const { runDiagnostics, runDiagnosticsReport, runCompletionDiagnostics, discoverDiagnostics } = core.runner;
-const { validateDiagnosticModule } = core.schema;
 const { initialize } = core.init;
 const { repairDiagnostic, createRepairPlan, applyRepairPlan, readAudit, autoRevertOrRepairOmission } = core.repairer;
 
@@ -70,6 +73,17 @@ const server = new McpServer({
   name: "vibe-diagnosis",
   version: "1.6.0",
 });
+
+const READ_ONLY_TOOLS = new Set(["list_repair_incidents", "audit_diagnostics", "list_diagnostics", "read_error_pattern", "check_symbol_diff", "recommend_cartridge_split"]);
+const DESTRUCTIVE_TOOLS = new Set(["apply_repair_plan", "init_diagnostics", "write_error_pattern", "stop_dashboard", "sync_ai_context", "sync_agent_rules"]);
+const OPEN_WORLD_TOOLS = new Set(["repair_diagnostic", "heal_all", "plan_repair"]);
+const registerLegacyTool = server.tool.bind(server);
+server.tool = (name, description, schema, handler) => registerLegacyTool(name, description, schema, {
+  readOnlyHint: READ_ONLY_TOOLS.has(name),
+  destructiveHint: DESTRUCTIVE_TOOLS.has(name),
+  idempotentHint: READ_ONLY_TOOLS.has(name),
+  openWorldHint: OPEN_WORLD_TOOLS.has(name),
+}, handler);
 
 function isPortInUse(port) {
   return new Promise((resolve) => {
@@ -128,21 +142,10 @@ async function autoStartDashboardIfNeeded(projectDir, defaultPort = 7700, isExpl
     }
 
     try {
-      const candidates = [
-        "C:\\Users\\lemai\\AppData\\Roaming\\npm\\node_modules\\vibe-diagnosis\\bin\\vibe-diag.js",
-        "c:\\home\\vibe-diagnosis\\bin\\vibe-diag.js"
-      ];
-
-      let vibeDiagBin = null;
-      for (const cand of candidates) {
-        if (fs.existsSync(cand)) {
-          vibeDiagBin = cand;
-          break;
-        }
-      }
-
-      if (!vibeDiagBin) {
-        vibeDiagBin = "vibe-diag";
+      let vibeDiagBin = "vibe-diag";
+      try { vibeDiagBin = require.resolve("vibe-diagnosis/bin/vibe-diag.js"); }
+      catch {
+        try { vibeDiagBin = require.resolve("../bin/vibe-diag.js"); } catch {}
       }
 
       const isJsFile = vibeDiagBin.endsWith(".js");
@@ -309,9 +312,8 @@ server.tool(
   },
   async ({ projectDir }) => {
     try {
-      const agentRules = core.rulesInjector.ensureAgentRules(projectDir);
       const report = await runCompletionDiagnostics(projectDir, { persist: true });
-      report.agentIntegration = agentRules;
+      report.agentIntegration = { modified: false, instruction: "Use init_diagnostics or sync_agent_rules to update agent rule files explicitly." };
       return {
         content: [{ type: "text", text: JSON.stringify(report, null, 2) }],
         isError: !report.completion.eligible,
@@ -428,39 +430,10 @@ server.tool(
         };
       }
 
-      const diagnostics = [];
-      for (const filePath of files) {
-        try {
-          let mod;
-          try {
-            delete require.cache[require.resolve(filePath)];
-            mod = require(filePath);
-          } catch (err) {
-            const fileUrl = require("url").pathToFileURL(filePath).href;
-            const esmMod = await import(fileUrl);
-            mod = esmMod.default || esmMod;
-          }
-          const validation = validateDiagnosticModule(mod, filePath);
-          diagnostics.push({
-            file: path.basename(filePath),
-            id: mod.id || path.basename(filePath, ".diag.js"),
-            name: mod.name || "Unknown",
-            layer: mod.layer || "UNKNOWN",
-            linkedTask: mod.linkedTask || null,
-            valid: validation.valid,
-            errors: validation.errors,
-          });
-        } catch (err) {
-          diagnostics.push({
-            file: path.basename(filePath),
-            id: path.basename(filePath, ".diag.js"),
-            name: "Failed to load",
-            layer: "UNKNOWN",
-            valid: false,
-            errors: [err.message],
-          });
-        }
-      }
+      const diagnostics = files.map(filePath => {
+        const descriptor = core.selector.inspectDiagnosticSource(filePath);
+        return { file: path.basename(filePath), id: descriptor.id, name: descriptor.name, layer: descriptor.layer, linkedTask: descriptor.linkedTask, valid: descriptor.valid, errors: descriptor.errors };
+      });
 
       return {
         content: [{ type: "text", text: JSON.stringify(diagnostics, null, 2) }],
@@ -509,7 +482,7 @@ server.tool(
         };
       }
 
-      const filePath = path.join(patternsDir, filename);
+      const filePath = core.pathPolicy.resolveWithin(patternsDir, filename, { extension: ".md" });
       if (!fs.existsSync(filePath)) {
         return {
           content: [{ type: "text", text: `Error pattern not found: ${filename}` }],
@@ -541,7 +514,7 @@ server.tool(
       const patternsDir = path.join(projectDir, ".vibe-diagnosis", "error-patterns");
       fs.mkdirSync(patternsDir, { recursive: true });
 
-      const filePath = path.join(patternsDir, filename);
+      const filePath = core.pathPolicy.resolveWithin(patternsDir, filename, { extension: ".md" });
       const existed = fs.existsSync(filePath);
       fs.writeFileSync(filePath, content, "utf-8");
 

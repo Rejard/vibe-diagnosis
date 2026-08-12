@@ -27,8 +27,11 @@
   },
   "author": "Rejard <lemaiiisk@gmail.com>",
   "license": "Apache-2.0",
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.12.1",
+    "@modelcontextprotocol/sdk": "^1.30.0",
     "vibe-diagnosis": "^1.6.0",
     "zod": "^3.24.0"
   }

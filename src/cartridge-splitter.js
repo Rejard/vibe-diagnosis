@@ -1,8 +1,9 @@
 const fs = require('fs');
 const path = require('path');
+const { resolveWithin } = require('./path-policy');
 
 function generateCartridgeBlueprint(projectDir, relativeFilePath) {
-  const absPath = path.resolve(projectDir, relativeFilePath);
+  const absPath = resolveWithin(projectDir, relativeFilePath);
   if (!fs.existsSync(absPath)) {
     return {
       targetFile: relativeFilePath,

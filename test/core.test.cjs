@@ -11,6 +11,8 @@ const { applyRepairPlan, autoRevertOrRepairOmission } = require('../src/repairer
 const { upsertRules } = require('../src/rules-injector');
 const { initialize } = require('../src/init');
 const { saveByokConfig, getByokConfig, getResolvedByok } = require('../src/config-manager');
+const { resolveWithin } = require('../src/path-policy');
+const { redactString } = require('../src/redaction');
 
 function project() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'vibe-diag-'));
@@ -86,6 +88,33 @@ test('critical blockers override a high pass percentage and evidence remains sep
   assert.equal(summary.overallStatus, 'RELEASE_BLOCKED');
   assert.equal(summary.gates.liveTradingStatus, 'LIVE_BLOCKED');
   assert.equal(summary.evidenceSummary.liveEvidenceStatus, 'UNVERIFIED');
+});
+
+test('legacy gate coverage is reported as not evaluated without breaking result compatibility', () => {
+  const summary = summarizeResults([{ id: 'legacy', status: 'OK', evidence: [] }]);
+  assert.equal(summary.gates.releaseStatus, 'NOT_EVALUATED');
+  assert.equal(summary.gates.liveTradingStatus, 'NOT_EVALUATED');
+  assert.equal(summary.evidenceSummary.coverage.status, 'INCOMPLETE');
+});
+
+test('workspace paths and diagnostic output secrets are guarded', t => {
+  const root = project();
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const fakeKey = 'sk-' + 'proj-' + '123456789012345678901234';
+  assert.throws(() => resolveWithin(root, '../outside.txt'), /escapes/);
+  assert.match(redactString(`apiKey=${fakeKey}`), /\[REDACTED\]/);
+  assert.doesNotMatch(redactString(`apiKey=${fakeKey}`), /sk-proj/);
+});
+
+test('runner redacts secrets from diagnostic details and stderr', async t => {
+  const root = project();
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const fakeKey = 'sk-' + 'proj-' + '123456789012345678901234';
+  diagnostic(root, 'secret', `module.exports={id:'secret',name:'secret',layer:'SYSTEM',async run(){process.stderr.write('apiKey=${fakeKey}');return {status:'ERROR',details:'token ${fakeKey}'}}}`);
+  const report = await runDiagnosticsReport(root, { persist: false, compareBaseline: false });
+  const serialized = JSON.stringify(report.results[0]);
+  assert.doesNotMatch(serialized, /sk-proj/);
+  assert.match(serialized, /REDACTED/);
 });
 
 test('provides AST assertions and fragile string warnings', () => {

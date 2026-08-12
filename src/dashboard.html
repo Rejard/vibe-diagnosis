@@ -754,6 +754,10 @@ header{display:flex;align-items:center;justify-content:space-between;padding:20p
 
 <script>
 const API = '';
+const DASHBOARD_TOKEN = __VIBE_DASHBOARD_TOKEN__;
+function apiFetch(url, options = {}) {
+  return fetch(url, { ...options, headers: { ...(options.headers || {}), 'X-Vibe-Dashboard-Token': DASHBOARD_TOKEN } });
+}
 
 let diagnosticsList = [];
 let lastResults = {};
@@ -793,17 +797,17 @@ function updateCardsSelection() {
 }
 
 async function fetchList() {
-  const res = await fetch(API + '/api/list');
+  const res = await apiFetch(API + '/api/list');
   return res.json();
 }
 
 async function fetchErrors() {
-  const res = await fetch(API + '/api/errors');
+  const res = await apiFetch(API + '/api/errors');
   return res.json();
 }
 
 async function fetchErrorContent(filename) {
-  const res = await fetch(API + '/api/errors/' + encodeURIComponent(filename));
+  const res = await apiFetch(API + '/api/errors/' + encodeURIComponent(filename));
   return res.text();
 }
 
@@ -935,7 +939,7 @@ async function runDiagnostics() {
   repairStates = {};
 
   try {
-    const res = await fetch(API + '/api/run', { method: 'POST' });
+    const res = await apiFetch(API + '/api/run', { method: 'POST' });
     const data = await res.json();
 
     lastResults = {};
@@ -972,7 +976,7 @@ async function repairDiagnostic(diagId) {
   renderCards();
 
   try {
-    const res = await fetch(API + '/api/repair/plan', {
+    const res = await apiFetch(API + '/api/repair/plan', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ diagId }),
@@ -1003,7 +1007,7 @@ async function repairDiagnostic(diagId) {
       renderCards();
       return;
     }
-    const applyRes = await fetch(API + '/api/repair/apply', {
+    const applyRes = await apiFetch(API + '/api/repair/apply', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ planId: plan.id, approved: true, approvedHighRisk }),
     });
@@ -1041,7 +1045,7 @@ function updateStatsFromResults() {
 
 async function loadByokConfig() {
   try {
-    const res = await fetch(API + '/api/byok/config');
+    const res = await apiFetch(API + '/api/byok/config');
     const data = await res.json();
 
     if (data.byok) {
@@ -1073,7 +1077,7 @@ async function saveByokConfig() {
   feedback.className = 'byok-feedback';
 
   try {
-    const res = await fetch(API + '/api/byok/save', {
+    const res = await apiFetch(API + '/api/byok/save', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ provider, apiKey, model }),
@@ -1122,7 +1126,7 @@ function scrollToByok() {
 
 async function loadHeuristicMetrics() {
   try {
-    const res = await fetch(API + '/api/metrics');
+    const res = await apiFetch(API + '/api/metrics');
     const metrics = await res.json();
 
     document.getElementById('metricPredictor').textContent = metrics.buildPredictorScore + '%';
@@ -1151,7 +1155,7 @@ async function loadHeuristicMetrics() {
 
 async function loadTimelineHistory() {
   try {
-    const res = await fetch(API + '/api/history');
+    const res = await apiFetch(API + '/api/history');
     const fullHistory = await res.json();
     const svg = document.getElementById('timelineSvg');
     const emptyText = document.getElementById('timelineEmptyText');
@@ -1351,7 +1355,7 @@ function closeModal(event) {
 
 async function loadMilestones() {
   try {
-    const res = await fetch(API + '/api/milestones');
+    const res = await apiFetch(API + '/api/milestones');
     const milestones = await res.json();
     document.getElementById('milestoneCount').textContent = milestones.length;
     
@@ -1398,7 +1402,7 @@ async function saveMilestone() {
   }
 
   try {
-    const res = await fetch(API + '/api/milestones', {
+    const res = await apiFetch(API + '/api/milestones', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ title, redErrors, partialPassRate, finalStatus, notes })
@@ -1425,7 +1429,7 @@ async function saveMilestone() {
 async function deleteMilestone(id) {
   if (!confirm('Are you sure you want to permanently delete this milestone?')) return;
   try {
-    const res = await fetch(API + `/api/milestones?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+    const res = await apiFetch(API + `/api/milestones?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
     const result = await res.json();
     if (result.success) {
       showToast('Milestone deleted', 'success');
@@ -1466,7 +1470,7 @@ if (btnShutdown) {
       btnShutdown.disabled = true;
       btnShutdown.innerText = '종료 중...';
       
-      const response = await fetch('/api/shutdown', {
+      const response = await apiFetch('/api/shutdown', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' }
       });

@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
-const { execSync } = require('child_process');
+const { execFileSync } = require('child_process');
+const { resolveWithin } = require('./path-policy');
 
 function extractSymbols(content) {
   if (!content || typeof content !== 'string') return [];
@@ -30,7 +31,7 @@ function analyzeSymbolDiff(projectDir, relativeFilePath, oldContentInput, newCon
   let oldContent = oldContentInput;
   let newContent = newContentInput;
 
-  const targetPath = path.resolve(projectDir, relativeFilePath || '');
+  const targetPath = resolveWithin(projectDir, relativeFilePath || '');
 
   if (oldContent === undefined || newContent === undefined) {
     if (fs.existsSync(targetPath)) {
@@ -41,7 +42,7 @@ function analyzeSymbolDiff(projectDir, relativeFilePath, oldContentInput, newCon
         oldContent = fs.readFileSync(backupPath, 'utf-8');
       } else {
         try {
-          const gitDiff = execSync(`git show HEAD:"${relativeFilePath}"`, {
+          const gitDiff = execFileSync('git', ['show', `HEAD:${path.relative(projectDir, targetPath).replace(/\\/g, '/')}`], {
             cwd: projectDir,
             encoding: 'utf-8',
             windowsHide: true

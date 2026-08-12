@@ -9,9 +9,12 @@ function summarizeResults(results) {
     error: results.filter(r => r.status === 'ERROR').length,
     flaky: results.filter(r => r.classification === 'FLAKY').length,
   };
-  const healthPercent = summary.total ? Math.round((summary.ok / summary.total) * 100) : 100;
+  const healthPercentExact = summary.total ? (summary.ok / summary.total) * 100 : 100;
+  const healthPercent = Number(healthPercentExact.toFixed(2));
   const releaseBlockedBy = results.filter(r => r.status === 'ERROR' && r.severity === 'CRITICAL' && r.blocksRelease).map(r => r.id);
   const liveBlockedBy = results.filter(r => r.status === 'ERROR' && r.severity === 'CRITICAL' && r.blocksLiveTrading).map(r => r.id);
+  const releaseEvaluated = results.some(r => r.gateDeclarations?.release);
+  const liveEvaluated = results.some(r => r.gateDeclarations?.liveTrading);
   const overallStatus = releaseBlockedBy.length ? 'RELEASE_BLOCKED'
     : liveBlockedBy.length ? 'LIVE_BLOCKED'
       : summary.error ? 'ERROR' : summary.warning ? 'WARNING' : 'OK';
@@ -27,10 +30,11 @@ function summarizeResults(results) {
     overallStatus,
     healthPercent,
     gates: {
-      releaseStatus: releaseBlockedBy.length ? 'RELEASE_BLOCKED' : 'RELEASE_ALLOWED',
-      liveTradingStatus: liveBlockedBy.length ? 'LIVE_BLOCKED' : 'LIVE_ALLOWED',
+      releaseStatus: releaseBlockedBy.length ? 'RELEASE_BLOCKED' : releaseEvaluated ? 'RELEASE_ALLOWED' : 'NOT_EVALUATED',
+      liveTradingStatus: liveBlockedBy.length ? 'LIVE_BLOCKED' : liveEvaluated ? 'LIVE_ALLOWED' : 'NOT_EVALUATED',
       releaseBlockedBy,
       liveBlockedBy,
+      coverage: { release: releaseEvaluated, liveTrading: liveEvaluated },
     },
     evidenceSummary: summarizeEvidence(results),
     domains,

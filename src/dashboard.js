@@ -3,11 +3,12 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { runDiagnosticsReport, discoverDiagnostics } = require('./runner');
-const { validateDiagnosticModule, normalizeMetadata } = require('./schema');
 const { getByokConfig, saveByokConfig } = require('./config-manager');
 const { repairDiagnostic, createRepairPlan, applyRepairPlan, readAudit } = require('./repairer');
 const { listProviders } = require('./ai-provider');
 const { runHeuristicMetrics } = require('./analyzer');
+const { resolveWithin } = require('./path-policy');
+const { inspectDiagnosticSource } = require('./selector');
 
 const HTML_PATH = path.join(__dirname, 'dashboard.html');
 
@@ -44,17 +45,22 @@ function listDiagnosticMeta(projectDir) {
 
   for (const filePath of files) {
     try {
-      delete require.cache[require.resolve(filePath)];
-      const mod = require(filePath);
-      const validation = validateDiagnosticModule(mod, filePath);
+      const mod = inspectDiagnosticSource(filePath);
       result.push({
         file: path.basename(filePath),
-        id: mod.id || path.basename(filePath, '.diag.js'),
-        name: mod.name || 'Unknown',
-        layer: mod.layer || 'UNKNOWN',
+        id: mod.id,
+        name: mod.name,
+        layer: mod.layer,
         linkedTask: mod.linkedTask || null,
-        ...normalizeMetadata(mod),
-        valid: validation.valid,
+        severity: mod.severity,
+        scope: mod.scope,
+        evidenceType: mod.evidenceType,
+        tags: mod.tags,
+        dependencies: mod.dependencies,
+        files: mod.files,
+        cache: mod.cache,
+        valid: mod.valid,
+        errors: mod.errors,
       });
     } catch (err) {
       result.push({
@@ -77,7 +83,7 @@ function listErrorPatterns(projectDir) {
 }
 
 function readErrorPattern(projectDir, filename) {
-  const filePath = path.join(projectDir, '.vibe-diagnosis', 'error-patterns', filename);
+  const filePath = resolveWithin(path.join(projectDir, '.vibe-diagnosis', 'error-patterns'), filename, { extension: '.md' });
   if (!fs.existsSync(filePath)) return null;
   return fs.readFileSync(filePath, 'utf-8');
 }
@@ -85,9 +91,8 @@ function readErrorPattern(projectDir, filename) {
 function sendJson(res, data, status = 200) {
   res.writeHead(status, {
     'Content-Type': 'application/json',
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
+    'Cache-Control': 'no-store',
+    'X-Content-Type-Options': 'nosniff',
   });
   res.end(JSON.stringify(data));
 }
@@ -95,20 +100,27 @@ function sendJson(res, data, status = 200) {
 function sendText(res, text, status = 200) {
   res.writeHead(status, {
     'Content-Type': 'text/plain; charset=utf-8',
-    'Access-Control-Allow-Origin': '*',
+    'Cache-Control': 'no-store',
+    'X-Content-Type-Options': 'nosniff',
   });
   res.end(text);
 }
 
 function sendHtml(res, html) {
-  res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8' });
+  res.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'Content-Security-Policy': "default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self' 'unsafe-inline'; connect-src 'self'; img-src 'self' data:; frame-ancestors 'none'", 'X-Frame-Options': 'DENY', 'X-Content-Type-Options': 'nosniff' });
   res.end(html);
 }
 
 function readBody(req) {
   return new Promise((resolve, reject) => {
     let data = '';
-    req.on('data', chunk => { data += chunk; });
+    req.on('data', chunk => {
+      data += chunk;
+      if (Buffer.byteLength(data) > 1024 * 1024) {
+        reject(new Error('Request body exceeds 1 MiB.'));
+        req.destroy();
+      }
+    });
     req.on('end', () => {
       try { resolve(JSON.parse(data)); }
       catch { reject(new Error('Invalid JSON body')); }
@@ -125,15 +137,19 @@ function startDashboard(projectDir, port = 7700, options = {}) {
   const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, `http://${req.headers.host}`);
 
-    if (req.method === 'OPTIONS') {
-      sendJson(res, {});
+    if (req.method === 'GET' && url.pathname === '/') {
+      const html = fs.readFileSync(HTML_PATH, 'utf-8').replace('__VIBE_DASHBOARD_TOKEN__', JSON.stringify(shutdownToken));
+      sendHtml(res, html);
       return;
     }
 
-    if (req.method === 'GET' && url.pathname === '/') {
-      const html = fs.readFileSync(HTML_PATH, 'utf-8');
-      sendHtml(res, html);
-      return;
+    if (url.pathname.startsWith('/api/')) {
+      const origin = req.headers.origin;
+      const expectedOrigin = `http://${req.headers.host}`;
+      if ((origin && origin !== expectedOrigin) || req.headers['x-vibe-dashboard-token'] !== shutdownToken) {
+        sendJson(res, { error: 'Dashboard API authorization failed.' }, 403);
+        return;
+      }
     }
 
     if (req.method === 'GET' && url.pathname === '/api/list') {
@@ -149,12 +165,13 @@ function startDashboard(projectDir, port = 7700, options = {}) {
     }
 
     if (req.method === 'GET' && url.pathname.startsWith('/api/errors/')) {
-      const filename = decodeURIComponent(url.pathname.slice('/api/errors/'.length));
-      const content = readErrorPattern(projectDir, filename);
-      if (content === null) {
-        sendText(res, 'Not found', 404);
-      } else {
-        sendText(res, content);
+      try {
+        const filename = decodeURIComponent(url.pathname.slice('/api/errors/'.length));
+        const content = readErrorPattern(projectDir, filename);
+        if (content === null) sendText(res, 'Not found', 404);
+        else sendText(res, content);
+      } catch (error) {
+        sendJson(res, { error: error.message }, 400);
       }
       return;
     }
@@ -390,7 +407,7 @@ function startDashboard(projectDir, port = 7700, options = {}) {
     res.end('Not found');
   });
 
-  server.listen(port, () => {
+  server.listen(port, '127.0.0.1', () => {
     const actualPort = server.address().port;
     // 기동 시 포트 락 파일(.vibe-diagnosis/active_port.json) 생성 및 저장
     try {

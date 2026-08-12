@@ -85,6 +85,10 @@ function normalizeMetadata(mod = {}) {
     evidenceType: mod.evidenceType || 'UNSPECIFIED',
     blocksRelease: mod.blocksRelease === true,
     blocksLiveTrading: mod.blocksLiveTrading === true,
+    gateDeclarations: {
+      release: typeof mod.blocksRelease === 'boolean',
+      liveTrading: typeof mod.blocksLiveTrading === 'boolean',
+    },
     confidence: typeof mod.confidence === 'number' ? mod.confidence : null,
     lastVerifiedAt: mod.lastVerifiedAt || null,
     tags: Array.isArray(mod.tags) ? mod.tags : [],

@@ -28,7 +28,17 @@ function summarizeEvidence(results) {
       else if (item.live && liveEvidenceStatus !== 'VERIFIED') liveEvidenceStatus = item.freshness === 'STALE' ? 'STALE' : 'UNVERIFIED';
     }
   }
-  return { byType, liveEvidenceStatus };
+  const diagnosticsWithEvidence = results.filter(result => (result.evidence || []).length > 0).length;
+  return {
+    byType,
+    liveEvidenceStatus,
+    coverage: {
+      diagnosticsWithEvidence,
+      totalDiagnostics: results.length,
+      percent: results.length ? Number(((diagnosticsWithEvidence / results.length) * 100).toFixed(2)) : 0,
+      status: diagnosticsWithEvidence === results.length && results.length ? 'COMPLETE' : 'INCOMPLETE',
+    },
+  };
 }
 
 module.exports = { normalizeEvidence, summarizeEvidence, LIVE_TYPES };

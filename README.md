@@ -14,10 +14,13 @@ Self-diagnosis and self-healing framework for AI-assisted coding projects. Place
 - `RELEASE_BLOCKED` and `LIVE_BLOCKED` are independent of health percentage. Static success and missing/stale live evidence can be shown at the same time.
 - `run_diagnostics` can select by ID, tag, scope, or severity and can use opt-in cache only for explicitly cacheable `STATIC`/`TEST` checks. Each saved run includes Git and environment fingerprints plus baseline comparisons.
 - Repairs always begin with a reviewable plan. Inspect the risk and complete diff preview, then call `apply_repair_plan` with explicit approval. High-risk areas require a separate approval and failed validation or regressions are rolled back.
-- Agent integration now requires `complete_task_diagnostics` immediately before a development task is reported complete. It runs the full suite without filters, cache, or dashboard; ordinary `run_diagnostics` also keeps the dashboard off unless explicitly requested.
+- Agent integration now requires `complete_task_diagnostics` immediately before a development task is reported complete. It runs the full suite without filters, cache, or dashboard and never edits agent rule files; use `init_diagnostics` or `sync_agent_rules` for explicit rule updates.
 - `stop_dashboard` is available through MCP and CLI and uses the project dashboard's local shutdown token instead of terminating an arbitrary recorded PID.
 - BYOK API keys are sent only to the selected provider for repair planning. Prefer `VIBE_DIAG_API_KEY`; dashboard-entered keys are stored only in ignored `.vibe-diagnosis/byok.local.json`, never in the shareable config or package.
 - Avoid `vibe-diag config set apiKey ...` on shared machines because command arguments can remain in shell history. Use the environment variable or the local dashboard instead.
+- The dashboard binds only to `127.0.0.1`. Its API requires the per-process token embedded in the local page and rejects cross-origin requests; error-pattern and project file inputs cannot escape their allowed directories.
+- Legacy diagnostics remain runnable, but undeclared release/live gates are reported as `NOT_EVALUATED` and evidence coverage is reported separately from the pass rate.
+- The CLI supports Node.js 18 or newer. The MCP package requires Node.js 20 or newer so its patched transport dependencies can be used without known advisory exposure.
 
 ---
 

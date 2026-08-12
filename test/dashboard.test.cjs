@@ -14,12 +14,29 @@ test('dashboard API returns the centralized V1.6 report', async t => {
   t.after(() => { server.close(); fs.rmSync(root, { recursive: true, force: true }); });
   await new Promise(resolve => server.once('listening', resolve));
   const port = server.address().port;
-  const response = await fetch(`http://localhost:${port}/api/run`, { method: 'POST' });
+  const lock = JSON.parse(fs.readFileSync(path.join(root, '.vibe-diagnosis', 'active_port.json'), 'utf8'));
+  const unauthorized = await fetch(`http://127.0.0.1:${port}/api/run`, { method: 'POST' });
+  assert.equal(unauthorized.status, 403);
+  const response = await fetch(`http://127.0.0.1:${port}/api/run`, { method: 'POST', headers: { 'X-Vibe-Dashboard-Token': lock.token } });
   const report = await response.json();
   assert.equal(report.schemaVersion, 2);
   assert.equal(report.summary.ok, 1);
-  assert.equal(report.gates.releaseStatus, 'RELEASE_ALLOWED');
+  assert.equal(report.gates.releaseStatus, 'NOT_EVALUATED');
   assert.equal(report.evidenceSummary.liveEvidenceStatus, 'UNVERIFIED');
+});
+
+test('dashboard rejects cross-origin and traversal requests', async t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'vibe-dashboard-security-'));
+  fs.mkdirSync(path.join(root, '.vibe-diagnosis', 'error-patterns'), { recursive: true });
+  const server = startDashboard(root, 0, { openBrowser: false });
+  t.after(() => { if (server.listening) server.close(); fs.rmSync(root, { recursive: true, force: true }); });
+  await new Promise(resolve => server.once('listening', resolve));
+  assert.equal(server.address().address, '127.0.0.1');
+  const lock = JSON.parse(fs.readFileSync(path.join(root, '.vibe-diagnosis', 'active_port.json'), 'utf8'));
+  const response = await fetch(`http://127.0.0.1:${lock.port}/api/errors/%2e%2e%2fconfig.json`, { headers: { Origin: 'https://example.com', 'X-Vibe-Dashboard-Token': lock.token } });
+  assert.equal(response.status, 403);
+  const traversal = await fetch(`http://127.0.0.1:${lock.port}/api/errors/%2e%2e%2fconfig.json`, { headers: { 'X-Vibe-Dashboard-Token': lock.token } });
+  assert.equal(traversal.status, 400);
 });
 
 test('dashboard control stops only the project dashboard and removes its lock', async t => {
