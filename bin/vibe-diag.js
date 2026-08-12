@@ -208,7 +208,7 @@ async function main() {
       console.log('    vibe-diag config set <key> <value>  Set BYOK config (provider, apiKey, model)');
       console.log('    vibe-diag repair <diagId>      Create a reviewable repair plan');
       console.log('    vibe-diag repair --all         Create plans for all failing diagnostics');
-      console.log('    vibe-diag apply-repair <planId> --approve [--approve-high-risk]');
+      console.log('    vibe-diag apply-repair <planId> --approve --checksum <sha256> [--approve-high-risk]');
       console.log('    vibe-diag audit                Audit duplicate and fragile diagnostics');
       console.log('    vibe-diag stop                 Stop the running web dashboard');
       console.log('    vibe-diag --cwd <path>        Run in specified directory\n');
@@ -336,13 +336,14 @@ async function handleRepair() {
 
 async function handleApplyRepair() {
   const planId = args[1];
-  if (!planId || !args.includes('--approve')) {
-    console.log('\n  Usage: vibe-diag apply-repair <planId> --approve [--approve-high-risk]\n');
+  const approvedChecksum = flagValue('--checksum');
+  if (!planId || !args.includes('--approve') || !approvedChecksum) {
+    console.log('\n  Usage: vibe-diag apply-repair <planId> --approve --checksum <sha256> [--approve-high-risk]\n');
     process.exitCode = 1;
     return;
   }
   const { applyRepairPlan } = require('../src/repairer');
-  const result = await applyRepairPlan(targetDir, planId, { approved: true, approvedHighRisk: args.includes('--approve-high-risk') });
+  const result = await applyRepairPlan(targetDir, planId, { approved: true, approvedChecksum, approvedHighRisk: args.includes('--approve-high-risk') });
   process.stdout.write(JSON.stringify(result, null, 2) + '\n');
   if (!result.result?.success) process.exitCode = 1;
 }

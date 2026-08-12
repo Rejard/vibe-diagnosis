@@ -6,6 +6,13 @@ module.exports = {
   name: '3 Advanced Omission Protection Modules Verification',
   layer: 'SYSTEM',
   linkedTask: 'Advanced Omission Guard',
+  severity: 'HIGH',
+  scope: 'RELEASE',
+  evidenceType: 'TEST',
+  blocksRelease: true,
+  confidence: 1,
+  tags: ['omission', 'repair'],
+  files: ['src/symbol-guard.js', 'src/cartridge-splitter.js', 'src/repairer.js'],
 
   async run({ projectDir }) {
     const symbolGuardPath = path.join(projectDir, 'src', 'symbol-guard.js');
@@ -74,7 +81,8 @@ export function SampleMonolithic() {
 
     return {
       status: 'OK',
-      details: 'All 3 advanced omission protection modules verified successfully.'
+      details: 'All 3 advanced omission protection modules verified successfully.',
+      evidence: [{ type: 'TEST', summary: 'Omission detection and cartridge split fixtures passed.', verifiedAt: new Date().toISOString() }]
     };
   }
 };

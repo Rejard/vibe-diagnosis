@@ -43,6 +43,7 @@ function loadCore() {
       diagnosticAudit: require("vibe-diagnosis/src/diagnostic-audit"),
       selector: require("vibe-diagnosis/src/selector"),
       pathPolicy: require("vibe-diagnosis/src/path-policy"),
+      completionReceipt: require("vibe-diagnosis/src/completion-receipt"),
     };
   } catch {
     return {
@@ -60,6 +61,7 @@ function loadCore() {
       diagnosticAudit: require("../src/diagnostic-audit"),
       selector: require("../src/selector"),
       pathPolicy: require("../src/path-policy"),
+      completionReceipt: require("../src/completion-receipt"),
     };
   }
 }
@@ -74,7 +76,7 @@ const server = new McpServer({
   version: "1.6.0",
 });
 
-const READ_ONLY_TOOLS = new Set(["list_repair_incidents", "audit_diagnostics", "list_diagnostics", "read_error_pattern", "check_symbol_diff", "recommend_cartridge_split"]);
+const READ_ONLY_TOOLS = new Set(["list_repair_incidents", "audit_diagnostics", "list_diagnostics", "read_error_pattern", "check_symbol_diff", "recommend_cartridge_split", "verify_completion_receipt"]);
 const DESTRUCTIVE_TOOLS = new Set(["apply_repair_plan", "init_diagnostics", "write_error_pattern", "stop_dashboard", "sync_ai_context", "sync_agent_rules"]);
 const OPEN_WORLD_TOOLS = new Set(["repair_diagnostic", "heal_all", "plan_repair"]);
 const registerLegacyTool = server.tool.bind(server);
@@ -325,6 +327,28 @@ server.tool(
 );
 
 server.tool(
+  "verify_completion_receipt",
+  "Verify that the latest completion receipt is intact and still matches the current workspace state.",
+  {
+    projectDir: z.string().describe("Absolute path to the project root directory containing .vibe-diagnosis/"),
+  },
+  async ({ projectDir }) => {
+    try {
+      const latestPath = path.join(projectDir, ".vibe-diagnosis", "runs", "latest.json");
+      if (!fs.existsSync(latestPath)) throw new Error("No saved diagnostic run was found.");
+      const latest = JSON.parse(fs.readFileSync(latestPath, "utf8"));
+      const verification = core.completionReceipt.verifyCompletionReceipt(projectDir, latest.completion?.receipt);
+      return {
+        content: [{ type: "text", text: JSON.stringify({ runId: latest.runId, eligible: latest.completion?.eligible === true, ...verification }, null, 2) }],
+        isError: !verification.valid || latest.completion?.eligible !== true,
+      };
+    } catch (err) {
+      return { content: [{ type: "text", text: `Completion receipt verification failed: ${err.message}` }], isError: true };
+    }
+  }
+);
+
+server.tool(
   "plan_repair",
   "Create a repair plan with risk classification and diff previews without changing files.",
   {
@@ -351,11 +375,12 @@ server.tool(
     projectDir: z.string(),
     planId: z.string(),
     approved: z.boolean().describe("True only after reviewing the complete plan and diff"),
+    approvedChecksum: z.string().length(64).describe("Checksum copied from the reviewed repair plan"),
     approvedHighRisk: z.boolean().optional().default(false).describe("Separate approval for trading, auth, DB, credential, dependency, or runtime changes"),
   },
-  async ({ projectDir, planId, approved, approvedHighRisk }) => {
+  async ({ projectDir, planId, approved, approvedChecksum, approvedHighRisk }) => {
     try {
-      const result = await applyRepairPlan(projectDir, planId, { approved, approvedHighRisk });
+      const result = await applyRepairPlan(projectDir, planId, { approved, approvedChecksum, approvedHighRisk });
       return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     } catch (err) {
       return { content: [{ type: "text", text: err.message }], isError: true };

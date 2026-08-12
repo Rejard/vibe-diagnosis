@@ -13,6 +13,8 @@ const { initialize } = require('../src/init');
 const { saveByokConfig, getByokConfig, getResolvedByok } = require('../src/config-manager');
 const { resolveWithin } = require('../src/path-policy');
 const { redactString } = require('../src/redaction');
+const { redactValue } = require('../src/redaction');
+const { verifyCompletionReceipt } = require('../src/completion-receipt');
 
 function project() {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'vibe-diag-'));
@@ -104,6 +106,9 @@ test('workspace paths and diagnostic output secrets are guarded', t => {
   assert.throws(() => resolveWithin(root, '../outside.txt'), /escapes/);
   assert.match(redactString(`apiKey=${fakeKey}`), /\[REDACTED\]/);
   assert.doesNotMatch(redactString(`apiKey=${fakeKey}`), /sk-proj/);
+  assert.deepEqual(redactValue({ password: 'short', nested: { accessToken: 'opaque' } }), { password: '[REDACTED]', nested: { accessToken: '[REDACTED]' } });
+  assert.equal(redactString('Authorization: Bearer opaque-token-value'), 'Authorization: [REDACTED]');
+  assert.doesNotMatch(redactString('postgres://user:password@localhost/db'), /password/);
 });
 
 test('runner redacts secrets from diagnostic details and stderr', async t => {
@@ -149,6 +154,11 @@ test('completion diagnostics run the full suite without cache or dashboard', asy
   assert.equal(report.completion.fullSuite, true);
   assert.equal(report.completion.cacheUsed, false);
   assert.equal(report.completion.dashboardRequired, false);
+  assert.equal(verifyCompletionReceipt(root, report.completion.receipt).valid, true);
+  fs.writeFileSync(path.join(root, 'changed.js'), 'change', 'utf8');
+  const stale = verifyCompletionReceipt(root, report.completion.receipt);
+  assert.equal(stale.valid, false);
+  assert.ok(stale.reasons.includes('STALE_WORKSPACE'));
 });
 
 test('completion diagnostics reject projects without diagnostics', async t => {
@@ -157,6 +167,16 @@ test('completion diagnostics reject projects without diagnostics', async t => {
   const report = await runCompletionDiagnostics(root, { persist: false });
   assert.equal(report.completion.eligible, false);
   assert.ok(report.completion.reasons.includes('NO_DIAGNOSTICS'));
+});
+
+test('completion diagnostics reject diagnostics that mutate the workspace', async t => {
+  const root = project();
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const marker = path.join(root, 'diagnostic-side-effect.txt').replace(/\\/g, '\\\\');
+  diagnostic(root, 'mutating', `const fs=require('fs');module.exports={id:'mutating',name:'mutating',layer:'TASK',async run(){fs.writeFileSync('${marker}','changed');return {status:'OK'}}}`);
+  const report = await runCompletionDiagnostics(root, { persist: false });
+  assert.equal(report.completion.eligible, false);
+  assert.ok(report.completion.reasons.includes('WORKSPACE_CHANGED_DURING_DIAGNOSTICS'));
 });
 
 test('agent rules preserve project instructions and upgrade legacy blocks', () => {
@@ -217,4 +237,36 @@ test('omission repair creates a plan without changing the file', async t => {
   assert.equal(result.restored, false);
   assert.equal(fs.readFileSync(path.join(root, 'src', 'view.js'), 'utf8'), 'current');
   assert.match(result.plan.files[0].diffPreview, /restored/);
+  assert.match(result.plan.files[0].beforeHash, /^[a-f0-9]{64}$/);
+  assert.match(result.plan.integrity.checksum, /^[a-f0-9]{64}$/);
+});
+
+test('omission repair refuses credential files', async t => {
+  const root = project();
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  fs.writeFileSync(path.join(root, '.env'), 'PASSWORD=local', 'utf8');
+  fs.writeFileSync(path.join(root, '.env.bak'), 'PASSWORD=backup', 'utf8');
+  await assert.rejects(() => autoRevertOrRepairOmission(root, '.env'), /prohibited/);
+  assert.equal(fs.readFileSync(path.join(root, '.env'), 'utf8'), 'PASSWORD=local');
+});
+
+test('repair rejects stale or tampered approved plans', async t => {
+  const root = project();
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  fs.mkdirSync(path.join(root, 'src'), { recursive: true });
+  const target = path.join(root, 'src', 'view.js');
+  fs.writeFileSync(target, 'current', 'utf8');
+  fs.writeFileSync(`${target}.bak`, 'restored', 'utf8');
+  const created = await autoRevertOrRepairOmission(root, 'src/view.js');
+  const planPath = path.join(root, '.vibe-diagnosis', 'repair-plans', `${created.plan.id}.json`);
+  const tampered = JSON.parse(fs.readFileSync(planPath, 'utf8'));
+  tampered.files[0].afterHash = '0'.repeat(64);
+  fs.writeFileSync(planPath, JSON.stringify(tampered), 'utf8');
+  await assert.rejects(() => applyRepairPlan(root, created.plan.id, { approved: true }), /integrity verification failed/);
+  assert.equal(fs.readFileSync(target, 'utf8'), 'current');
+
+  const stalePlan = await autoRevertOrRepairOmission(root, 'src/view.js');
+  fs.writeFileSync(target, 'newer work', 'utf8');
+  await assert.rejects(() => applyRepairPlan(root, stalePlan.plan.id, { approved: true, approvedChecksum: stalePlan.plan.integrity.checksum }), /target changed after planning/);
+  assert.equal(fs.readFileSync(target, 'utf8'), 'newer work');
 });

@@ -13,10 +13,13 @@ Self-diagnosis and self-healing framework for AI-assisted coding projects. Place
 - Optional diagnostic metadata supports `severity`, `scope`, `evidenceType`, `blocksRelease`, `blocksLiveTrading`, `confidence`, `lastVerifiedAt`, `tags`, `dependencies`, and input `files`.
 - `RELEASE_BLOCKED` and `LIVE_BLOCKED` are independent of health percentage. Static success and missing/stale live evidence can be shown at the same time.
 - `run_diagnostics` can select by ID, tag, scope, or severity and can use opt-in cache only for explicitly cacheable `STATIC`/`TEST` checks. Each saved run includes Git and environment fingerprints plus baseline comparisons.
-- Repairs always begin with a reviewable plan. Inspect the risk and complete diff preview, then call `apply_repair_plan` with explicit approval. High-risk areas require a separate approval and failed validation or regressions are rolled back.
+- Repairs always begin with a reviewable plan. Inspect the risk, complete diff preview, and checksum, then call `apply_repair_plan` with that approved checksum. High-risk areas require a separate approval and failed validation or regressions are rolled back.
 - Agent integration now requires `complete_task_diagnostics` immediately before a development task is reported complete. It runs the full suite without filters, cache, or dashboard and never edits agent rule files; use `init_diagnostics` or `sync_agent_rules` for explicit rule updates.
+- Completion results include a receipt with the run ID, Git SHA, workspace fingerprint, and checksum. Agents must not reuse a receipt from an earlier workspace state.
 - `stop_dashboard` is available through MCP and CLI and uses the project dashboard's local shutdown token instead of terminating an arbitrary recorded PID.
 - BYOK API keys are sent only to the selected provider for repair planning. Prefer `VIBE_DIAG_API_KEY`; dashboard-entered keys are stored only in ignored `.vibe-diagnosis/byok.local.json`, never in the shareable config or package.
+- Diagnostic and repair output also redacts Bearer/JWT credentials, credential-bearing database URLs, private keys, and sensitive object properties.
+- Repair plans enforce file-count, size, and changed-line limits plus a plan checksum. Application is rejected if either the target or approved content changed; environment files, private keys, and the local BYOK store are prohibited repair targets.
 - Avoid `vibe-diag config set apiKey ...` on shared machines because command arguments can remain in shell history. Use the environment variable or the local dashboard instead.
 - The dashboard binds only to `127.0.0.1`. Its API requires the per-process token embedded in the local page and rejects cross-origin requests; error-pattern and project file inputs cannot escape their allowed directories.
 - Legacy diagnostics remain runnable, but undeclared release/live gates are reported as `NOT_EVALUATED` and evidence coverage is reported separately from the pass rate.
@@ -112,9 +115,22 @@ Add this JSON block into your AI agent's MCP configuration panel and restart the
 | AI Agent | MCP Settings Path |
 |---|---|
 | Gemini / Antigravity | Project-level `.gemini/settings.json` or global `~/.gemini/config/mcp_config.json` |
+| Claude Code | Project-local registration with `claude mcp add`; shared project configuration is `.mcp.json` |
 | Claude Desktop | `%APPDATA%/Claude/claude_desktop_config.json` |
 | Cursor | `.cursor/mcp.json` |
 | Windsurf | `~/.codeium/windsurf/mcp_config.json` |
+
+For a private Claude Code registration on macOS, Linux, or WSL:
+
+```bash
+claude mcp add vibe-diagnosis --scope local -- npx -y vibe-diagnosis-mcp
+```
+
+Native Windows requires the command wrapper documented by Claude Code:
+
+```powershell
+claude mcp add vibe-diagnosis --scope local -- cmd /c npx -y vibe-diagnosis-mcp
+```
 
 ---
 
@@ -172,12 +188,13 @@ npx -y vibe-diagnosis heal                  # 5. Trigger bulk AI self-healing re
 | `list_diagnostics` | Discovers and validates all written `.diag.js` files |
 | `run_diagnostics` | Runs all diagnostic checks and records data history |
 | `complete_task_diagnostics` | Mandatory final full-suite, uncached, dashboard-free completion gate |
+| `verify_completion_receipt` | Verifies that the saved completion receipt still matches the current workspace |
 | `open_dashboard` | Launches the local dashboard web interface |
 | `stop_dashboard` | Shuts down the active dashboard server and frees up port resources |
 | `repair_diagnostic` | Compatibility tool that creates a reviewable repair plan without applying it |
 | `heal_all` | Creates plans for failing diagnostics without applying changes |
 | `plan_repair` | Creates a risk-rated plan with file-level diff previews |
-| `apply_repair_plan` | Applies an explicitly approved plan, validates the full suite, and rolls back regressions |
+| `apply_repair_plan` | Applies a plan whose reviewed checksum is explicitly approved, validates the full suite, and rolls back regressions |
 | `list_repair_incidents` | Reads local plan, validation, regression, and rollback history |
 | `audit_diagnostics` | Reports duplicates, fragile source-string checks, and missing references |
 | `read_error_pattern` | Loads known common error resolution knowledge |

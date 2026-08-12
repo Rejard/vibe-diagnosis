@@ -6,6 +6,13 @@ module.exports = {
   name: 'Omission Protection & Monolithic File Scanner Verification',
   layer: 'SYSTEM',
   linkedTask: 'Omission Protection',
+  severity: 'HIGH',
+  scope: 'RELEASE',
+  evidenceType: 'TEST',
+  blocksRelease: true,
+  confidence: 1,
+  tags: ['omission', 'analyzer'],
+  files: ['src/analyzer.js', 'templates/PATTERN_UI_BLOCK_OMISSION.md', 'templates/monolithic_ui_scanner.diag.js', 'templates/cartridge_integrity_template.diag.js'],
 
   async run({ projectDir }) {
     const analyzerPath = path.join(projectDir, 'src', 'analyzer.js');
@@ -70,7 +77,8 @@ module.exports = {
 
     return {
       status: 'OK',
-      details: 'All Omission Protection functions, templates, and scanner heuristics verified successfully.'
+      details: 'All Omission Protection functions, templates, and scanner heuristics verified successfully.',
+      evidence: [{ type: 'TEST', summary: 'Monolithic UI analyzer fixture passed.', verifiedAt: new Date().toISOString() }]
     };
   }
 };

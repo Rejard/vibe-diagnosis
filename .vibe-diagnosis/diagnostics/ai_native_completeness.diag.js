@@ -6,6 +6,13 @@ module.exports = {
   name: 'AI-Native Completeness & Session Handover Verification',
   layer: 'SYSTEM',
   linkedTask: 'AI-Native Completeness',
+  severity: 'HIGH',
+  scope: 'RELEASE',
+  evidenceType: 'TEST',
+  blocksRelease: true,
+  confidence: 1,
+  tags: ['agent', 'completion'],
+  files: ['src/context-manager.js', 'src/build-verifier.js', 'src/rules-injector.js', 'src/completion-receipt.js'],
 
   async run({ projectDir }) {
     const ctxPath = path.join(projectDir, 'src', 'context-manager.js');
@@ -68,7 +75,8 @@ module.exports = {
 
     return {
       status: 'OK',
-      details: 'All 3 AI-Native completeness & session handover modules verified successfully.'
+      details: 'All 3 AI-Native completeness & session handover modules verified successfully.',
+      evidence: [{ type: 'TEST', summary: 'Context, build verifier, and agent rule fixtures passed.', verifiedAt: new Date().toISOString() }]
     };
   }
 };

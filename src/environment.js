@@ -11,6 +11,25 @@ function git(projectDir, args) {
   }
 }
 
+const FINGERPRINT_IGNORES = new Set(['.git', 'node_modules']);
+const VIBE_RUNTIME_DIRS = new Set(['runs', 'repair-plans', 'scratch_test_guard', 'scratch_test_ainative', 'scratch_test_omission']);
+
+function hashDirectory(hash, root, current = root) {
+  for (const entry of fs.readdirSync(current, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
+    const absolute = path.join(current, entry.name);
+    const relative = path.relative(root, absolute).replace(/\\/g, '/');
+    if (FINGERPRINT_IGNORES.has(entry.name) || (relative.startsWith('.vibe-diagnosis/') && VIBE_RUNTIME_DIRS.has(entry.name))) continue;
+    if (entry.isSymbolicLink()) {
+      hash.update(`${relative}:SYMLINK`);
+    } else if (entry.isDirectory()) {
+      hashDirectory(hash, root, absolute);
+    } else if (entry.isFile()) {
+      hash.update(relative);
+      hash.update(fs.readFileSync(absolute));
+    }
+  }
+}
+
 function captureEnvironment(projectDir) {
   const sha = git(projectDir, ['rev-parse', 'HEAD']);
   const branch = git(projectDir, ['branch', '--show-current']);
@@ -20,11 +39,16 @@ function captureEnvironment(projectDir) {
   const untrackedOutput = git(projectDir, ['ls-files', '--others', '--exclude-standard']);
   const untracked = untrackedOutput ? untrackedOutput.split(/\r?\n/).filter(Boolean).sort() : [];
   const workspaceHash = crypto.createHash('sha256');
-  workspaceHash.update(diff);
-  for (const relative of untracked) {
-    workspaceHash.update(relative);
-    const absolute = path.join(projectDir, relative);
-    if (fs.existsSync(absolute) && fs.statSync(absolute).isFile()) workspaceHash.update(fs.readFileSync(absolute));
+  if (sha === null) {
+    workspaceHash.update('NO_GIT');
+    hashDirectory(workspaceHash, path.resolve(projectDir));
+  } else {
+    workspaceHash.update(diff);
+    for (const relative of untracked) {
+      workspaceHash.update(relative);
+      const absolute = path.join(projectDir, relative);
+      if (fs.existsSync(absolute) && fs.statSync(absolute).isFile()) workspaceHash.update(fs.readFileSync(absolute));
+    }
   }
   const workspaceFingerprint = workspaceHash.digest('hex');
   const environment = {

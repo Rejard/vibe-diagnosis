@@ -3,6 +3,13 @@ module.exports = {
   name: 'Runner Engine Smoke Test',
   layer: 'TASK',
   linkedTask: 'TASK-001',
+  severity: 'CRITICAL',
+  scope: 'RELEASE',
+  evidenceType: 'TEST',
+  blocksRelease: true,
+  confidence: 1,
+  tags: ['runner', 'schema'],
+  files: ['src/runner.js', 'src/schema.js', 'examples/calculator/.vibe-diagnosis/diagnostics/func-calc-engine.diag.js', 'examples/calculator/.vibe-diagnosis/diagnostics/task-001-arithmetic.diag.js', 'examples/calculator/.vibe-diagnosis/diagnostics/task-002-division-zero.diag.js'],
 
   async run(ctx) {
     const { discoverDiagnostics, runDiagnostics } = require('../../src/runner');
@@ -50,6 +57,10 @@ module.exports = {
       return { status: 'ERROR', details: 'validateResult incorrectly accepted null result' };
     }
 
-    return { status: 'OK', details: `Discovered ${files.length} files, schema validation working` };
+    return {
+      status: 'OK',
+      details: `Discovered ${files.length} files, schema validation working`,
+      evidence: [{ type: 'TEST', summary: 'Example discovery and schema contracts passed.', verifiedAt: new Date().toISOString() }],
+    };
   }
 };

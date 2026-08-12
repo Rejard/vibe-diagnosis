@@ -8,12 +8,16 @@ AI 코딩 프로젝트를 위한 자가진단 및 자가치유 프레임워크�
 
 ## V1.6 증거 우선 진단
 
+- 완료 결과에는 실행 ID, Git SHA, 작업공간 fingerprint와 checksum이 포함된 영수증이 들어갑니다. 에이전트는 이전 작업 상태의 영수증을 재사용하지 않습니다.
+- API 키뿐 아니라 Bearer/JWT, 데이터베이스 자격증명 URL, 개인키와 민감한 객체 속성도 진단·수리 출력에서 마스킹합니다.
+- 수리 계획은 파일 수·크기·변경량 제한과 계획 checksum을 가지며, 승인 후 대상이나 제안 내용이 바뀌면 적용을 거부합니다. 환경파일·개인키·BYOK 로컬 저장소는 수리 대상이 될 수 없습니다.
+
 - 각 진단은 별도 Node 워커에서 실행되며 cwd, env, 모듈 캐시, 선택적 Prisma 연결을 공유하지 않습니다. 실행기 오류와 timeout만 새 워커에서 한 번 재시도하며 복구되면 `FLAKY`로 기록합니다.
 - 기존 `OK/WARNING/ERROR` 결과는 그대로 호환됩니다. 새 `classification`은 `CONTRACT_ERROR`, `TEST_FAILURE`, `RUNNER_ERROR`, `TIMEOUT`, `FLAKY`를 구분하고 exit code, signal, timeout, stdout, stderr, 모든 시도 기록을 보존합니다.
 - `severity`, `scope`, `evidenceType`, `blocksRelease`, `blocksLiveTrading`, `confidence`, `lastVerifiedAt`, `tags`, `dependencies`, `files` 메타데이터를 선택적으로 사용할 수 있습니다.
 - 건강도와 별개로 `RELEASE_BLOCKED` 및 `LIVE_BLOCKED`를 계산하며, 정적 OK와 실시간 증거 미확인/노후 상태를 동시에 표시합니다.
 - ID, tag, scope, severity 선택 실행과 명시적으로 허용한 `STATIC/TEST` 진단의 안전 캐시를 지원합니다. 저장된 실행에는 Git/환경 fingerprint와 기준선 비교가 포함됩니다.
-- 수리는 항상 위험도와 diff가 포함된 계획부터 만듭니다. 검토 후 `apply_repair_plan`으로 명시적으로 승인하며, 고위험 영역은 별도 승인이 필요하고 회귀가 발생하면 롤백합니다.
+- 수리는 항상 위험도, diff, checksum이 포함된 계획부터 만듭니다. 검토한 checksum과 함께 `apply_repair_plan`으로 명시적으로 승인하며, 고위험 영역은 별도 승인이 필요하고 회귀가 발생하면 롤백합니다.
 - 에이전트는 개발 완료를 보고하기 직전에 `complete_task_diagnostics`를 반드시 호출합니다. 필터·캐시·대시보드 없이 전체 진단을 실행하고 에이전트 규칙 파일은 수정하지 않습니다. 규칙 변경은 `init_diagnostics` 또는 `sync_agent_rules`를 명시적으로 사용합니다.
 - `stop_dashboard`는 MCP와 CLI에서 사용할 수 있으며 기록된 PID를 직접 종료하지 않고 프로젝트 대시보드의 로컬 종료 토큰을 검증합니다.
 - BYOK API 키는 수리 계획 생성 시 선택한 공급자에게만 전송합니다. `VIBE_DIAG_API_KEY` 환경변수를 권장하며, 대시보드에서 입력한 키는 무시되는 `.vibe-diagnosis/byok.local.json`에만 저장하고 공유 설정이나 패키지에는 넣지 않습니다.
@@ -110,9 +114,22 @@ AI 코딩 에이전트의 MCP 설정 파일에 아래 JSON 코드를 마우스�
 | AI 에이전트 | 설정 파일 위치 |
 |---|---|
 | Gemini / Antigravity | 프로젝트 루트 `.gemini/settings.json` 또는 `~/.gemini/config/mcp_config.json` |
+| Claude Code | `claude mcp add`를 이용한 프로젝트 로컬 등록, 팀 공유 설정은 `.mcp.json` |
 | Claude Desktop | `%APPDATA%/Claude/claude_desktop_config.json` |
 | Cursor | `.cursor/mcp.json` |
 | Windsurf | `~/.codeium/windsurf/mcp_config.json` |
+
+macOS, Linux 또는 WSL에서 Claude Code 프로젝트 로컬 등록:
+
+```bash
+claude mcp add vibe-diagnosis --scope local -- npx -y vibe-diagnosis-mcp
+```
+
+네이티브 Windows에서는 Claude Code 공식 안내에 따라 명령 래퍼를 사용합니다.
+
+```powershell
+claude mcp add vibe-diagnosis --scope local -- cmd /c npx -y vibe-diagnosis-mcp
+```
 
 ---
 
@@ -172,12 +189,13 @@ npx -y vibe-diagnosis repair --all          # 5. 실패 진단의 검토 가능�
 | `list_diagnostics` | 프로젝트에 작성된 모든 .diag.js 목록 조회 (작업 개시 전 필수 실행) |
 | `run_diagnostics` | 전체 또는 선택 진단 실행과 실행 이력 기록; 대시보드는 명시적 요청 시에만 실행 |
 | `complete_task_diagnostics` | 작업 완료 직전 전체 비캐시 진단을 대시보드 없이 실행하고 완료 가능 여부 판정 |
+| `verify_completion_receipt` | 저장된 완료 영수증이 현재 작업공간과 여전히 일치하는지 검증 |
 | `open_dashboard` | 로컬 대시보드 서버 기동 및 브라우저 열기 |
 | `stop_dashboard` | 실행 중인 대시보드 서버 프로세스를 강제 종료하고 포트 자원 반환 |
 | `repair_diagnostic` | 파일을 적용하지 않고 검토 가능한 수리 계획 생성 |
 | `heal_all` | 실패 진단 전체의 계획만 생성하며 변경은 적용하지 않음 |
 | `plan_repair` | 위험도와 파일별 diff를 포함한 수리 계획 생성 |
-| `apply_repair_plan` | 명시적으로 승인된 계획 적용, 전수 재검증 및 회귀 롤백 |
+| `apply_repair_plan` | 검토한 checksum과 함께 명시적으로 승인된 계획 적용, 전수 재검증 및 회귀 롤백 |
 | `list_repair_incidents` | 계획·승인·검증·회귀·롤백 이력 조회 |
 | `audit_diagnostics` | 중복 진단, 취약 문자열 검사, 사라진 참조 분석 |
 | `read_error_pattern` | 자주 발생하는 에러 패턴 지식 정보 조회 |

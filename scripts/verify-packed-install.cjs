@@ -65,6 +65,7 @@ async function main() {
   assert.equal(rootFiles.some(file => file.startsWith('.vibe-diagnosis/')), false);
   assert.equal(rootFiles.some(file => file.startsWith('test/') || file.startsWith('examples/')), false);
   assert.ok(rootFiles.includes('src/dashboard-control.js'));
+  assert.ok(rootFiles.includes('src/completion-receipt.js'));
   assert.deepEqual(mcpPack.files.map(file => file.path).sort(), ['index.js', 'package.json']);
   runNpm(['init', '-y'], consumerDir);
   runNpm(['install', '--ignore-scripts', rootTarball], consumerDir);
@@ -83,13 +84,15 @@ async function main() {
     client.child.stdin.write(`${JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' })}\n`);
     const listed = await client.request('tools/list', {});
     const tools = new Map(listed.result.tools.map(tool => [tool.name, tool]));
-    for (const name of ['run_diagnostics', 'complete_task_diagnostics', 'open_dashboard', 'stop_dashboard', 'plan_repair', 'apply_repair_plan']) assert.ok(tools.has(name), `Packed MCP missing ${name}`);
+    for (const name of ['run_diagnostics', 'complete_task_diagnostics', 'verify_completion_receipt', 'open_dashboard', 'stop_dashboard', 'plan_repair', 'apply_repair_plan']) assert.ok(tools.has(name), `Packed MCP missing ${name}`);
     assert.equal(tools.get('run_diagnostics').inputSchema.properties.autoLaunchDashboard.default, false);
     const completed = await client.request('tools/call', { name: 'complete_task_diagnostics', arguments: { projectDir } });
     assert.notEqual(completed.result.isError, true);
     const report = JSON.parse(completed.result.content[0].text);
     assert.equal(report.completion.eligible, true);
     assert.equal(report.completion.dashboardRequired, false);
+    const receipt = await client.request('tools/call', { name: 'verify_completion_receipt', arguments: { projectDir } });
+    assert.equal(JSON.parse(receipt.result.content[0].text).valid, true);
     assert.equal(fs.existsSync(path.join(projectDir, '.vibe-diagnosis', 'active_port.json')), false);
     process.stdout.write(`${JSON.stringify({ verified: true, rootTarball: rootPack.filename, mcpTarball: mcpPack.filename, tools: tools.size, completion: report.completion }, null, 2)}\n`);
   } finally {

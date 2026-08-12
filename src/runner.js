@@ -8,6 +8,7 @@ const { captureEnvironment } = require('./environment');
 const { loadBaseline, compareToBaseline, linkChangedFiles, saveRunReport } = require('./baseline');
 const { summarizeResults } = require('./run-summary');
 const { detectFragileStringChecks } = require('./assertions');
+const { createCompletionReceipt } = require('./completion-receipt');
 
 const DIAG_DIR = '.vibe-diagnosis/diagnostics';
 const DIAG_PATTERN = /\.diag\.js$/;
@@ -77,10 +78,12 @@ async function runCompletionDiagnostics(projectDir, options = {}) {
     filters: {},
   });
   const reasons = [];
+  report.completionEnvironment = captureEnvironment(path.resolve(projectDir));
   if (report.discovered === 0) reasons.push('NO_DIAGNOSTICS');
   if (report.selected !== report.discovered) reasons.push('INCOMPLETE_SELECTION');
   if (report.summary.error > 0) reasons.push('DIAGNOSTIC_FAILURES');
   if (report.gates.releaseStatus === 'RELEASE_BLOCKED') reasons.push('RELEASE_BLOCKED');
+  if (report.environment.fingerprint !== report.completionEnvironment.fingerprint) reasons.push('WORKSPACE_CHANGED_DURING_DIAGNOSTICS');
   report.completion = {
     eligible: reasons.length === 0,
     reasons,
@@ -88,11 +91,12 @@ async function runCompletionDiagnostics(projectDir, options = {}) {
     cacheUsed: false,
     dashboardRequired: false,
     warnings: report.summary.warning,
-    verifiedFingerprint: report.environment.fingerprint,
+    verifiedFingerprint: report.completionEnvironment.fingerprint,
     instruction: reasons.length
       ? 'Do not report the development task complete. Resolve or accurately report the blocking diagnostics.'
       : 'The full uncached diagnostic suite completed. Report any warnings and evidence limitations with the result.',
   };
+  report.completion.receipt = createCompletionReceipt(report);
   if (options.persist !== false) report.runFile = saveRunReport(path.resolve(projectDir), report);
   return report;
 }

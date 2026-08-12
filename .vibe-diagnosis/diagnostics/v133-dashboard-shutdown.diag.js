@@ -1,62 +1,33 @@
-const fs = require('fs');
 const path = require('path');
+const { spawnSync } = require('child_process');
 
 module.exports = {
   id: 'v133-dashboard-shutdown-diagnostic',
-  name: 'Vibe Diagnosis Dashboard Shutdown Verification',
+  name: 'Dashboard shutdown isolation',
   layer: 'SYSTEM',
-  linkedTask: 'v133-dashboard-shutdown',
-  
-  async run(ctx) {
-    const projectDir = ctx.projectDir;
-    const binFile = path.join(projectDir, 'bin', 'vibe-diag.js');
-    if (!fs.existsSync(binFile)) {
-      return {
-        status: 'ERROR',
-        message: 'vibe-diag.js bin file is missing'
-      };
-    }
-    const binContent = fs.readFileSync(binFile, 'utf8');
-    if (!binContent.includes("case 'stop':") || !binContent.includes("vibe-diag stop")) {
-      return {
-        status: 'ERROR',
-        message: 'vibe-diag.js does not support "stop" command or help is missing'
-      };
-    }
+  linkedTask: 'v1.3.3 dashboard shutdown compatibility',
+  severity: 'HIGH',
+  scope: 'RELEASE',
+  evidenceType: 'TEST',
+  blocksRelease: true,
+  confidence: 1,
+  tags: ['dashboard', 'shutdown', 'compatibility'],
+  files: ['src/dashboard-control.js', 'src/dashboard.js', 'test/dashboard.test.cjs'],
 
-    const dbFile = path.join(projectDir, 'src', 'dashboard.js');
-    if (!fs.existsSync(dbFile)) {
-      return {
-        status: 'ERROR',
-        message: 'dashboard.js src file is missing'
-      };
+  async run({ projectDir }) {
+    const result = spawnSync(process.execPath, ['--test', '--test-name-pattern=dashboard control stops', path.join(projectDir, 'test', 'dashboard.test.cjs')], {
+      cwd: projectDir,
+      encoding: 'utf8',
+      windowsHide: true,
+      timeout: 30000,
+    });
+    if (result.status !== 0 || result.error) {
+      return { status: 'ERROR', details: result.error?.message || result.stderr || result.stdout || 'Dashboard shutdown test failed.' };
     }
-    const dbContent = fs.readFileSync(dbFile, 'utf8');
-    if (!dbContent.includes('/api/shutdown')) {
-      return {
-        status: 'ERROR',
-        message: 'dashboard.js does not have /api/shutdown endpoint definition'
-      };
-    }
-
-    const htmlFile = path.join(projectDir, 'src', 'dashboard.html');
-    if (!fs.existsSync(htmlFile)) {
-      return {
-        status: 'ERROR',
-        message: 'dashboard.html is missing'
-      };
-    }
-    const htmlContent = fs.readFileSync(htmlFile, 'utf8');
-    if (!htmlContent.includes('btn-shutdown') || !htmlContent.includes('shutdown-overlay')) {
-      return {
-        status: 'ERROR',
-        message: 'dashboard.html is missing either the btn-shutdown button or shutdown-overlay element'
-      };
-    }
-
     return {
       status: 'OK',
-      message: 'All v1.3.3 Dashboard Shutdown feature validations passed successfully!'
+      details: 'Dashboard shutdown isolation passed through the executable control test.',
+      evidence: [{ type: 'TEST', summary: 'Project-scoped dashboard shutdown test passed.', verifiedAt: new Date().toISOString() }],
     };
-  }
+  },
 };

@@ -7,16 +7,65 @@ const { getResolvedByok } = require('./config-manager');
 const { runDiagnosticsReport, discoverDiagnostics, clearProjectRequireCache } = require('./runner');
 const { captureEnvironment } = require('./environment');
 const { redactString, redactValue } = require('./redaction');
+const { resolveWithin } = require('./path-policy');
 
 const SYSTEM_PROMPT = `You are a code repair specialist. Return only JSON with a summary and complete proposed file contents. Fix the functional root cause. Never weaken, delete, or bypass diagnostics and never insert text solely to satisfy a source-string check. Do not modify live trading, authentication, database schema/data, credentials, deployment, or runtime settings unless the plan explicitly marks those files high risk.`;
 const HIGH_RISK = /(^|\/)(\.env|auth|credentials?|secrets?|database|db|schema|migrations?|deploy|runtime|trading|orders?|wallet|payments?)(\/|\.|$)|(?:package-lock|pnpm-lock|yarn\.lock)/i;
+const PROHIBITED_PATH = /(^|\/)(?:\.git|node_modules)(?:\/|$)|(^|\/)\.vibe-diagnosis\/(?:byok\.local\.json|repair-plans)(?:\/|$)|(^|\/)(?:\.env(?:\..*)?|[^/]*\.(?:pem|key|p12|pfx))$/i;
+const MAX_FILES = 20;
+const MAX_FILE_BYTES = 1024 * 1024;
+const MAX_TOTAL_BYTES = 2 * 1024 * 1024;
+const MAX_CHANGED_LINES = 5000;
 
 function safePath(projectDir, relativePath) {
-  const root = path.resolve(projectDir);
-  const absolute = path.resolve(root, relativePath);
-  const relative = path.relative(root, absolute);
-  if (!relative || relative.startsWith('..') || path.isAbsolute(relative)) throw new Error(`Unsafe repair path: ${relativePath}`);
-  return absolute;
+  return resolveWithin(projectDir, relativePath);
+}
+
+function contentHash(content) {
+  return crypto.createHash('sha256').update(content === null ? '<MISSING>' : content).digest('hex');
+}
+
+function planIntegrityPayload(plan) {
+  return {
+    id: plan.id,
+    createdAt: plan.createdAt,
+    diagId: plan.diagId,
+    summary: plan.summary,
+    source: plan.source,
+    files: plan.files.map(file => ({ path: file.path, beforeHash: file.beforeHash, afterHash: file.afterHash })),
+  };
+}
+
+function sealPlan(plan) {
+  plan.integrity = {
+    algorithm: 'sha256',
+    checksum: crypto.createHash('sha256').update(JSON.stringify(planIntegrityPayload(plan))).digest('hex'),
+  };
+  return plan;
+}
+
+function verifyPlanIntegrity(plan) {
+  const expected = crypto.createHash('sha256').update(JSON.stringify(planIntegrityPayload(plan))).digest('hex');
+  if (plan.integrity?.algorithm !== 'sha256' || plan.integrity.checksum !== expected) {
+    throw new Error('Repair plan integrity verification failed. Create and approve a new plan.');
+  }
+}
+
+function validateProposedFiles(proposed) {
+  if (!Array.isArray(proposed) || proposed.length === 0) throw new Error('Repair plan must contain at least one file.');
+  if (proposed.length > MAX_FILES) throw new Error(`Repair plan exceeds the ${MAX_FILES}-file limit.`);
+  const seen = new Set();
+  let totalBytes = 0;
+  for (const file of proposed) {
+    const normalized = file.path.replace(/\\/g, '/');
+    if (seen.has(normalized)) throw new Error(`Repair plan contains duplicate path: ${normalized}`);
+    if (PROHIBITED_PATH.test(normalized)) throw new Error(`Repair path is prohibited: ${normalized}`);
+    seen.add(normalized);
+    const bytes = Buffer.byteLength(file.content, 'utf8');
+    if (bytes > MAX_FILE_BYTES) throw new Error(`Repair file exceeds the ${MAX_FILE_BYTES}-byte limit: ${normalized}`);
+    totalBytes += bytes;
+  }
+  if (totalBytes > MAX_TOTAL_BYTES) throw new Error(`Repair plan exceeds the ${MAX_TOTAL_BYTES}-byte total limit.`);
 }
 
 function planDir(projectDir) {
@@ -28,7 +77,7 @@ function auditPath(projectDir) { return path.join(projectDir, '.vibe-diagnosis',
 function readAudit(projectDir) { try { return JSON.parse(fs.readFileSync(auditPath(projectDir), 'utf8')); } catch { return []; } }
 function appendAudit(projectDir, entry) {
   const entries = readAudit(projectDir);
-  entries.unshift(entry);
+  entries.unshift(redactValue(entry));
   fs.writeFileSync(auditPath(projectDir), JSON.stringify(entries.slice(0, 500), null, 2), 'utf8');
 }
 function persistPlan(projectDir, plan) { fs.writeFileSync(path.join(planDir(projectDir), `${plan.id}.json`), JSON.stringify(plan, null, 2), 'utf8'); }
@@ -100,15 +149,19 @@ function promptFor(context) {
 }
 
 function prepareFiles(projectDir, proposed) {
-  return proposed.map(file => {
+  validateProposedFiles(proposed);
+  const files = proposed.map(file => {
     const absolute = safePath(projectDir, file.path);
+    if (fs.existsSync(absolute) && fs.lstatSync(absolute).isSymbolicLink()) throw new Error(`Repair target cannot be a symbolic link: ${file.path}`);
     const before = fs.existsSync(absolute) ? fs.readFileSync(absolute, 'utf8') : null;
-    return { path: file.path.replace(/\\/g, '/'), content: file.content, before, ...makeDiff(before, file.content) };
+    return { path: file.path.replace(/\\/g, '/'), content: file.content, before, beforeHash: contentHash(before), afterHash: contentHash(file.content), ...makeDiff(before, file.content) };
   });
+  if (files.reduce((sum, file) => sum + file.changedLines, 0) > MAX_CHANGED_LINES) throw new Error(`Repair plan exceeds the ${MAX_CHANGED_LINES}-changed-line limit.`);
+  return files;
 }
 
 function publicPlan(plan) {
-  return { ...plan, files: plan.files.map(({ content, before, ...file }) => file) };
+  return redactValue({ ...plan, files: plan.files.map(({ content, before, ...file }) => file) });
 }
 
 async function createRepairPlan(projectDir, diagnostic, baselineResults) {
@@ -136,6 +189,7 @@ async function createRepairPlan(projectDir, diagnostic, baselineResults) {
   };
   plan.gamingWarnings = detectGaming(plan);
   if (plan.gamingWarnings.length) plan.status = 'REJECTED_DIAGNOSTIC_GAMING';
+  sealPlan(plan);
   persistPlan(projectDir, plan);
   appendAudit(projectDir, { type: plan.status === 'PENDING_APPROVAL' ? 'PLAN_CREATED' : 'PLAN_REJECTED', planId: plan.id, diagId: plan.diagId, timestamp: plan.createdAt, risk: plan.risk.level, summary: plan.summary, gamingWarnings: plan.gamingWarnings, files: files.map(file => file.path) });
   return publicPlan(plan);
@@ -146,7 +200,11 @@ function snapshotAndApply(projectDir, files) {
   try {
     for (const file of files) {
       const absolute = safePath(projectDir, file.path);
-      snapshots.push({ path: file.path, existed: fs.existsSync(absolute), content: fs.existsSync(absolute) ? fs.readFileSync(absolute, 'utf8') : null });
+      if (fs.existsSync(absolute) && fs.lstatSync(absolute).isSymbolicLink()) throw new Error(`Repair target cannot be a symbolic link: ${file.path}`);
+      const current = fs.existsSync(absolute) ? fs.readFileSync(absolute, 'utf8') : null;
+      if (contentHash(current) !== file.beforeHash) throw new Error(`Repair target changed after planning: ${file.path}`);
+      if (contentHash(file.content) !== file.afterHash) throw new Error(`Approved repair content changed after planning: ${file.path}`);
+      snapshots.push({ path: file.path, existed: current !== null, content: current });
       fs.mkdirSync(path.dirname(absolute), { recursive: true });
       fs.writeFileSync(absolute, file.content, 'utf8');
     }
@@ -170,6 +228,8 @@ async function applyRepairPlan(projectDir, planId, approval = {}) {
   if (approval.approved !== true) throw new Error('Explicit approval is required before applying a repair plan.');
   const plan = loadPlan(projectDir, planId);
   if (plan.status !== 'PENDING_APPROVAL') throw new Error(`Repair plan is ${plan.status}.`);
+  verifyPlanIntegrity(plan);
+  if (approval.approvedChecksum !== plan.integrity.checksum) throw new Error('The approved plan checksum is required and must match the reviewed plan.');
   if (plan.risk.requiresHighRiskApproval && approval.approvedHighRisk !== true) throw new Error('Separate high-risk approval is required for this repair plan.');
   if (plan.gamingWarnings?.length) throw new Error('Repair plan was rejected as diagnostic gaming.');
   let snapshots = [];
@@ -222,6 +282,7 @@ async function autoRevertOrRepairOmission(projectDir, relativeFilePath) {
   const files = prepareFiles(projectDir, [{ path: relativeFilePath, content }]);
   const baseline = await runDiagnosticsReport(projectDir, { persist: false, compareBaseline: false });
   const plan = { id: `omission-${Date.now()}-${crypto.randomBytes(3).toString('hex')}`, createdAt: new Date().toISOString(), diagId: 'repair-omission', diagnostic: { id: 'repair-omission', classification: 'TEST_FAILURE' }, summary: `Restore ${relativeFilePath} from ${source}`, source, verification: 'FILE_CONTENT', files, risk: classifyRisk(files, source), gamingWarnings: [], baselineResults: baseline.results, environmentBefore: captureEnvironment(projectDir), status: 'PENDING_APPROVAL' };
+  sealPlan(plan);
   persistPlan(projectDir, plan);
   appendAudit(projectDir, { type: 'PLAN_CREATED', planId: plan.id, diagId: plan.diagId, timestamp: plan.createdAt, risk: plan.risk.level, summary: plan.summary, files: [relativeFilePath] });
   return { restored: false, requiresApproval: true, plan: publicPlan(plan), details: 'Restore plan created. No files were changed.' };
