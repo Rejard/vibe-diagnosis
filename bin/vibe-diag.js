@@ -12,7 +12,24 @@ const flags = {
   all: args.includes('--all'),
   cwd: null,
   port: 7700,
+  useCache: args.includes('--cache'),
+  baselineId: null,
+  ids: [],
+  tags: [],
+  scope: null,
+  severity: null,
 };
+
+function flagValue(name) {
+  const index = args.indexOf(name);
+  return index !== -1 ? args[index + 1] : null;
+}
+
+flags.baselineId = flagValue('--baseline');
+flags.ids = (flagValue('--ids') || '').split(',').filter(Boolean);
+flags.tags = (flagValue('--tags') || '').split(',').filter(Boolean);
+flags.scope = flagValue('--scope');
+flags.severity = flagValue('--severity');
 
 const cwdIndex = args.indexOf('--cwd');
 if (cwdIndex !== -1 && args[cwdIndex + 1]) {
@@ -109,23 +126,27 @@ async function main() {
       break;
     }
     case 'run': {
-      const { runDiagnostics } = require('../src/runner');
+      const { runDiagnosticsReport } = require('../src/runner');
       const { formatResults, formatResultsJson } = require('../src/reporter');
 
       if (!flags.json) {
         autoStartDashboardIfNeeded().catch(() => {});
       }
 
-      const results = await runDiagnostics(targetDir);
+      const report = await runDiagnosticsReport(targetDir, {
+        persist: true,
+        useCache: flags.useCache,
+        baselineId: flags.baselineId,
+        filters: { ids: flags.ids, tags: flags.tags, scope: flags.scope, severity: flags.severity },
+      });
 
       if (flags.json) {
-        process.stdout.write(formatResultsJson(results));
+        process.stdout.write(formatResultsJson(report));
       } else {
-        process.stdout.write(formatResults(results, targetDir));
+        process.stdout.write(formatResults(report, targetDir));
       }
 
-      const hasError = results.some(r => r.status === 'ERROR');
-      if (hasError) process.exitCode = 1;
+      if (report.summary.error > 0 || report.gates.releaseStatus === 'RELEASE_BLOCKED') process.exitCode = 1;
       break;
     }
     case 'dashboard': {
@@ -149,6 +170,24 @@ async function main() {
       await handleRepair();
       break;
     }
+    case 'complete': {
+      const { runCompletionDiagnostics } = require('../src/runner');
+      const { formatResults, formatResultsJson } = require('../src/reporter');
+      const report = await runCompletionDiagnostics(targetDir, { persist: true });
+      process.stdout.write(flags.json ? formatResultsJson(report) : formatResults(report, targetDir));
+      if (!report.completion.eligible) process.exitCode = 1;
+      break;
+    }
+    case 'apply-repair': {
+      await handleApplyRepair();
+      break;
+    }
+    case 'audit': {
+      const { discoverDiagnostics } = require('../src/runner');
+      const { auditDiagnostics } = require('../src/diagnostic-audit');
+      process.stdout.write(JSON.stringify(auditDiagnostics(targetDir, discoverDiagnostics(targetDir)), null, 2) + '\n');
+      break;
+    }
     case 'stop': {
       await handleStop();
       break;
@@ -160,13 +199,17 @@ async function main() {
       console.log('    vibe-diag init                Initialize .vibe-diagnosis/ in current project');
       console.log('    vibe-diag run                 Run all diagnostics');
       console.log('    vibe-diag run --json           Output results as JSON');
+      console.log('    vibe-diag run --ids a,b --tags security --scope AUTH  Select diagnostics');
+      console.log('    vibe-diag run --cache          Use safe opt-in STATIC/TEST cache');
+      console.log('    vibe-diag complete             Run the mandatory full uncached completion check');
       console.log('    vibe-diag dashboard            Open web dashboard (default port 7700)');
       console.log('    vibe-diag dashboard --port 8080  Use custom port');
       console.log('    vibe-diag config get           Show current BYOK configuration');
       console.log('    vibe-diag config set <key> <value>  Set BYOK config (provider, apiKey, model)');
-      console.log('    vibe-diag repair <diagId>      Auto-repair a specific diagnostic with AI');
-      console.log('    vibe-diag repair --all         Auto-repair all failing diagnostics');
-      console.log('    vibe-diag heal                 Auto-heal all failing diagnostics (local or AI)');
+      console.log('    vibe-diag repair <diagId>      Create a reviewable repair plan');
+      console.log('    vibe-diag repair --all         Create plans for all failing diagnostics');
+      console.log('    vibe-diag apply-repair <planId> --approve [--approve-high-risk]');
+      console.log('    vibe-diag audit                Audit duplicate and fragile diagnostics');
       console.log('    vibe-diag stop                 Stop the running web dashboard');
       console.log('    vibe-diag --cwd <path>        Run in specified directory\n');
     }
@@ -230,8 +273,8 @@ async function handleConfig() {
 }
 
 async function handleRepair() {
-  const { runDiagnostics } = require('../src/runner');
-  const { repairDiagnostic } = require('../src/repairer');
+  const { runDiagnosticsReport } = require('../src/runner');
+  const { createRepairPlan } = require('../src/repairer');
   const diagId = flags.all ? null : args[1];
 
   if (!diagId && !flags.all) {
@@ -242,7 +285,8 @@ async function handleRepair() {
   }
 
   console.log(`\n  \x1b[36m🔧 Running diagnostics...\x1b[0m`);
-  const results = await runDiagnostics(targetDir);
+  const report = await runDiagnosticsReport(targetDir, { persist: false });
+  const results = report.results;
   const failing = results.filter(r => r.status === 'ERROR' || r.status === 'WARNING');
 
   if (failing.length === 0) {
@@ -269,61 +313,48 @@ async function handleRepair() {
     targets = [target];
   }
 
-  console.log(`  Found ${failing.length} failing, repairing ${targets.length}...\n`);
+  console.log(`  Found ${failing.length} failing, planning ${targets.length}...\n`);
 
   let successCount = 0;
   for (const target of targets) {
     const icon = target.status === 'ERROR' ? '🔴' : '🟡';
     process.stdout.write(`  ${icon} ${target.id.padEnd(30)} `);
 
-    const result = await repairDiagnostic(targetDir, target);
-
-    if (result.success) {
-      console.log(`\x1b[32m✅ Fixed\x1b[0m  ${result.summary}`);
+    try {
+      const plan = await createRepairPlan(targetDir, target, results);
+      console.log(`\x1b[32mPLAN\x1b[0m ${plan.id} (${plan.risk.level}) ${plan.summary}`);
+      for (const file of plan.files) console.log(`    ${file.path}\n${file.diffPreview}`);
       successCount++;
-    } else if (result.error) {
-      console.log(`\x1b[31m❌ Failed\x1b[0m ${result.error}`);
-    } else {
-      console.log(`\x1b[33m⚠️  Partial\x1b[0m ${result.summary}`);
-    }
-
-    if (result.filesModified.length > 0) {
-      console.log(`    Files: ${result.filesModified.join(', ')}`);
-    }
-    if (result.backupFiles.length > 0) {
-      console.log(`    Backups: ${result.backupFiles.map(f => path.basename(f)).join(', ')}`);
-    }
+    } catch (error) { console.log(`\x1b[31mFAILED\x1b[0m ${error.message}`); }
   }
 
   console.log(`\n  \x1b[90m${'─'.repeat(40)}\x1b[0m`);
-  console.log(`  Repaired: ${successCount}/${targets.length}`);
+  console.log(`  Plans created: ${successCount}/${targets.length}`);
   if (successCount < targets.length) process.exitCode = 1;
   console.log('');
 }
 
-async function handleStop() {
-  const fs = require('fs');
-  const lockPath = path.join(targetDir, '.vibe-diagnosis', 'active_port.json');
-  if (!fs.existsSync(lockPath)) {
-    console.log('\n  \x1b[33m⚠️ No running dashboard found.\x1b[0m\n');
+async function handleApplyRepair() {
+  const planId = args[1];
+  if (!planId || !args.includes('--approve')) {
+    console.log('\n  Usage: vibe-diag apply-repair <planId> --approve [--approve-high-risk]\n');
+    process.exitCode = 1;
     return;
   }
+  const { applyRepairPlan } = require('../src/repairer');
+  const result = await applyRepairPlan(targetDir, planId, { approved: true, approvedHighRisk: args.includes('--approve-high-risk') });
+  process.stdout.write(JSON.stringify(result, null, 2) + '\n');
+  if (!result.result?.success) process.exitCode = 1;
+}
+
+async function handleStop() {
   try {
-    const lock = JSON.parse(fs.readFileSync(lockPath, 'utf8'));
-    if (lock && lock.pid) {
-      try {
-        process.kill(lock.pid, 'SIGTERM');
-        console.log(`\n  \x1b[32m✅ Terminated dashboard process (PID: ${lock.pid})\x1b[0m`);
-      } catch (e) {
-        console.log(`\n  \x1b[33m⚠️ Process (PID: ${lock.pid}) is already stopped.\x1b[0m`);
-      }
-    }
-    if (fs.existsSync(lockPath)) {
-      fs.unlinkSync(lockPath);
-    }
-    console.log('  \x1b[32m✅ Removed active_port.json lock file.\x1b[0m\n');
+    const { stopDashboard } = require('../src/dashboard-control');
+    const result = await stopDashboard(targetDir);
+    console.log(`\n  ${result.stopped ? '\x1b[32m✅' : '\x1b[33m⚠️'} ${result.status}\x1b[0m${result.port ? ` (port ${result.port})` : ''}\n`);
   } catch (e) {
     console.error('\n  \x1b[31m❌ Error stopping dashboard:\x1b[0m', e.message);
+    process.exitCode = 1;
   }
 }
 

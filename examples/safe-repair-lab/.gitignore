@@ -1,0 +1,8 @@
+.vibe-diagnosis/repair-plans/
+.vibe-diagnosis/repair-history.json
+.vibe-diagnosis/runs/
+.vibe-diagnosis/cache.json
+.vibe-diagnosis/active_port.json
+.vibe-diagnosis/config.json
+.vibe-diagnosis/history.json
+.vibe-diagnosis/milestones.json

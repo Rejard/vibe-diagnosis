@@ -7,6 +7,7 @@ import { createRequire } from "module";
 import fs from "fs";
 import path from "path";
 import net from "net";
+import { exec, spawn } from "child_process";
 const require = createRequire(import.meta.url);
 
 const rawStdoutWrite = process.stdout.write.bind(process.stdout);
@@ -33,11 +34,13 @@ function loadCore() {
       init: require("vibe-diagnosis/src/init"),
       repairer: require("vibe-diagnosis/src/repairer"),
       dashboard: require("vibe-diagnosis/src/dashboard"),
+      dashboardControl: require("vibe-diagnosis/src/dashboard-control"),
       symbolGuard: require("vibe-diagnosis/src/symbol-guard"),
       cartridgeSplitter: require("vibe-diagnosis/src/cartridge-splitter"),
       contextManager: require("vibe-diagnosis/src/context-manager"),
       buildVerifier: require("vibe-diagnosis/src/build-verifier"),
       rulesInjector: require("vibe-diagnosis/src/rules-injector"),
+      diagnosticAudit: require("vibe-diagnosis/src/diagnostic-audit"),
     };
   } catch {
     return {
@@ -46,24 +49,26 @@ function loadCore() {
       init: require("../src/init"),
       repairer: require("../src/repairer"),
       dashboard: require("../src/dashboard"),
+      dashboardControl: require("../src/dashboard-control"),
       symbolGuard: require("../src/symbol-guard"),
       cartridgeSplitter: require("../src/cartridge-splitter"),
       contextManager: require("../src/context-manager"),
       buildVerifier: require("../src/build-verifier"),
       rulesInjector: require("../src/rules-injector"),
+      diagnosticAudit: require("../src/diagnostic-audit"),
     };
   }
 }
 
 const core = loadCore();
-const { runDiagnostics, discoverDiagnostics } = core.runner;
+const { runDiagnostics, runDiagnosticsReport, runCompletionDiagnostics, discoverDiagnostics } = core.runner;
 const { validateDiagnosticModule } = core.schema;
 const { initialize } = core.init;
-const { repairDiagnostic, autoRevertOrRepairOmission } = core.repairer;
+const { repairDiagnostic, createRepairPlan, applyRepairPlan, readAudit, autoRevertOrRepairOmission } = core.repairer;
 
 const server = new McpServer({
   name: "vibe-diagnosis",
-  version: "1.5.1",
+  version: "1.6.0",
 });
 
 function isPortInUse(port) {
@@ -166,27 +171,20 @@ async function autoStartDashboardIfNeeded(projectDir, defaultPort = 7700, isExpl
 
 server.tool(
   "run_diagnostics",
-  "Run all .diag.js diagnostics in the project, boot up the dashboard server, and open user's browser. MANDATORY: Run this tool at the end of every development task to verify that everything works properly and all diagnostics pass (OK). Trigger: 자가진단 실행, 진단 돌려줘, run diagnostics",
+  "Run project .diag.js diagnostics. The dashboard is optional and disabled by default. Use complete_task_diagnostics for the mandatory final full-suite check.",
   {
     projectDir: z.string().describe("Absolute path to the project root directory containing .vibe-diagnosis/"),
-    autoLaunchDashboard: z.boolean().optional().default(true).describe("Whether to automatically start the dashboard server and launch browser"),
+    autoLaunchDashboard: z.boolean().optional().default(false).describe("Explicitly start and open the optional dashboard"),
+    ids: z.array(z.string()).optional().describe("Run only these diagnostic IDs"),
+    tags: z.array(z.string()).optional().describe("Run diagnostics matching any tag"),
+    scope: z.string().optional().describe("Run diagnostics in one scope"),
+    severity: z.string().optional().describe("Run diagnostics at one severity"),
+    useCache: z.boolean().optional().default(false).describe("Use opt-in cache only for STATIC/TEST diagnostics"),
+    baselineId: z.string().optional().describe("Compare against a specific saved run ID"),
   },
-  async ({ projectDir, autoLaunchDashboard }) => {
+  async ({ projectDir, autoLaunchDashboard, ids, tags, scope, severity, useCache, baselineId }) => {
     try {
-      const results = await runDiagnostics(projectDir);
-
-      const summary = {
-        total: results.length,
-        ok: results.filter((r) => r.status === "OK").length,
-        warning: results.filter((r) => r.status === "WARNING").length,
-        error: results.filter((r) => r.status === "ERROR").length,
-      };
-
-      const overallStatus =
-        summary.error > 0 ? "ERROR" : summary.warning > 0 ? "WARNING" : "OK";
-
-      const healthPercent =
-        summary.total > 0 ? Math.round((summary.ok / summary.total) * 100) : 100;
+      const report = await runDiagnosticsReport(projectDir, { persist: true, useCache, baselineId, filters: { ids, tags, scope, severity } });
 
       if (autoLaunchDashboard) {
         autoStartDashboardIfNeeded(projectDir, 7700, false).catch(() => {});
@@ -197,7 +195,7 @@ server.tool(
           {
             type: "text",
             text: JSON.stringify(
-              { results, summary, overallStatus, healthPercent },
+              report,
               null,
               2
             ),
@@ -215,7 +213,7 @@ server.tool(
 
 server.tool(
   "repair_diagnostic",
-  "Auto-repair a specific failed diagnostic using either local fix/heal business methods or AI BYOK reasoning. Trigger: 자가치유 실행, repair diagnostic",
+  "Create a reviewable repair plan for a failed diagnostic. This tool never changes project files.",
   {
     projectDir: z.string().describe("Absolute path to the project root directory"),
     diagId: z.string().describe("Diagnostic ID to repair (e.g. wallet-transaction-integrity)"),
@@ -259,7 +257,7 @@ server.tool(
 
 server.tool(
   "heal_all",
-  "Auto-repair and self-heal all failing diagnostics in the project automatically in sequence. Trigger: 자가치유 전수 실행, heal all failing diagnostics",
+  "Create reviewable repair plans for all failing diagnostics without applying changes.",
   {
     projectDir: z.string().describe("Absolute path to the project root directory"),
   },
@@ -290,7 +288,7 @@ server.tool(
         content: [
           {
             type: "text",
-            text: JSON.stringify({ healedCount: repairResults.filter(r => r.success).length, details: repairResults }, null, 2),
+            text: JSON.stringify({ appliedCount: 0, plannedCount: repairResults.filter(r => r.planId).length, requiresApproval: true, details: repairResults }, null, 2),
           },
         ],
       };
@@ -304,6 +302,87 @@ server.tool(
 );
 
 server.tool(
+  "complete_task_diagnostics",
+  "MANDATORY final step for development tasks. Run the complete diagnostic suite without cache or dashboard and return a completion eligibility decision.",
+  {
+    projectDir: z.string().describe("Absolute path to the project root directory containing .vibe-diagnosis/"),
+  },
+  async ({ projectDir }) => {
+    try {
+      const agentRules = core.rulesInjector.ensureAgentRules(projectDir);
+      const report = await runCompletionDiagnostics(projectDir, { persist: true });
+      report.agentIntegration = agentRules;
+      return {
+        content: [{ type: "text", text: JSON.stringify(report, null, 2) }],
+        isError: !report.completion.eligible,
+      };
+    } catch (err) {
+      return { content: [{ type: "text", text: `Completion diagnostics failed: ${err.message}` }], isError: true };
+    }
+  }
+);
+
+server.tool(
+  "plan_repair",
+  "Create a repair plan with risk classification and diff previews without changing files.",
+  {
+    projectDir: z.string(),
+    diagId: z.string(),
+  },
+  async ({ projectDir, diagId }) => {
+    try {
+      const report = await runDiagnosticsReport(projectDir, { persist: false });
+      const target = report.results.find(result => result.id === diagId);
+      if (!target || target.status === "OK") throw new Error("A failing diagnostic result is required.");
+      const plan = await createRepairPlan(projectDir, target, report.results);
+      return { content: [{ type: "text", text: JSON.stringify(plan, null, 2) }] };
+    } catch (err) {
+      return { content: [{ type: "text", text: err.message }], isError: true };
+    }
+  }
+);
+
+server.tool(
+  "apply_repair_plan",
+  "Apply a reviewed repair plan. Explicit approval and separate high-risk approval are enforced.",
+  {
+    projectDir: z.string(),
+    planId: z.string(),
+    approved: z.boolean().describe("True only after reviewing the complete plan and diff"),
+    approvedHighRisk: z.boolean().optional().default(false).describe("Separate approval for trading, auth, DB, credential, dependency, or runtime changes"),
+  },
+  async ({ projectDir, planId, approved, approvedHighRisk }) => {
+    try {
+      const result = await applyRepairPlan(projectDir, planId, { approved, approvedHighRisk });
+      return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    } catch (err) {
+      return { content: [{ type: "text", text: err.message }], isError: true };
+    }
+  }
+);
+
+server.tool(
+  "list_repair_incidents",
+  "Read local repair plan, approval, validation, regression, and rollback history.",
+  { projectDir: z.string() },
+  async ({ projectDir }) => ({ content: [{ type: "text", text: JSON.stringify(readAudit(projectDir), null, 2) }] })
+);
+
+server.tool(
+  "audit_diagnostics",
+  "Analyze duplicate IDs/sources, fragile string checks, and missing references without running repairs.",
+  { projectDir: z.string() },
+  async ({ projectDir }) => {
+    try {
+      const audit = core.diagnosticAudit.auditDiagnostics(projectDir, discoverDiagnostics(projectDir));
+      return { content: [{ type: "text", text: JSON.stringify(audit, null, 2) }] };
+    } catch (err) {
+      return { content: [{ type: "text", text: err.message }], isError: true };
+    }
+  }
+);
+
+server.tool(
   "init_diagnostics",
   "Initialize .vibe-diagnosis/ directory structure in a project. CRITICAL: This tool MUST be called at the very beginning of any development task, before modifying any source code, to establish a quality baseline and create test templates. Trigger: 자가진단 초기화, vibe-diagnosis init",
   {
@@ -311,23 +390,16 @@ server.tool(
   },
   async ({ projectDir }) => {
     try {
-      const diagRoot = path.join(projectDir, ".vibe-diagnosis");
-
-      if (fs.existsSync(diagRoot)) {
-        return {
-          content: [{ type: "text", text: `.vibe-diagnosis/ already exists in ${projectDir}` }],
-        };
-      }
-
       const origLog = console.log;
       console.log = () => {};
-      try { initialize(projectDir); } finally { console.log = origLog; }
+      let result;
+      try { result = initialize(projectDir); } finally { console.log = origLog; }
 
       return {
         content: [
           {
             type: "text",
-            text: `Initialized .vibe-diagnosis/ in ${projectDir}`,
+            text: JSON.stringify({ projectDir, ...result }, null, 2),
           },
         ],
       };
@@ -516,6 +588,20 @@ server.tool(
 );
 
 server.tool(
+  "stop_dashboard",
+  "Gracefully stop the dashboard associated with this project and release its port lock.",
+  { projectDir: z.string().describe("Absolute path to the project root directory") },
+  async ({ projectDir }) => {
+    try {
+      const result = await core.dashboardControl.stopDashboard(projectDir);
+      return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
+    } catch (err) {
+      return { content: [{ type: "text", text: `Error stopping dashboard: ${err.message}` }], isError: true };
+    }
+  }
+);
+
+server.tool(
   "check_symbol_diff",
   "Analyze loss of JSX UI card tags, export symbols, and formula functions after code modification. Trigger: 심볼 차이 검사, check symbol diff",
   {
@@ -558,7 +644,7 @@ server.tool(
   },
   async ({ projectDir, relativeFilePath }) => {
     try {
-      const result = core.repairer.autoRevertOrRepairOmission(projectDir, relativeFilePath);
+      const result = await core.repairer.autoRevertOrRepairOmission(projectDir, relativeFilePath);
       return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     } catch (err) {
       return { content: [{ type: "text", text: `Error repairing omission: ${err.message}` }], isError: true };

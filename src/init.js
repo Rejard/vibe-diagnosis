@@ -41,52 +41,45 @@ function initialize(targetDir) {
   const diagRoot = path.join(targetDir, '.vibe-diagnosis');
   const diagnosticsDir = path.join(diagRoot, 'diagnostics');
   const errorPatternsDir = path.join(diagRoot, 'error-patterns');
+  const alreadyInitialized = fs.existsSync(diagRoot);
 
-  if (fs.existsSync(diagRoot)) {
-    console.log(`\n  \x1b[33m⚠️  .vibe-diagnosis/ already exists in ${targetDir}\x1b[0m\n`);
-    return;
-  }
+  if (!alreadyInitialized) {
+    fs.mkdirSync(diagnosticsDir, { recursive: true });
+    fs.mkdirSync(errorPatternsDir, { recursive: true });
 
-  fs.mkdirSync(diagnosticsDir, { recursive: true });
-  fs.mkdirSync(errorPatternsDir, { recursive: true });
+    const configSrc = path.join(TEMPLATE_DIR, 'config.json');
+    const configDest = path.join(diagRoot, 'config.json');
+    fs.copyFileSync(configSrc, configDest);
 
-  const configSrc = path.join(TEMPLATE_DIR, 'config.json');
-  const configDest = path.join(diagRoot, 'config.json');
-  fs.copyFileSync(configSrc, configDest);
+    const exampleSrc = path.join(TEMPLATE_DIR, 'example.diag.js');
+    const exampleDest = path.join(diagnosticsDir, 'example.diag.js');
+    fs.copyFileSync(exampleSrc, exampleDest);
 
-  const exampleSrc = path.join(TEMPLATE_DIR, 'example.diag.js');
-  const exampleDest = path.join(diagnosticsDir, 'example.diag.js');
-  fs.copyFileSync(exampleSrc, exampleDest);
+    const monoUiScannerSrc = path.join(TEMPLATE_DIR, 'monolithic_ui_scanner.diag.js');
+    if (fs.existsSync(monoUiScannerSrc)) fs.copyFileSync(monoUiScannerSrc, path.join(diagnosticsDir, 'monolithic_ui_scanner.diag.js'));
 
-  const monoUiScannerSrc = path.join(TEMPLATE_DIR, 'monolithic_ui_scanner.diag.js');
-  if (fs.existsSync(monoUiScannerSrc)) {
-    fs.copyFileSync(monoUiScannerSrc, path.join(diagnosticsDir, 'monolithic_ui_scanner.diag.js'));
-  }
+    const cartridgeIntegritySrc = path.join(TEMPLATE_DIR, 'cartridge_integrity_template.diag.js');
+    if (fs.existsSync(cartridgeIntegritySrc)) fs.copyFileSync(cartridgeIntegritySrc, path.join(diagnosticsDir, 'cartridge_integrity_template.diag.js'));
 
-  const cartridgeIntegritySrc = path.join(TEMPLATE_DIR, 'cartridge_integrity_template.diag.js');
-  if (fs.existsSync(cartridgeIntegritySrc)) {
-    fs.copyFileSync(cartridgeIntegritySrc, path.join(diagnosticsDir, 'cartridge_integrity_template.diag.js'));
-  }
+    const errorPatternSrc = path.join(TEMPLATE_DIR, 'error-pattern.md');
+    const errorPatternDest = path.join(errorPatternsDir, 'ERR_000_template.md');
+    fs.copyFileSync(errorPatternSrc, errorPatternDest);
 
-  const errorPatternSrc = path.join(TEMPLATE_DIR, 'error-pattern.md');
-  const errorPatternDest = path.join(errorPatternsDir, 'ERR_000_template.md');
-  fs.copyFileSync(errorPatternSrc, errorPatternDest);
-
-  const omissionPatternSrc = path.join(TEMPLATE_DIR, 'PATTERN_UI_BLOCK_OMISSION.md');
-  if (fs.existsSync(omissionPatternSrc)) {
-    fs.copyFileSync(omissionPatternSrc, path.join(errorPatternsDir, 'PATTERN_UI_BLOCK_OMISSION.md'));
+    const omissionPatternSrc = path.join(TEMPLATE_DIR, 'PATTERN_UI_BLOCK_OMISSION.md');
+    if (fs.existsSync(omissionPatternSrc)) fs.copyFileSync(omissionPatternSrc, path.join(errorPatternsDir, 'PATTERN_UI_BLOCK_OMISSION.md'));
   }
 
   ensureGitignore(targetDir);
 
+  let rulesResult = { updatedFiles: [], count: 0 };
   try {
     const { ensureAgentRules } = require('./rules-injector');
-    ensureAgentRules(targetDir);
+    rulesResult = ensureAgentRules(targetDir);
   } catch (e) {
     // Safe skip if module load fails
   }
 
-  try {
+  if (!alreadyInitialized) try {
     const { saveAiContext } = require('./context-manager');
     saveAiContext(targetDir, {
       currentGoal: 'Project Initialized with Vibe Diagnosis MCP',
@@ -97,6 +90,13 @@ function initialize(targetDir) {
   }
 
   const mcpAdded = setupGeminiMcp(targetDir);
+
+  if (alreadyInitialized) {
+    console.log(`\n  \x1b[32m✅ Refreshed Vibe Diagnosis agent integration in ${targetDir}\x1b[0m`);
+    console.log(`  Agent rules updated: ${rulesResult.count}`);
+    console.log(`  Gemini MCP configured: ${mcpAdded ? 'yes' : 'already configured'}`);
+    return { initialized: false, refreshed: true, rules: rulesResult, mcpAdded };
+  }
 
   console.log(`\n  \x1b[32m✅ Initialized .vibe-diagnosis/ in ${targetDir}\x1b[0m`);
   console.log('');
@@ -124,6 +124,7 @@ function initialize(targetDir) {
   console.log('    2. Run: npx vibe-diag run');
   console.log('    3. Configure BYOK in dashboard: npx vibe-diag dashboard');
   console.log('');
+  return { initialized: true, refreshed: false, rules: rulesResult, mcpAdded };
 }
 
 

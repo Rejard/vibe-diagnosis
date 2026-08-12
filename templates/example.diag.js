@@ -3,6 +3,16 @@ module.exports = {
   name: 'Example Diagnostic',
   layer: 'TASK',
   linkedTask: 'TASK-000',
+  severity: 'MEDIUM',
+  scope: 'GENERAL',
+  evidenceType: 'TEST',
+  blocksRelease: false,
+  blocksLiveTrading: false,
+  confidence: 1,
+  tags: ['example'],
+  dependencies: [],
+  files: ['src/example.js'],
+  cache: false,
 
   async run(ctx) {
     const isWorking = true;
@@ -11,6 +21,10 @@ module.exports = {
       return { status: 'ERROR', details: 'Something is broken' };
     }
 
-    return { status: 'OK', details: 'Everything is working correctly' };
+    return {
+      status: 'OK',
+      details: 'Everything is working correctly',
+      evidence: [{ type: 'TEST', summary: 'Behavior executed successfully', verifiedAt: new Date().toISOString() }],
+    };
   }
 };

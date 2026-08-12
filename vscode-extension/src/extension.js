@@ -115,13 +115,13 @@ function runDiagnosticsAsync(workspaceRoot) {
   });
 }
 
-function postRepairRequest(diagId) {
+function postJson(pathname, bodyValue) {
   return new Promise((resolve, reject) => {
-    const body = JSON.stringify({ diagId });
+    const body = JSON.stringify(bodyValue);
     const options = {
       hostname: 'localhost',
       port: 7700,
-      path: '/api/repair',
+      path: pathname,
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -150,6 +150,9 @@ function postRepairRequest(diagId) {
     req.end();
   });
 }
+
+function postRepairRequest(diagId) { return postJson('/api/repair/plan', { diagId }); }
+function applyRepairRequest(planId, approvedHighRisk) { return postJson('/api/repair/apply', { planId, approved: true, approvedHighRisk }); }
 
 async function autoRepair() {
   const workspaceRoot = getWorkspaceRoot();
@@ -197,17 +200,39 @@ async function autoRepair() {
 
   try {
     const result = await vscode.window.withProgress(
-      { location: vscode.ProgressLocation.Notification, title: `Vibe Diagnosis: Repairing ${selected.diagId}...`, cancellable: false },
+      { location: vscode.ProgressLocation.Notification, title: `Vibe Diagnosis: Planning repair for ${selected.diagId}...`, cancellable: false },
       () => postRepairRequest(selected.diagId)
+    );
+
+    if (!result.plan) throw new Error(result.error || 'Dashboard did not return a repair plan.');
+    const plan = result.plan;
+    const preview = plan.files.map(file => `${file.path}\n${file.diffPreview}`).join('\n\n');
+    outputChannel.clear();
+    outputChannel.appendLine(`Repair Plan — ${selected.diagId} — ${plan.risk.level} RISK`);
+    outputChannel.appendLine('\u2500'.repeat(55));
+    outputChannel.appendLine(plan.summary);
+    outputChannel.appendLine(preview || '(No file changes proposed)');
+    outputChannel.show();
+    const choice = await vscode.window.showWarningMessage(`Review the Vibe Diagnosis output. Apply plan ${plan.id}?`, { modal: true }, 'Apply reviewed plan');
+    if (choice !== 'Apply reviewed plan') return;
+    let approvedHighRisk = false;
+    if (plan.risk.requiresHighRiskApproval) {
+      const highRiskChoice = await vscode.window.showErrorMessage('HIGH RISK repair: trading, authority, data, credentials, dependencies, or runtime settings may change.', { modal: true }, 'Approve high risk');
+      if (highRiskChoice !== 'Approve high risk') return;
+      approvedHighRisk = true;
+    }
+    const applied = await vscode.window.withProgress(
+      { location: vscode.ProgressLocation.Notification, title: `Vibe Diagnosis: Applying ${plan.id}...`, cancellable: false },
+      () => applyRepairRequest(plan.id, approvedHighRisk)
     );
 
     outputChannel.clear();
     outputChannel.appendLine(`Auto Repair Result — ${selected.diagId}`);
     outputChannel.appendLine('\u2500'.repeat(55));
-    outputChannel.appendLine(typeof result === 'string' ? result : JSON.stringify(result, null, 2));
+    outputChannel.appendLine(JSON.stringify(applied, null, 2));
     outputChannel.show();
 
-    vscode.window.showInformationMessage(`Vibe Diagnosis: Repair completed for ${selected.diagId}`);
+    vscode.window.showInformationMessage(applied.success ? `Vibe Diagnosis: Repair validated for ${selected.diagId}` : `Vibe Diagnosis: Repair rolled back for ${selected.diagId}`);
   } catch (err) {
     outputChannel.clear();
     outputChannel.appendLine(`Auto Repair Failed — ${selected.diagId}`);
@@ -222,7 +247,7 @@ async function autoRepair() {
 function renderResults(parsed, workspaceRoot) {
   const { results, summary, overallStatus, healthPercent } = parsed;
 
-  const statusIcons = { OK: '\u2705', WARNING: '\u26a0\ufe0f', ERROR: '\u274c' };
+  const statusIcons = { OK: '\u2705', WARNING: '\u26a0\ufe0f', ERROR: '\u274c', RELEASE_BLOCKED: '\u26d4', LIVE_BLOCKED: '\u26d4' };
   const layerLabels = { TASK: 'TASK', FUNCTION: 'FUNC', SYSTEM: 'SYS ' };
 
   outputChannel.appendLine('');
@@ -236,7 +261,7 @@ function renderResults(parsed, workspaceRoot) {
     const layer = layerLabels[r.layer] || '??? ';
     const icon = statusIcons[r.status] || '\u274c';
     const id = r.id.padEnd(28);
-    outputChannel.appendLine(`  ${layer} \u2502 ${id} \u2502 ${icon} ${r.status.padEnd(7)} \u2502 ${r.details}`);
+    outputChannel.appendLine(`  ${layer} \u2502 ${id} \u2502 ${icon} ${r.status.padEnd(7)} \u2502 ${r.classification || 'RESULT'} \u2502 ${r.details}`);
 
     if (r.status === 'ERROR' || r.status === 'WARNING') {
       const severity = r.status === 'ERROR'
@@ -258,6 +283,7 @@ function renderResults(parsed, workspaceRoot) {
   outputChannel.appendLine('  ' + '\u2500'.repeat(55));
   outputChannel.appendLine(`  Total: ${summary.total} \u2502 OK: ${summary.ok} \u2502 WARN: ${summary.warning} \u2502 ERR: ${summary.error}`);
   outputChannel.appendLine(`  Overall: ${statusIcons[overallStatus]} ${overallStatus} \u2014 Health ${healthPercent}%`);
+  if (parsed.gates) outputChannel.appendLine(`  Release: ${parsed.gates.releaseStatus} \u2502 Live: ${parsed.gates.liveTradingStatus} \u2502 Evidence: ${parsed.evidenceSummary?.liveEvidenceStatus || 'UNVERIFIED'}`);
   outputChannel.appendLine('');
   outputChannel.show();
 

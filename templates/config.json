@@ -3,6 +3,11 @@
   "diagnosticsDir": "diagnostics",
   "errorPatternsDir": "error-patterns",
   "layers": ["TASK", "FUNCTION", "SYSTEM"],
+  "runner": {
+    "timeoutMs": 120000,
+    "retryInfrastructureFailures": true,
+    "cache": false
+  },
   "byok": {
     "provider": "",
     "apiKey": "",

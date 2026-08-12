@@ -1,0 +1,55 @@
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('fs');
+const os = require('os');
+const path = require('path');
+const { spawn } = require('child_process');
+
+test('MCP exposes V1.6 report filters and approval-first repair tools', async () => {
+  const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'vibe-mcp-completion-'));
+  fs.mkdirSync(path.join(projectDir, '.vibe-diagnosis', 'diagnostics'), { recursive: true });
+  fs.writeFileSync(path.join(projectDir, '.vibe-diagnosis', 'diagnostics', 'ok.diag.js'), `module.exports={id:'ok',name:'ok',layer:'TASK',async run(){return {status:'OK',details:'verified'}}}`, 'utf8');
+  const child = spawn(process.execPath, ['index.js'], { cwd: path.join(__dirname, '..', 'mcp-server'), stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true });
+  let buffer = '';
+  const pending = new Map();
+  child.stdout.on('data', chunk => {
+    buffer += chunk.toString('utf8');
+    const lines = buffer.split('\n');
+    buffer = lines.pop();
+    for (const line of lines.filter(Boolean)) {
+      const message = JSON.parse(line);
+      if (message.id !== undefined && pending.has(message.id)) { pending.get(message.id)(message); pending.delete(message.id); }
+    }
+  });
+  let nextId = 1;
+  function request(method, params) {
+    const id = nextId++;
+    child.stdin.write(JSON.stringify({ jsonrpc: '2.0', id, method, params }) + '\n');
+    return new Promise((resolve, reject) => {
+      const timer = setTimeout(() => reject(new Error(`MCP timeout: ${method}`)), 5000);
+      pending.set(id, message => { clearTimeout(timer); resolve(message); });
+    });
+  }
+  try {
+    await request('initialize', { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: 'schema-test', version: '1.0.0' } });
+    child.stdin.write(JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' }) + '\n');
+    const listed = await request('tools/list', {});
+    const tools = new Map(listed.result.tools.map(tool => [tool.name, tool]));
+    for (const name of ['run_diagnostics', 'complete_task_diagnostics', 'open_dashboard', 'stop_dashboard', 'plan_repair', 'apply_repair_plan', 'list_repair_incidents', 'audit_diagnostics']) assert.ok(tools.has(name), `missing ${name}`);
+    const runProperties = tools.get('run_diagnostics').inputSchema.properties;
+    for (const name of ['ids', 'tags', 'scope', 'severity', 'useCache', 'baselineId']) assert.ok(runProperties[name], `run_diagnostics missing ${name}`);
+    assert.equal(runProperties.autoLaunchDashboard.default, false);
+    const applyProperties = tools.get('apply_repair_plan').inputSchema.properties;
+    assert.ok(applyProperties.approved);
+    assert.ok(applyProperties.approvedHighRisk);
+    const completed = await request('tools/call', { name: 'complete_task_diagnostics', arguments: { projectDir } });
+    const report = JSON.parse(completed.result.content[0].text);
+    assert.equal(report.completion.eligible, true);
+    assert.equal(report.completion.dashboardRequired, false);
+    assert.equal(fs.existsSync(path.join(projectDir, '.vibe-diagnosis', 'active_port.json')), false);
+    assert.match(fs.readFileSync(path.join(projectDir, 'AGENTS.md'), 'utf8'), /complete_task_diagnostics/);
+  } finally {
+    child.kill();
+    fs.rmSync(projectDir, { recursive: true, force: true });
+  }
+});

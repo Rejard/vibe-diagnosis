@@ -1,6 +1,16 @@
 # Change Log
 
-## 1.5.1 (Current)
+## 1.6.0 (Current)
+
+- Added a dashboard-independent `complete_task_diagnostics` gate that runs the full suite without cache before an agent reports completion.
+- Agent rule synchronization now covers root `AGENTS.md`, `.agents/AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, Cursor, and Windsurf rule files, including already initialized projects.
+- Changed MCP `run_diagnostics` so dashboard launch is explicit and disabled by default.
+- Restored the documented `stop_dashboard` MCP tool with project-scoped authenticated shutdown and stale-lock handling.
+- Added isolated per-diagnostic workers with structured exit, signal, timeout, stdout, stderr, and retry evidence.
+- Added failure classifications, evidence freshness, Git/environment baselines, release/live blockers, safe selection/cache, diagnostic auditing, and root-cause grouping.
+- Replaced immediate repair UI behavior with reviewable plans, explicit approval, separate high-risk approval, full-suite validation, and rollback.
+
+## 1.5.1
 - **Enhanced**: Adaptive Monolithic Component Omission Protection (UI files: 300+ lines warning, Backend/Logic files: 600+ lines warning).
 
 ## 1.5.0

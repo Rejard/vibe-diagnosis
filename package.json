@@ -1,6 +1,6 @@
 {
   "name": "vibe-diagnosis",
-  "version": "1.5.1",
+  "version": "1.6.0",
   "description": "Self-diagnosis framework for vibe coding projects",
   "main": "src/runner.js",
   "bin": {
@@ -9,14 +9,21 @@
   "files": [
     "bin/",
     "src/",
-    "mcp-server/",
+    "mcp-server/index.js",
+    "mcp-server/package.json",
     "templates/",
     "README.md",
     "README.ko.md"
   ],
   "scripts": {
-    "test": "node bin/vibe-diag.js run",
-    "test:example": "node bin/vibe-diag.js run --cwd examples/calculator"
+    "test": "node --test test/*.test.cjs && node bin/vibe-diag.js run --json",
+    "test:unit": "node --test test/*.test.cjs",
+    "test:example": "node bin/vibe-diag.js run --cwd examples/calculator --json",
+    "test:rollback": "node examples/safe-repair-lab/verify-rollback.cjs",
+    "test:packed": "node scripts/verify-packed-install.cjs"
+  },
+  "dependencies": {
+    "acorn": "^8.15.0"
   },
   "keywords": [
     "vibe-coding",

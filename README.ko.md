@@ -4,7 +4,18 @@ AI 코딩 프로젝트를 위한 자가진단 및 자가치유 프레임워크�
 
 [English README](./README.md)
 
-> 🚀 **최신 버전: 1.5.1** (UI 파일 300줄 / 로직 파일 600줄 가변 임계값 Adaptive Threshold 보완 및 누락 방지 스캐너 고도화)
+> 🚀 **최신 버전: 1.6.0** (격리 진단, 구조화 실패 증거, 릴리스/실거래 차단, 의미 기반 assertion, 기준선, 안전 캐시, 근본 원인 그룹, 승인 우선 수리)
+
+## V1.6 증거 우선 진단
+
+- 각 진단은 별도 Node 워커에서 실행되며 cwd, env, 모듈 캐시, 선택적 Prisma 연결을 공유하지 않습니다. 실행기 오류와 timeout만 새 워커에서 한 번 재시도하며 복구되면 `FLAKY`로 기록합니다.
+- 기존 `OK/WARNING/ERROR` 결과는 그대로 호환됩니다. 새 `classification`은 `CONTRACT_ERROR`, `TEST_FAILURE`, `RUNNER_ERROR`, `TIMEOUT`, `FLAKY`를 구분하고 exit code, signal, timeout, stdout, stderr, 모든 시도 기록을 보존합니다.
+- `severity`, `scope`, `evidenceType`, `blocksRelease`, `blocksLiveTrading`, `confidence`, `lastVerifiedAt`, `tags`, `dependencies`, `files` 메타데이터를 선택적으로 사용할 수 있습니다.
+- 건강도와 별개로 `RELEASE_BLOCKED` 및 `LIVE_BLOCKED`를 계산하며, 정적 OK와 실시간 증거 미확인/노후 상태를 동시에 표시합니다.
+- ID, tag, scope, severity 선택 실행과 명시적으로 허용한 `STATIC/TEST` 진단의 안전 캐시를 지원합니다. 저장된 실행에는 Git/환경 fingerprint와 기준선 비교가 포함됩니다.
+- 수리는 항상 위험도와 diff가 포함된 계획부터 만듭니다. 검토 후 `apply_repair_plan`으로 명시적으로 승인하며, 고위험 영역은 별도 승인이 필요하고 회귀가 발생하면 롤백합니다.
+- 에이전트는 개발 완료를 보고하기 직전에 `complete_task_diagnostics`를 반드시 호출합니다. 필터·캐시·대시보드 없이 전체 진단을 실행하며, 일반 `run_diagnostics`도 명시적으로 요청하지 않으면 대시보드를 열지 않습니다.
+- `stop_dashboard`는 MCP와 CLI에서 사용할 수 있으며 기록된 PID를 직접 종료하지 않고 프로젝트 대시보드의 로컬 종료 토큰을 검증합니다.
 
 ---
 
@@ -50,7 +61,7 @@ npm run test:example
 
 ### 🔧 [시나리오 C] 실패(FAIL) 에러가 발생해 AI가 스스로 고쳐놓게 만들고 싶을 때 (자가 치유 수리)
 ```text
-현재 실패(FAIL)하는 진단이 있다면, AI 자가치유(heal_all) 도구를 사용해 스스로 코드를 수정하고 완전 통과 상태로 치료해줘. 통과가 완료되면 대시보드 타임라인 그래프와 빌드 신뢰 지수(Predictor Score)를 갱신해줘.
+실패 진단이 있다면 `plan_repair` 또는 호환 도구 `repair_diagnostic`으로 계획만 생성해줘. 위험도와 diff를 먼저 보고하고, 별도 승인 전에는 `apply_repair_plan`을 호출하거나 파일을 변경하지 마.
 ```
 
 ---
@@ -67,9 +78,9 @@ npm run test:example
 ```markdown
 ## Vibe Diagnosis 규칙 (자가진단 가이드라인)
 - 새로운 기능 구현이나 수정이 필요할 때는, 코드를 짜기 전에 해당 기능을 검증할 수 있는 `.diag.js` 진단 파일을 `.vibe-diagnosis/diagnostics/` 폴더에 항상 먼저 생성하거나 수정할 것 (TDD 방식).
-- 작업 중간 혹은 완료 단계에서 run_diagnostics를 실행하여 기능이 완벽히 정상 작동하는지 스스로 검증할 것.
-- 진단 과정에서 실패(FAIL)하는 검사가 발생하면 repair_diagnostic 또는 heal_all 도구로 자가 수리를 시도하여 문제를 해결할 것.
-- 모든 작업이 마무리되면 반드시 open_dashboard를 호출하고 모든 검사가 통과(OK)했음을 확인한 뒤, 검증 결과 리포트를 사용자에게 제출할 것.
+- 작업 중에는 `run_diagnostics`를 사용하고, 완료 보고 직전에는 `complete_task_diagnostics`를 호출하여 `completion.eligible: true`를 확인할 것.
+- 실패 진단은 먼저 수리 계획과 diff를 제시하고, 명시적 승인 및 필요한 고위험 승인을 받은 뒤에만 적용할 것.
+- 대시보드는 사용자가 시각적 확인을 요청할 때만 열며, 완료 판정은 대시보드 실행 여부에 의존하지 않을 것.
 ```
 
 ---
@@ -126,7 +137,7 @@ AI 코딩 에이전트의 MCP 설정 파일에 아래 JSON 코드를 마우스�
    - **Cartridge Integrity Check**: 필수 UI 카드가 오버라이트되어 삭제되는 상실 사고 무결성 검증.
    - **Symbol Diff Guard (`check_symbol_diff`)**: 코드 변경 전/후 지워진 JSX UI 태그, Export 심볼, 수식 함수 정밀 추적.
    - **Cartridge Splitter Blueprint (`recommend_cartridge_split`)**: 거대 컴포넌트를 소형 카트리지로 자동 분리하는 모듈화 청사진 제공.
-   - **Auto-Revert Repair (`repair_omission`)**: 필수 UI 태그 상실 시 로컬 백업(`.bak`) 또는 git 스냅샷을 통한 이전 상태 자동 원복.
+   - **승인 우선 누락 복구 (`repair_omission`)**: 로컬 백업 또는 Git 스냅샷에서 복구 계획과 diff만 만들며 승인 전에는 파일을 변경하지 않습니다.
 7. **🧠 AI-Native 완결성 & 세션 승계 (v1.5.0 신규)**:
    - **AI Context Handover (`sync_ai_context`)**: `.vibe-diagnosis/active_context.json`에 AI 작업 목표와 상태를 영속화하여 대화 세션 교체 시 완벽 승계.
    - **Build Safety Verifier (`verify_build_safety`)**: AI 작업 종료 직전 백그라운드 빌드(`npm run build` 등) 자가검증으로 compilation error 0개 체크.
@@ -143,7 +154,7 @@ npx -y vibe-diagnosis init                  # 1. 자가진단 환경 초기화 (
 npx -y vibe-diagnosis run                   # 2. 모든 검증 가동 및 대시보드 서버 실행
 npx -y vibe-diagnosis dashboard             # 3. 대시보드 전용 웹뷰 서버 실행
 npx -y vibe-diagnosis stop                  # 4. 백그라운드 대시보드 서버 정상 프로세스 종료
-npx -y vibe-diagnosis heal                  # 5. 실패한 테스트 전체 AI 자동 자가치유 기동
+npx -y vibe-diagnosis repair --all          # 5. 실패 진단의 검토 가능한 수리 계획 생성
 ```
 
 ---
@@ -154,16 +165,21 @@ npx -y vibe-diagnosis heal                  # 5. 실패한 테스트 전체 AI �
 |---|---|
 | `init_diagnostics` | 진단 폴더 구조 및 예제 템플릿 생성 (프로젝트 시작 시 최우선 필수 실행) |
 | `list_diagnostics` | 프로젝트에 작성된 모든 .diag.js 목록 조회 (작업 개시 전 필수 실행) |
-| `run_diagnostics` | 전체 진단 실행 및 대시보드 자동 연동 (작업 완료 시 필수 실행) |
+| `run_diagnostics` | 전체 또는 선택 진단 실행과 실행 이력 기록; 대시보드는 명시적 요청 시에만 실행 |
+| `complete_task_diagnostics` | 작업 완료 직전 전체 비캐시 진단을 대시보드 없이 실행하고 완료 가능 여부 판정 |
 | `open_dashboard` | 로컬 대시보드 서버 기동 및 브라우저 열기 |
 | `stop_dashboard` | 실행 중인 대시보드 서버 프로세스를 강제 종료하고 포트 자원 반환 |
-| `repair_diagnostic` | 실패한 검사 한 개를 분석 및 AI 자동 수리 시도 |
-| `heal_all` | 실패한 모든 진단을 순차적으로 일괄 수리 및 치료 |
+| `repair_diagnostic` | 파일을 적용하지 않고 검토 가능한 수리 계획 생성 |
+| `heal_all` | 실패 진단 전체의 계획만 생성하며 변경은 적용하지 않음 |
+| `plan_repair` | 위험도와 파일별 diff를 포함한 수리 계획 생성 |
+| `apply_repair_plan` | 명시적으로 승인된 계획 적용, 전수 재검증 및 회귀 롤백 |
+| `list_repair_incidents` | 계획·승인·검증·회귀·롤백 이력 조회 |
+| `audit_diagnostics` | 중복 진단, 취약 문자열 검사, 사라진 참조 분석 |
 | `read_error_pattern` | 자주 발생하는 에러 패턴 지식 정보 조회 |
 | `write_error_pattern` | 신규 또는 반복 오류에 대한 대응 패턴 마크다운 저장 |
 | `check_symbol_diff` | **(v1.5.0)** 코드 수정 전/후 상실된 JSX 카드 태그, export 심볼, 수식 함수 자동 추적 감시 |
 | `recommend_cartridge_split` | **(v1.5.0)** 500줄 초과 거대 UI 컴포넌트의 소형 카트리지 모듈화 분리 청사진 자동 생성 |
-| `repair_omission` | **(v1.5.0)** 필수 UI 태그 상실 시 백업(.bak) 또는 git 스냅샷을 활용한 소스 코드 자동 원복 |
+| `repair_omission` | 백업 또는 Git 스냅샷 기반 승인 필수 복구 계획 생성 |
 | `sync_ai_context` | **(v1.5.0)** AI 작업 목표 및 진단 메모리를 영속화하여 대화 세션 간 완벽 승계 |
 | `verify_build_safety` | **(v1.5.0)** 백그라운드 빌드/구문 자가검증으로 컴파일 에러 0개 확인 |
 | `sync_agent_rules` | **(v1.5.0)** AI 규칙 파일(.cursorrules, AGENTS.md)에 자가진단 수행 수칙 자동 동기화 |

@@ -1,10 +1,11 @@
 const http = require('http');
 const fs = require('fs');
 const path = require('path');
-const { runDiagnostics, discoverDiagnostics } = require('./runner');
-const { validateDiagnosticModule } = require('./schema');
+const crypto = require('crypto');
+const { runDiagnosticsReport, discoverDiagnostics } = require('./runner');
+const { validateDiagnosticModule, normalizeMetadata } = require('./schema');
 const { getByokConfig, saveByokConfig } = require('./config-manager');
-const { repairDiagnostic } = require('./repairer');
+const { repairDiagnostic, createRepairPlan, applyRepairPlan, readAudit } = require('./repairer');
 const { listProviders } = require('./ai-provider');
 const { runHeuristicMetrics } = require('./analyzer');
 
@@ -52,6 +53,7 @@ function listDiagnosticMeta(projectDir) {
         name: mod.name || 'Unknown',
         layer: mod.layer || 'UNKNOWN',
         linkedTask: mod.linkedTask || null,
+        ...normalizeMetadata(mod),
         valid: validation.valid,
       });
     } catch (err) {
@@ -115,8 +117,10 @@ function readBody(req) {
   });
 }
 
-function startDashboard(projectDir, port = 7700) {
+function startDashboard(projectDir, port = 7700, options = {}) {
   let lastRunResults = [];
+  let lastRunReport = null;
+  const shutdownToken = crypto.randomBytes(24).toString('hex');
 
   const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, `http://${req.headers.host}`);
@@ -157,23 +161,18 @@ function startDashboard(projectDir, port = 7700) {
 
     if (req.method === 'POST' && url.pathname === '/api/run') {
       try {
-        const results = await runDiagnostics(projectDir);
+        const report = await runDiagnosticsReport(projectDir, { persist: true });
+        const results = report.results;
         lastRunResults = results;
-        const summary = {
-          total: results.length,
-          ok: results.filter(r => r.status === 'OK').length,
-          warning: results.filter(r => r.status === 'WARNING').length,
-          error: results.filter(r => r.status === 'ERROR').length,
-        };
-        const overallStatus = summary.error > 0 ? 'ERROR' : summary.warning > 0 ? 'WARNING' : 'OK';
-        const healthPercent = summary.total > 0 ? Math.round((summary.ok / summary.total) * 100) : 100;
+        lastRunReport = report;
+        const { summary, overallStatus, healthPercent } = report;
         
         // Log to session history
         const passRate = summary.total > 0 ? summary.ok / summary.total : 1.0;
         const cardResults = results.map(r => ({ id: r.id, status: r.status }));
         logSessionHistory(projectDir, passRate, overallStatus, cardResults);
 
-        sendJson(res, { results, summary, overallStatus, healthPercent });
+        sendJson(res, report);
       } catch (err) {
         sendJson(res, { error: err.message }, 500);
       }
@@ -324,12 +323,6 @@ function startDashboard(projectDir, port = 7700) {
         }
 
         const result = await repairDiagnostic(projectDir, diagResult);
-
-        if (result.rerunResult) {
-          const idx = lastRunResults.findIndex(r => r.id === diagId);
-          if (idx !== -1) lastRunResults[idx] = result.rerunResult;
-        }
-
         sendJson(res, result);
       } catch (err) {
         sendJson(res, { error: err.message }, 500);
@@ -337,8 +330,44 @@ function startDashboard(projectDir, port = 7700) {
       return;
     }
 
+    if (req.method === 'POST' && url.pathname === '/api/repair/plan') {
+      try {
+        const body = await readBody(req);
+        const target = lastRunResults.find(result => result.id === body.diagId);
+        if (!target || target.status === 'OK') { sendJson(res, { error: 'A recent failing diagnostic result is required.' }, 400); return; }
+        const plan = await createRepairPlan(projectDir, target, lastRunResults);
+        sendJson(res, { success: true, plan });
+      } catch (err) { sendJson(res, { error: err.message }, 400); }
+      return;
+    }
+
+    if (req.method === 'POST' && url.pathname === '/api/repair/apply') {
+      try {
+        const body = await readBody(req);
+        const repair = await applyRepairPlan(projectDir, body.planId, { approved: body.approved === true, approvedHighRisk: body.approvedHighRisk === true });
+        if (repair.result?.report) { lastRunReport = repair.result.report; lastRunResults = repair.result.report.results; }
+        sendJson(res, { success: repair.result?.success === true, repair });
+      } catch (err) { sendJson(res, { error: err.message }, 400); }
+      return;
+    }
+
+    if (req.method === 'GET' && url.pathname === '/api/incidents') {
+      sendJson(res, readAudit(projectDir));
+      return;
+    }
+
+    if (req.method === 'GET' && url.pathname === '/api/report') {
+      sendJson(res, lastRunReport || { results: [], message: 'Run diagnostics to create a report.' });
+      return;
+    }
+
     if (req.method === 'POST' && url.pathname === '/api/shutdown') {
       try {
+        const suppliedToken = req.headers['x-vibe-dashboard-token'];
+        if (suppliedToken !== shutdownToken) {
+          sendJson(res, { error: 'Invalid dashboard shutdown token.' }, 403);
+          return;
+        }
         sendJson(res, { success: true, message: 'Dashboard is shutting down...' });
 
         const lockFile = path.join(projectDir, '.vibe-diagnosis', 'active_port.json');
@@ -350,9 +379,7 @@ function startDashboard(projectDir, port = 7700) {
           }
         }
 
-        setTimeout(() => {
-          process.exit(0);
-        }, 500);
+        setTimeout(() => server.close(), 100);
       } catch (err) {
         sendJson(res, { error: err.message }, 500);
       }
@@ -364,14 +391,17 @@ function startDashboard(projectDir, port = 7700) {
   });
 
   server.listen(port, () => {
+    const actualPort = server.address().port;
     // 기동 시 포트 락 파일(.vibe-diagnosis/active_port.json) 생성 및 저장
     try {
       const fs = require('fs');
       const lockDir = path.join(projectDir, '.vibe-diagnosis');
       if (fs.existsSync(lockDir)) {
         fs.writeFileSync(path.join(lockDir, 'active_port.json'), JSON.stringify({
-          port,
+          port: actualPort,
           pid: process.pid,
+          projectDir: path.resolve(projectDir),
+          token: shutdownToken,
           timestamp: new Date().toISOString()
         }, null, 2), 'utf8');
       }
@@ -379,7 +409,7 @@ function startDashboard(projectDir, port = 7700) {
       // Safe skip if lock file write fails
     }
 
-    const url = `http://localhost:${port}`;
+    const url = `http://localhost:${actualPort}`;
     console.log(`\n  \x1b[36m🩺 Vibe Diagnosis Dashboard\x1b[0m`);
     console.log(`  \x1b[90m${'─'.repeat(40)}\x1b[0m`);
     console.log(`  Running at: \x1b[32m${url}\x1b[0m`);
@@ -387,7 +417,7 @@ function startDashboard(projectDir, port = 7700) {
     console.log(`  \x1b[90m${'─'.repeat(40)}\x1b[0m`);
     console.log(`  Press \x1b[33mCtrl+C\x1b[0m to stop\n`);
 
-    openBrowser(url);
+    if (options.openBrowser !== false) openBrowser(url);
   });
 
   return server;

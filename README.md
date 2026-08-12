@@ -4,7 +4,18 @@ Self-diagnosis and self-healing framework for AI-assisted coding projects. Place
 
 [한국어 README](./README.ko.md)
 
-> 🚀 **Latest Version: 1.5.1** (Featuring Adaptive Monolithic File Thresholds: UI files 300+ lines / Logic files 600+ lines, Symbol Diff Guard, Cartridge Splitter Blueprint, and AI Context Sync)
+> 🚀 **Latest Version: 1.6.0** (Isolated diagnostics, structured failure evidence, release/live gates, semantic assertions, baselines, safe selection/cache, root-cause grouping, and approval-first repair)
+
+## V1.6 evidence-first diagnostics
+
+- Every diagnostic runs in an isolated Node worker with its own cwd, environment view, module cache, and optional Prisma connection. Runner/timeouts are retried once in a fresh worker and recovery is reported as `FLAKY`.
+- Legacy `status: OK | WARNING | ERROR` remains compatible. `classification` adds `CONTRACT_ERROR`, `TEST_FAILURE`, `RUNNER_ERROR`, `TIMEOUT`, and `FLAKY`, while execution records preserve exit code, signal, timeout, stdout, stderr, and all attempts.
+- Optional diagnostic metadata supports `severity`, `scope`, `evidenceType`, `blocksRelease`, `blocksLiveTrading`, `confidence`, `lastVerifiedAt`, `tags`, `dependencies`, and input `files`.
+- `RELEASE_BLOCKED` and `LIVE_BLOCKED` are independent of health percentage. Static success and missing/stale live evidence can be shown at the same time.
+- `run_diagnostics` can select by ID, tag, scope, or severity and can use opt-in cache only for explicitly cacheable `STATIC`/`TEST` checks. Each saved run includes Git and environment fingerprints plus baseline comparisons.
+- Repairs always begin with a reviewable plan. Inspect the risk and complete diff preview, then call `apply_repair_plan` with explicit approval. High-risk areas require a separate approval and failed validation or regressions are rolled back.
+- Agent integration now requires `complete_task_diagnostics` immediately before a development task is reported complete. It runs the full suite without filters, cache, or dashboard; ordinary `run_diagnostics` also keeps the dashboard off unless explicitly requested.
+- `stop_dashboard` is available through MCP and CLI and uses the project dashboard's local shutdown token instead of terminating an arbitrary recorded PID.
 
 ---
 
@@ -52,7 +63,7 @@ Run diagnostics (run_diagnostics) first on this project to verify that the exist
 
 ### 🔧 [Scenario C] Fixing Failing Diagnostics via MCP (Autonomous AI Healing)
 ```text
-If there are any failing (FAIL) diagnostics, invoke the AI self-healing (heal_all) tool to analyze and fix the implementation automatically. Once resolved, run the suite again to update the TDD Timeline and Build Success Predictor.
+If diagnostics fail, use `plan_repair` or the compatibility `repair_diagnostic` tool to create a plan. Review its risk and diff before separately invoking `apply_repair_plan`; no repair tool applies changes during planning.
 ```
 
 ---
@@ -69,9 +80,9 @@ Create a rules config file in your project root corresponding to your AI workspa
 ```markdown
 ## Vibe Diagnosis Rules (Self-Diagnosis Guidelines)
 - Before writing any feature or fixing a bug, always create/modify a corresponding `.diag.js` file under `.vibe-diagnosis/diagnostics/` to verify requirements (TDD methodology).
-- Run run_diagnostics during implementation and at completion phases to mechanically prove that everything operates flawlessly.
-- If a diagnostic check fails, attempt auto-repairing using repair_diagnostic or heal_all tools.
-- Upon completion, always invoke open_dashboard to verify health status, ensure all tests are green (OK), and present the telemetry summary to the user.
+- Use `run_diagnostics` during implementation. Immediately before reporting completion, call `complete_task_diagnostics` and require `completion.eligible: true`.
+- If a diagnostic fails, create and review a repair plan. Never apply it without explicit approval and separate high-risk approval when required.
+- Open the dashboard only when the user requests visual inspection; completion eligibility does not depend on it.
 ```
 
 ---
@@ -128,7 +139,7 @@ Open `http://localhost:7700` to find a premium Glassmorphism cockpit summarizing
    - **Cartridge Integrity Check**: Guarantees required sub-components are not overwritten or dropped.
    - **Symbol Diff Guard (`check_symbol_diff`)**: Tracks lost JSX UI card tags, export symbols, and formula functions before and after AI modifications.
    - **Cartridge Splitter Blueprint (`recommend_cartridge_split`)**: Parses monolithic files to generate modular sub-cartridge component blueprints.
-   - **Auto-Revert Repair (`repair_omission`)**: Restores deleted UI blocks automatically from `.bak` backups or git snapshots.
+   - **Approval-First Omission Repair (`repair_omission`)**: Creates a restoration plan and diff from `.bak` or Git; it does not alter the target before approval.
 7. **🧠 AI-Native Completeness & Session Handover (NEW in v1.5.0)**:
    - **AI Context Sync (`sync_ai_context`)**: Persists current goals and diagnostic state to `.vibe-diagnosis/active_context.json` for seamless handover between AI sessions.
    - **Build Safety Verifier (`verify_build_safety`)**: Runs background compilation (`npm run build`, etc.) to confirm 0 build or syntax errors before finishing tasks.
@@ -155,15 +166,20 @@ npx -y vibe-diagnosis heal                  # 5. Trigger bulk AI self-healing re
 | `init_diagnostics` | Sets up directory structure & copies default boilerplate template |
 | `list_diagnostics` | Discovers and validates all written `.diag.js` files |
 | `run_diagnostics` | Runs all diagnostic checks and records data history |
+| `complete_task_diagnostics` | Mandatory final full-suite, uncached, dashboard-free completion gate |
 | `open_dashboard` | Launches the local dashboard web interface |
 | `stop_dashboard` | Shuts down the active dashboard server and frees up port resources |
-| `repair_diagnostic` | Runs autonomous AI debugging on a specific failing test |
-| `heal_all` | Runs sequential bulk AI self-healing routines across all failed tests |
+| `repair_diagnostic` | Compatibility tool that creates a reviewable repair plan without applying it |
+| `heal_all` | Creates plans for failing diagnostics without applying changes |
+| `plan_repair` | Creates a risk-rated plan with file-level diff previews |
+| `apply_repair_plan` | Applies an explicitly approved plan, validates the full suite, and rolls back regressions |
+| `list_repair_incidents` | Reads local plan, validation, regression, and rollback history |
+| `audit_diagnostics` | Reports duplicates, fragile source-string checks, and missing references |
 | `read_error_pattern` | Loads known common error resolution knowledge |
 | `write_error_pattern` | Documents new recursive error patterns in markdown |
 | `check_symbol_diff` | **(v1.5.0)** Tracks lost JSX UI card tags, export symbols, and formula functions after code edits |
 | `recommend_cartridge_split` | **(v1.5.0)** Generates modular sub-cartridge splitting blueprints for monolithic UI files |
-| `repair_omission` | **(v1.5.0)** Auto-reverts lost UI symbols from local backups (.bak) or git snapshot |
+| `repair_omission` | Creates an approval-required restoration plan from a backup or Git snapshot |
 | `sync_ai_context` | **(v1.5.0)** Persists and syncs AI goals and diagnostic state for seamless session handover |
 | `verify_build_safety` | **(v1.5.0)** Runs background build/syntax checks to confirm 0 compilation errors |
 | `sync_agent_rules` | **(v1.5.0)** Auto-injects self-diagnosis guidelines into AI agent rules files |

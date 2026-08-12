@@ -615,6 +615,9 @@ header{display:flex;align-items:center;justify-content:space-between;padding:20p
       <div class="stat" style="color:var(--ok)"><strong id="statOk">—</strong> OK</div>
       <div class="stat" style="color:var(--warn)"><strong id="statWarn">—</strong> WARN</div>
       <div class="stat" style="color:var(--err)"><strong id="statErr">—</strong> ERR</div>
+      <div class="stat"><strong id="releaseGate">—</strong> release</div>
+      <div class="stat"><strong id="liveGate">—</strong> live</div>
+      <div class="stat"><strong id="liveEvidence">—</strong> evidence</div>
     </div>
   </div>
 
@@ -828,17 +831,17 @@ function createCard(diag, result) {
   let repairHtml = '';
   if (needsRepair && byokConfigured) {
     let btnClass = 'btn-repair';
-    let btnContent = '<span class="repair-icon">🔧</span><span class="repair-spinner"></span> Auto Repair';
+    let btnContent = '<span class="repair-icon">🔧</span><span class="repair-spinner"></span> Plan Repair';
     let summaryHtml = '';
     let disabled = '';
 
     if (repairState === 'repairing') {
       btnClass += ' repairing repairing-pulse';
-      btnContent = '<span class="repair-icon">🔧</span><span class="repair-spinner"></span> Repairing...';
+      btnContent = '<span class="repair-icon">🔧</span><span class="repair-spinner"></span> Planning...';
       disabled = 'disabled';
     } else if (repairState === 'repaired') {
       btnClass += ' repaired';
-      btnContent = '✅ Fixed!';
+      btnContent = '✅ Applied';
       disabled = 'disabled';
     } else if (repairState && repairState.startsWith('failed:')) {
       btnClass += ' failed';
@@ -867,6 +870,7 @@ function createCard(diag, result) {
         <span class="card-badge ${layerClass}">${diag.layer || 'UNKNOWN'}</span>
       </div>
       ${diag.linkedTask ? `<div class="card-task">🔗 ${diag.linkedTask}</div>` : ''}
+      <div class="card-task">${result ? `${result.classification || 'RESULT'} · ${result.severity || 'UNSPECIFIED'} · ${result.scope || 'GENERAL'}${result.cached ? ' · CACHED' : ''}` : ''}</div>
       <div class="card-status">
         <span class="status-dot ${status}"></span>
         <span class="card-details">${details}</span>
@@ -941,6 +945,9 @@ async function runDiagnostics() {
     document.getElementById('statOk').textContent = data.summary.ok;
     document.getElementById('statWarn').textContent = data.summary.warning;
     document.getElementById('statErr').textContent = data.summary.error;
+    document.getElementById('releaseGate').textContent = data.gates.releaseStatus;
+    document.getElementById('liveGate').textContent = data.gates.liveTradingStatus;
+    document.getElementById('liveEvidence').textContent = data.evidenceSummary.liveEvidenceStatus;
 
     updateHealthRing(data.healthPercent);
     renderCards();
@@ -951,7 +958,7 @@ async function runDiagnostics() {
     if (data.overallStatus === 'OK') {
       showToast('✅ All diagnostics passed! Health ' + data.healthPercent + '%', 'success');
     } else {
-      showToast('⚠️ Issues detected — Health ' + data.healthPercent + '%', 'error');
+      showToast('⚠️ ' + data.overallStatus + ' — Health ' + data.healthPercent + '% · Live evidence ' + data.evidenceSummary.liveEvidenceStatus, 'error');
     }
   } catch (err) {
     showToast('❌ Failed to run diagnostics', 'error');
@@ -965,7 +972,7 @@ async function repairDiagnostic(diagId) {
   renderCards();
 
   try {
-    const res = await fetch(API + '/api/repair', {
+    const res = await fetch(API + '/api/repair/plan', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ diagId }),
@@ -979,19 +986,32 @@ async function repairDiagnostic(diagId) {
       return;
     }
 
-    if (data.success) {
-      repairStates[diagId] = 'repaired';
-      if (data.rerunResult) {
-        lastResults[diagId] = data.rerunResult;
-      }
-      showToast('✅ ' + (data.summary || 'Repair successful!'), 'success');
-    } else {
-      repairStates[diagId] = 'failed:' + (data.summary || data.error || 'Repair did not resolve the issue');
-      if (data.rerunResult) {
-        lastResults[diagId] = data.rerunResult;
-      }
-      showToast('⚠️ ' + (data.summary || 'Repair applied but issue persists'), 'error');
+    const plan = data.plan;
+    const preview = plan.files.map(file => `${file.path}\n${file.diffPreview}`).join('\n\n');
+    const approved = window.confirm(`Repair plan ${plan.id}\nRisk: ${plan.risk.level}\n\n${plan.summary}\n\n${preview}\n\nApprove and apply this exact plan?`);
+    if (!approved) {
+      repairStates[diagId] = 'failed:Plan dismissed without changes';
+      showToast('Plan dismissed. No files changed.', 'success');
+      renderCards();
+      return;
     }
+    const approvedHighRisk = plan.risk.requiresHighRiskApproval
+      ? window.confirm('HIGH RISK: this plan touches trading, authority, data, credentials, dependencies, or runtime settings. Approve separately?')
+      : false;
+    if (plan.risk.requiresHighRiskApproval && !approvedHighRisk) {
+      repairStates[diagId] = 'failed:High-risk approval not granted';
+      renderCards();
+      return;
+    }
+    const applyRes = await fetch(API + '/api/repair/apply', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ planId: plan.id, approved: true, approvedHighRisk }),
+    });
+    const applied = await applyRes.json();
+    if (applied.error) throw new Error(applied.error);
+    repairStates[diagId] = applied.success ? 'repaired' : 'failed:Validation failed and changes were rolled back';
+    showToast(applied.success ? '✅ Repair applied and validated' : '⚠️ Repair rolled back after validation', applied.success ? 'success' : 'error');
+    await runDiagnostics();
 
     renderCards();
     updateStatsFromResults();
