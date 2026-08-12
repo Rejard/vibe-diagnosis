@@ -2,6 +2,10 @@
 
 ## 1.6.0 (Current)
 
+- Rewrote the extension documentation around the current 1.6 diagnostic, completion, dashboard, and approval-gated repair behavior.
+- Fixed safe repair to use the current project's allocated dashboard port and authentication token.
+- Added the reviewed repair-plan checksum to dashboard application requests.
+- Included the Apache-2.0 license in the packaged extension.
 - Added a dashboard-independent `complete_task_diagnostics` gate that runs the full suite without cache before an agent reports completion.
 - Agent rule synchronization now covers root `AGENTS.md`, `.agents/AGENTS.md`, `CLAUDE.md`, `GEMINI.md`, Cursor, and Windsurf rule files, including already initialized projects.
 - Changed MCP `run_diagnostics` so dashboard launch is explicit and disabled by default.

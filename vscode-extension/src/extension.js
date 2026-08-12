@@ -1,7 +1,7 @@
 const vscode = require('vscode');
 const { exec } = require('child_process');
 const path = require('path');
-const http = require('http');
+const { readDashboardConnection, postJson, buildRepairApproval } = require('./dashboard-client');
 
 let statusBarItem;
 let outputChannel;
@@ -97,62 +97,39 @@ function runDiagnostics(jsonMode) {
   });
 }
 
-function runDiagnosticsAsync(workspaceRoot) {
-  return new Promise((resolve, reject) => {
-    const bin = findVibeDiagBin();
-    const isLocalBin = bin.endsWith('.js');
-    const cmd = isLocalBin
-      ? `node "${bin}" run --json --cwd "${workspaceRoot}"`
-      : `npx vibe-diag run --json --cwd "${workspaceRoot}"`;
-
-    exec(cmd, { windowsHide: true, timeout: 30000 }, (error, stdout, stderr) => {
-      try {
-        resolve(JSON.parse(stdout));
-      } catch {
-        reject(new Error(stderr || stdout || 'Failed to parse diagnostic output'));
-      }
-    });
-  });
+function startDashboardProcess(workspaceRoot) {
+  const bin = findVibeDiagBin();
+  const isLocalBin = bin.endsWith('.js');
+  const cmd = isLocalBin
+    ? `node "${bin}" dashboard --cwd "${workspaceRoot}"`
+    : `npx vibe-diag dashboard --cwd "${workspaceRoot}"`;
+  exec(cmd, { windowsHide: true }, () => {});
 }
 
-function postJson(pathname, bodyValue) {
-  return new Promise((resolve, reject) => {
-    const body = JSON.stringify(bodyValue);
-    const options = {
-      hostname: 'localhost',
-      port: 7700,
-      path: pathname,
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Content-Length': Buffer.byteLength(body)
-      }
-    };
+async function runAuthenticatedDashboardDiagnostics(workspaceRoot) {
+  try {
+    return await postJson(workspaceRoot, '/api/run');
+  } catch {
+    startDashboardProcess(workspaceRoot);
+  }
 
-    const req = http.request(options, (res) => {
-      let data = '';
-      res.on('data', (chunk) => { data += chunk; });
-      res.on('end', () => {
-        if (res.statusCode >= 200 && res.statusCode < 300) {
-          try {
-            resolve(JSON.parse(data));
-          } catch {
-            resolve({ message: data });
-          }
-        } else {
-          reject(new Error(`Repair API returned ${res.statusCode}: ${data}`));
-        }
-      });
-    });
-
-    req.on('error', (err) => reject(err));
-    req.write(body);
-    req.end();
-  });
+  for (let attempt = 0; attempt < 40; attempt += 1) {
+    await new Promise(resolve => setTimeout(resolve, 100));
+    try {
+      readDashboardConnection(workspaceRoot);
+      return await postJson(workspaceRoot, '/api/run');
+    } catch {}
+  }
+  throw new Error('Dashboard did not start or did not publish an authenticated project lock.');
 }
 
-function postRepairRequest(diagId) { return postJson('/api/repair/plan', { diagId }); }
-function applyRepairRequest(planId, approvedHighRisk) { return postJson('/api/repair/apply', { planId, approved: true, approvedHighRisk }); }
+function postRepairRequest(workspaceRoot, diagId) {
+  return postJson(workspaceRoot, '/api/repair/plan', { diagId });
+}
+
+function applyRepairRequest(workspaceRoot, plan, approvedHighRisk) {
+  return postJson(workspaceRoot, '/api/repair/apply', buildRepairApproval(plan, approvedHighRisk));
+}
 
 async function autoRepair() {
   const workspaceRoot = getWorkspaceRoot();
@@ -165,7 +142,7 @@ async function autoRepair() {
   try {
     parsed = await vscode.window.withProgress(
       { location: vscode.ProgressLocation.Notification, title: 'Vibe Diagnosis: Running diagnostics...' },
-      () => runDiagnosticsAsync(workspaceRoot)
+      () => runAuthenticatedDashboardDiagnostics(workspaceRoot)
     );
   } catch (err) {
     vscode.window.showErrorMessage(`Vibe Diagnosis: Diagnostics failed — ${err.message}`);
@@ -201,16 +178,18 @@ async function autoRepair() {
   try {
     const result = await vscode.window.withProgress(
       { location: vscode.ProgressLocation.Notification, title: `Vibe Diagnosis: Planning repair for ${selected.diagId}...`, cancellable: false },
-      () => postRepairRequest(selected.diagId)
+      () => postRepairRequest(workspaceRoot, selected.diagId)
     );
 
     if (!result.plan) throw new Error(result.error || 'Dashboard did not return a repair plan.');
     const plan = result.plan;
+    if (!plan.integrity?.checksum) throw new Error('Dashboard returned a repair plan without an integrity checksum.');
     const preview = plan.files.map(file => `${file.path}\n${file.diffPreview}`).join('\n\n');
     outputChannel.clear();
     outputChannel.appendLine(`Repair Plan — ${selected.diagId} — ${plan.risk.level} RISK`);
     outputChannel.appendLine('\u2500'.repeat(55));
     outputChannel.appendLine(plan.summary);
+    outputChannel.appendLine(`Checksum: ${plan.integrity.checksum}`);
     outputChannel.appendLine(preview || '(No file changes proposed)');
     outputChannel.show();
     const choice = await vscode.window.showWarningMessage(`Review the Vibe Diagnosis output. Apply plan ${plan.id}?`, { modal: true }, 'Apply reviewed plan');
@@ -223,7 +202,7 @@ async function autoRepair() {
     }
     const applied = await vscode.window.withProgress(
       { location: vscode.ProgressLocation.Notification, title: `Vibe Diagnosis: Applying ${plan.id}...`, cancellable: false },
-      () => applyRepairRequest(plan.id, approvedHighRisk)
+      () => applyRepairRequest(workspaceRoot, plan, approvedHighRisk)
     );
 
     outputChannel.clear();
@@ -338,14 +317,8 @@ function openDashboard() {
     return;
   }
 
-  const bin = findVibeDiagBin();
-  const isLocalBin = bin.endsWith('.js');
-  const cmd = isLocalBin
-    ? `node "${bin}" dashboard --cwd "${workspaceRoot}"`
-    : `npx vibe-diag dashboard --cwd "${workspaceRoot}"`;
-
-  exec(cmd, { windowsHide: true, timeout: 5000 }, () => {});
-  vscode.window.showInformationMessage('Vibe Diagnosis: Dashboard opened at http://localhost:7700');
+  startDashboardProcess(workspaceRoot);
+  vscode.window.showInformationMessage('Vibe Diagnosis: Starting the project dashboard.');
 }
 
 module.exports = { activate, deactivate };

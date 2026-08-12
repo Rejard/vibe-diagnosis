@@ -361,7 +361,11 @@ function startDashboard(projectDir, port = 7700, options = {}) {
     if (req.method === 'POST' && url.pathname === '/api/repair/apply') {
       try {
         const body = await readBody(req);
-        const repair = await applyRepairPlan(projectDir, body.planId, { approved: body.approved === true, approvedHighRisk: body.approvedHighRisk === true });
+        const repair = await applyRepairPlan(projectDir, body.planId, {
+          approved: body.approved === true,
+          approvedChecksum: body.approvedChecksum,
+          approvedHighRisk: body.approvedHighRisk === true,
+        });
         if (repair.result?.report) { lastRunReport = repair.result.report; lastRunResults = repair.result.report.results; }
         sendJson(res, { success: repair.result?.success === true, repair });
       } catch (err) { sendJson(res, { error: err.message }, 400); }

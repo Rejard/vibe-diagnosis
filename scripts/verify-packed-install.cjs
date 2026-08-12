@@ -66,7 +66,7 @@ async function main() {
   assert.equal(rootFiles.some(file => file.startsWith('test/') || file.startsWith('examples/')), false);
   assert.ok(rootFiles.includes('src/dashboard-control.js'));
   assert.ok(rootFiles.includes('src/completion-receipt.js'));
-  assert.deepEqual(mcpPack.files.map(file => file.path).sort(), ['index.js', 'package.json']);
+  assert.deepEqual(mcpPack.files.map(file => file.path).sort(), ['LICENSE', 'README.md', 'index.js', 'package.json']);
   runNpm(['init', '-y'], consumerDir);
   runNpm(['install', '--ignore-scripts', rootTarball], consumerDir);
   runNpm(['install', '--ignore-scripts', mcpTarball], consumerDir);

@@ -1,215 +1,202 @@
-# 🩺 vibe-diagnosis
+# Vibe Diagnosis
 
-AI 코딩 프로젝트를 위한 자가진단 및 자가치유 프레임워크입니다. 프로젝트 옆에 가벼운 검사 파일(`.diag.js`)을 두고, 검사를 실행한 뒤 로컬 웹 대시보드에서 정성/정량 성과지표와 에러 해결 타임라인을 실시간으로 확인합니다.
+AI 보조 코딩을 위한 증거 우선 자가진단 및 승인 기반 자가수리 도구입니다.
 
 [English README](./README.md)
 
-> 🚀 **최신 버전: 1.6.0** (격리 진단, 구조화 실패 증거, 릴리스/실거래 차단, 의미 기반 assertion, 기준선, 안전 캐시, 근본 원인 그룹, 승인 우선 수리)
+Vibe Diagnosis는 코딩 에이전트가 작업 완료를 보고하기 전에 실제 동작을 기계적으로 증명하게 합니다. 프로젝트에 가벼운 `.diag.js` 진단을 작성하면 각 진단을 격리 실행하고, 구조화된 증거를 보존하며, 배포·운영 차단 여부를 판정하고, 현재 작업공간에 결합된 완료 영수증을 발급합니다.
 
-## V1.6 증거 우선 진단
+버전: **1.6.0**
 
-- 완료 결과에는 실행 ID, Git SHA, 작업공간 fingerprint와 checksum이 포함된 영수증이 들어갑니다. 에이전트는 이전 작업 상태의 영수증을 재사용하지 않습니다.
-- API 키뿐 아니라 Bearer/JWT, 데이터베이스 자격증명 URL, 개인키와 민감한 객체 속성도 진단·수리 출력에서 마스킹합니다.
-- 수리 계획은 파일 수·크기·변경량 제한과 계획 checksum을 가지며, 승인 후 대상이나 제안 내용이 바뀌면 적용을 거부합니다. 환경파일·개인키·BYOK 로컬 저장소는 수리 대상이 될 수 없습니다.
+## 1.6.0 핵심 기능
 
-- 각 진단은 별도 Node 워커에서 실행되며 cwd, env, 모듈 캐시, 선택적 Prisma 연결을 공유하지 않습니다. 실행기 오류와 timeout만 새 워커에서 한 번 재시도하며 복구되면 `FLAKY`로 기록합니다.
-- 기존 `OK/WARNING/ERROR` 결과는 그대로 호환됩니다. 새 `classification`은 `CONTRACT_ERROR`, `TEST_FAILURE`, `RUNNER_ERROR`, `TIMEOUT`, `FLAKY`를 구분하고 exit code, signal, timeout, stdout, stderr, 모든 시도 기록을 보존합니다.
-- `severity`, `scope`, `evidenceType`, `blocksRelease`, `blocksLiveTrading`, `confidence`, `lastVerifiedAt`, `tags`, `dependencies`, `files` 메타데이터를 선택적으로 사용할 수 있습니다.
-- 건강도와 별개로 `RELEASE_BLOCKED` 및 `LIVE_BLOCKED`를 계산하며, 정적 OK와 실시간 증거 미확인/노후 상태를 동시에 표시합니다.
-- ID, tag, scope, severity 선택 실행과 명시적으로 허용한 `STATIC/TEST` 진단의 안전 캐시를 지원합니다. 저장된 실행에는 Git/환경 fingerprint와 기준선 비교가 포함됩니다.
-- 수리는 항상 위험도, diff, checksum이 포함된 계획부터 만듭니다. 검토한 checksum과 함께 `apply_repair_plan`으로 명시적으로 승인하며, 고위험 영역은 별도 승인이 필요하고 회귀가 발생하면 롤백합니다.
-- 에이전트는 개발 완료를 보고하기 직전에 `complete_task_diagnostics`를 반드시 호출합니다. 필터·캐시·대시보드 없이 전체 진단을 실행하고 에이전트 규칙 파일은 수정하지 않습니다. 규칙 변경은 `init_diagnostics` 또는 `sync_agent_rules`를 명시적으로 사용합니다.
-- `stop_dashboard`는 MCP와 CLI에서 사용할 수 있으며 기록된 PID를 직접 종료하지 않고 프로젝트 대시보드의 로컬 종료 토큰을 검증합니다.
-- BYOK API 키는 수리 계획 생성 시 선택한 공급자에게만 전송합니다. `VIBE_DIAG_API_KEY` 환경변수를 권장하며, 대시보드에서 입력한 키는 무시되는 `.vibe-diagnosis/byok.local.json`에만 저장하고 공유 설정이나 패키지에는 넣지 않습니다.
-- 대시보드는 `127.0.0.1`에만 바인딩되고 프로세스별 토큰이 있어야 API를 사용할 수 있으며 교차 출처 요청을 거부합니다. 오류 패턴과 프로젝트 파일 입력은 허용된 디렉터리 밖으로 나갈 수 없습니다.
-- 구버전 진단은 계속 실행할 수 있지만 릴리스·실거래 게이트 선언이 없으면 `NOT_EVALUATED`로 표시하며, 증거 커버리지는 통과율과 분리해 보고합니다.
-- CLI는 Node.js 18 이상을 지원합니다. MCP 패키지는 보안 패치된 전송 의존성을 사용하기 위해 Node.js 20 이상이 필요합니다.
-- 공용 장비에서는 명령 기록에 키가 남을 수 있는 `vibe-diag config set apiKey ...` 사용을 피하고 환경변수 또는 로컬 대시보드를 사용하세요.
+- 진단별 독립 작업 디렉터리·환경·모듈 캐시를 사용하는 격리 실행기
+- 종료 코드, 시그널, 제한 시간, stdout, stderr, 실행 시간, 재시도 기록을 포함한 구조화된 실행 증거
+- `CONTRACT_ERROR`, `TEST_FAILURE`, `RUNNER_ERROR`, `TIMEOUT`, `FLAKY` 실패 분류
+- 심각도, 범위, 증거 유형, 신뢰도, 의존성, 변경 파일, 배포·실운영 차단 여부 메타데이터
+- 단순 통과율과 분리된 증거 커버리지, `RELEASE_BLOCKED`, `LIVE_BLOCKED` 판정
+- `STATIC`, `TEST`, `RUNTIME`, `DATA`, `PROVIDER`, `AUTHORITY`, `UI`, `LIVE_EVIDENCE` 증거 구분
+- Git·환경 지문, 기준선 비교, 변경 연계, 근본 원인 그룹화
+- ID, 태그, 범위, 심각도별 선택 실행과 명시적으로 허용된 정적·테스트 진단 캐시
+- export, route, API, 상태 전이, 렌더링 구조를 검사하는 의미 기반 assertion과 취약한 문자열 검사 경고
+- 대시보드 없이 실행되는 필수 작업 완료 게이트와 재검증 가능한 완료 영수증
+- 위험도, diff, 체크섬 승인, 적용 후 전체 검증, 회귀 시 롤백을 포함한 안전수리
+- OpenAI, Anthropic, Google Gemini, OpenRouter를 사용자가 직접 연결하는 BYOK 수리 계획
+- `127.0.0.1`에만 바인딩되고 프로젝트별 포트·토큰을 사용하는 선택형 로컬 대시보드
 
----
+기존 `OK`, `WARNING`, `ERROR` 형식의 `.diag.js`는 마이그레이션 없이 계속 실행됩니다. 선언하지 않은 증거나 게이트는 추측하지 않고 `NOT_EVALUATED`로 보고합니다.
 
-## 🎯 왜 vibe-diagnosis(자가진단)가 필요할까요?
+## 패키지 구성
 
-**"바이브 코딩(Vibe Coding)에 날카로운 안전망과 정량적 성과 지표를 부여하세요."**
+| 패키지 | 역할 | 요구 사항 |
+|---|---|---|
+| `vibe-diagnosis` | CLI, 진단 실행기, 대시보드, 수리 엔진 | Node.js 18 이상 |
+| `vibe-diagnosis-mcp` | 코딩 에이전트가 사용하는 MCP 서버 | Node.js 20 이상 |
+| `vibe-diagnosis-vscode` | VS Code 명령, 상태 표시, Problems 연동, 검토형 수리 UI | VS Code 1.80 이상, Node.js 18 이상 |
 
-AI 에이전트(Antigravity, Cursor, Windsurf 등)는 매우 빠른 속도로 코드를 작성하지만, 한편으로는 **오버클레임(말만 번지르르하게 하고 실제 빌드는 무너뜨리는 현상)**과 **환각(Hallucination)**에 취약합니다. 
-
-`vibe-diagnosis`는 에이전트가 코드를 짜기 전에 **"기계적 진단 스크립트(`.diag.js`)를 먼저 생성하여 TDD 방식으로 요구사항을 스스로 증명해라"**라고 통제하는 강력한 안전 장치입니다. 1.3.0부터는 단순히 테스트 통과 여부를 넘어, **TDD 극복 시간 추적**, **반응형 UI 품질 등급(A~F)**, **에셋 오프라인 독립성 등급(GOLD 배지)**, **미사용 코드 부채 지수** 등을 대시보드 한복판에 미려한 SVG 그래프와 계기판으로 시각화하여, 개발 주기 단축 및 예방 효과를 화려한 실적으로 증명해 줍니다.
-
----
-
-## 🧮 실시간 자가진단 예제 체험 (Live Example)
-
-이 저장소에는 자가진단을 쉽고 간편하게 체험해 볼 수 있도록 사전 세팅된 `examples/calculator` 예제 프로젝트가 동봉되어 있습니다. 아래 명령어로 작동하는 진단 계기판의 실물을 즉각 경험해 보세요!
+## CLI 빠른 시작
 
 ```bash
-# 1. 저장소를 클론받고 의존성을 설치합니다.
-git clone https://github.com/Rejard/vibe-diagnosis.git
-cd vibe-diagnosis
-npm install
-
-# 2. 사전 정의된 계산기 단위 테스트 자가진단을 즉시 구동합니다!
-npm run test:example
+npx -y vibe-diagnosis@1.6.0 init
+npx -y vibe-diagnosis@1.6.0 run --json
+npx -y vibe-diagnosis@1.6.0 complete
 ```
 
----
+초기화하면 `.vibe-diagnosis/`, 예제 진단, 지원되는 에이전트 규칙 파일의 Vibe Diagnosis 규칙 블록이 생성됩니다. 이 디렉터리에는 로컬 진단, 실행 증거, 수리 계획, 선택적 BYOK 정보가 저장되며 기본적으로 `.gitignore`에 추가됩니다.
 
-## 📋 에이전트 협업 시나리오별 지시 템플릿 (상황별 택1 복사)
+대시보드는 필수가 아니며 요청할 때만 실행됩니다.
 
-> 💡 **주의**: 아래의 3가지 템플릿은 동시에 전부 복사하는 것이 아닙니다! 현재 개발 흐름상 본인에게 딱 맞는 **단 1개의 템플릿만 마우스로 편하게 긁어서** AI 에이전트 채팅창에 던지세요.
-
-### 🆕 [시나리오 A] 새로운 기능 구현을 처음 시작할 때 (TDD 안전 가동)
-```text
-{새로운 프로젝트 내용} 구현해줘. 단, 코드를 짜기 전에 Vibe-Diagnosis(자가진단) 도구를 초기화(init_diagnostics)하고, 해당 기능의 핵심 성공 여부를 기계적으로 검증할 수 있는 `.diag.js` 검사 스크립트를 먼저 만들어서 실패(FAIL)하는 상태를 보여줘. 그 다음 실제 코드를 구현해가며 자가진단을 수시로 구동하고, 최종 통과(OK)하면 대시보드(open_dashboard)를 띄워줘.
+```bash
+npx -y vibe-diagnosis@1.6.0 dashboard
+npx -y vibe-diagnosis@1.6.0 stop
 ```
 
-### 🔍 [시나리오 B] 기존 코드가 망가지지 않았는지 미리 확인하고 싶을 때 (사전 상태 점검)
-```text
-이 프로젝트에 자가진단을 먼저 실행(run_diagnostics)해줘. 기존에 구현되어 있는 기능들이 현재 무결하게 정상 작동하는지 베이스라인을 검증한 뒤, 대시보드 주소를 안내하고 다음 작업을 이어서 시작해줘.
-```
+## MCP 설정
 
-### 🔧 [시나리오 C] 실패(FAIL) 에러가 발생해 AI가 스스로 고쳐놓게 만들고 싶을 때 (자가 치유 수리)
-```text
-실패 진단이 있다면 `plan_repair` 또는 호환 도구 `repair_diagnostic`으로 계획만 생성해줘. 위험도와 diff를 먼저 보고하고, 별도 승인 전에는 `apply_repair_plan`을 호출하거나 파일을 변경하지 마.
-```
-
----
-
-## 🔒 AI 코딩 에이전트 전역 규칙 가이드
-
-루트에 본인이 사용하는 AI 코더에 맞는 규칙 파일을 생성하고 다음 코드 블록의 내용을 통째로 복사해서 넣으세요. 에이전트가 매번 잔소리를 듣지 않고도 자동으로 자가진단을 우선 실행하게 만드는 장치입니다.
-
-* **Antigravity / Gemini**: `.agents/AGENTS.md`
-* **Cursor**: `.cursorrules`
-* **Windsurf**: `.windsurfrules`
-
-### 📝 규칙 파일에 복사해 넣을 내용:
-```markdown
-## Vibe Diagnosis 규칙 (자가진단 가이드라인)
-- 새로운 기능 구현이나 수정이 필요할 때는, 코드를 짜기 전에 해당 기능을 검증할 수 있는 `.diag.js` 진단 파일을 `.vibe-diagnosis/diagnostics/` 폴더에 항상 먼저 생성하거나 수정할 것 (TDD 방식).
-- 작업 중에는 `run_diagnostics`를 사용하고, 완료 보고 직전에는 `complete_task_diagnostics`를 호출하여 `completion.eligible: true`를 확인할 것.
-- 실패 진단은 먼저 수리 계획과 diff를 제시하고, 명시적 승인 및 필요한 고위험 승인을 받은 뒤에만 적용할 것.
-- 대시보드는 사용자가 시각적 확인을 요청할 때만 열며, 완료 판정은 대시보드 실행 여부에 의존하지 않을 것.
-```
-
----
-
-## 🚀 3단계로 빠르게 시작하기 (MCP 방식)
-
-AI 코딩 에이전트의 MCP 설정 파일에 아래 JSON 코드를 마우스로 긁어 추가한 후 재시작하세요.
+사용 중인 코딩 에이전트의 MCP 설정에 다음 서버를 추가합니다.
 
 ```json
 {
   "mcpServers": {
     "vibe-diagnosis": {
       "command": "npx",
-      "args": ["-y", "vibe-diagnosis-mcp"]
+      "args": ["-y", "vibe-diagnosis-mcp@1.6.0"]
     }
   }
 }
 ```
 
-### 📍 MCP 설정 파일 경로
+macOS, Linux, WSL의 Claude Code:
 
-| AI 에이전트 | 설정 파일 위치 |
+```bash
+claude mcp add vibe-diagnosis --scope local -- npx -y vibe-diagnosis-mcp@1.6.0
+```
+
+Windows의 Claude Code:
+
+```powershell
+claude mcp add vibe-diagnosis --scope local -- cmd /c npx -y vibe-diagnosis-mcp@1.6.0
+```
+
+주요 설정 위치:
+
+| 클라이언트 | 위치 |
 |---|---|
-| Gemini / Antigravity | 프로젝트 루트 `.gemini/settings.json` 또는 `~/.gemini/config/mcp_config.json` |
-| Claude Code | `claude mcp add`를 이용한 프로젝트 로컬 등록, 팀 공유 설정은 `.mcp.json` |
+| Claude Code | `claude mcp add`로 로컬 등록, 프로젝트 공유 설정은 `.mcp.json` |
 | Claude Desktop | `%APPDATA%/Claude/claude_desktop_config.json` |
 | Cursor | `.cursor/mcp.json` |
 | Windsurf | `~/.codeium/windsurf/mcp_config.json` |
+| Gemini / Antigravity | 프로젝트 `.gemini/settings.json` 또는 해당 클라이언트의 MCP 설정 |
 
-macOS, Linux 또는 WSL에서 Claude Code 프로젝트 로컬 등록:
+## 에이전트 작업 흐름
+
+에이전트에는 다음처럼 한 번만 지시하면 됩니다.
 
 ```bash
-claude mcp add vibe-diagnosis --scope local -- npx -y vibe-diagnosis-mcp
+이 작업에 Vibe Diagnosis를 사용해. 구현 전에 프로젝트 진단을 확인하거나 초기화하고, 작업 중 핵심 요구사항 진단을 최신 상태로 유지해. 완료를 보고하기 직전에 complete_task_diagnostics를 호출하고 completion.eligible=true와 현재 작업공간의 완료 영수증을 확인해. 내가 요청하지 않으면 대시보드는 열지 마. 실패하면 먼저 수리 계획과 diff를 보여주고, 내 명시적 승인과 필요한 고위험 승인을 받기 전에는 적용하지 마.
 ```
 
-네이티브 Windows에서는 Claude Code 공식 안내에 따라 명령 래퍼를 사용합니다.
+권장 순서:
+
+1. 새 프로젝트는 `init_diagnostics`, 초기화된 프로젝트는 `list_diagnostics`로 시작합니다.
+2. 작업의 실제 성공 조건을 표현하는 진단을 추가하거나 갱신합니다.
+3. 구현 중에는 `run_diagnostics`로 필요한 범위를 반복 검사합니다.
+4. 완료 보고 직전에 `complete_task_diagnostics`로 전체 진단을 캐시와 대시보드 없이 실행합니다.
+5. `completion.eligible`이 `true`일 때만 완료로 판단하고, 작업공간이 바뀌었을 수 있으면 `verify_completion_receipt`로 다시 확인합니다.
+
+`run_diagnostics`는 기본적으로 대시보드를 실행하지 않습니다. 화면 확인이 필요할 때만 `open_dashboard`를 명시적으로 사용합니다.
+
+## 진단 작성 예제
+
+`.vibe-diagnosis/diagnostics/example.diag.js`:
+
+```js
+module.exports = {
+  id: 'example-behavior',
+  name: 'Example behavior',
+  layer: 'TASK',
+  severity: 'HIGH',
+  scope: 'RELEASE',
+  evidenceType: 'TEST',
+  blocksRelease: true,
+  blocksLiveTrading: false,
+  confidence: 1,
+  tags: ['example'],
+  dependencies: [],
+  files: ['src/example.js'],
+  cache: false,
+
+  async run(ctx) {
+    const verified = true; // 실제 실행 가능한 검증으로 교체합니다.
+    return verified
+      ? {
+          status: 'OK',
+          details: '예제 동작을 실행해 확인했습니다.',
+          evidence: [{
+            type: 'TEST',
+            summary: '실행 가능한 동작 검사가 통과했습니다.',
+            verifiedAt: new Date().toISOString(),
+          }],
+        }
+      : { status: 'ERROR', classification: 'TEST_FAILURE', details: '예제 동작이 실패했습니다.' };
+  },
+};
+```
+
+정확한 문구 포함 여부보다 실제 동작, AST, route, API, 상태 전이, UI, 공급자 응답, 인증된 운영 증거를 우선합니다.
+
+## CLI 명령
+
+```bash
+vibe-diag init
+vibe-diag run [--json] [--ids a,b] [--tags security] [--scope RELEASE] [--severity HIGH] [--cache]
+vibe-diag complete
+vibe-diag dashboard [--port 8080]
+vibe-diag stop
+vibe-diag audit
+vibe-diag repair <diagId>
+vibe-diag repair --all
+vibe-diag apply-repair <planId> --approve --checksum <sha256> [--approve-high-risk]
+vibe-diag config get
+vibe-diag config set <provider|model|apiKey> <value>
+```
+
+다른 프로젝트를 대상으로 할 때는 `--cwd <경로>`를 사용합니다.
+
+## MCP 도구 묶음
+
+- 진단: `init_diagnostics`, `list_diagnostics`, `run_diagnostics`, `audit_diagnostics`
+- 완료 검증: `complete_task_diagnostics`, `verify_completion_receipt`
+- 수리: `repair_diagnostic`, `heal_all`, `plan_repair`, `apply_repair_plan`, `list_repair_incidents`, `repair_omission`
+- 프로젝트 검사: `check_symbol_diff`, `recommend_cartridge_split`, `verify_build_safety`
+- 에이전트 컨텍스트: `sync_ai_context`, `sync_agent_rules`
+- 오류 지식: `read_error_pattern`, `write_error_pattern`
+- 대시보드: `open_dashboard`, `stop_dashboard`
+
+계획 도구는 프로젝트 파일을 변경하지 않습니다. `apply_repair_plan`은 검토한 계획의 체크섬이 필요하며 인증, 데이터, 자격증명, 의존성, 런타임 설정, 거래 로직과 같은 고위험 대상은 별도 승인을 요구합니다.
+
+## BYOK와 로컬 보안
+
+가능하면 환경 변수를 사용합니다.
 
 ```powershell
-claude mcp add vibe-diagnosis --scope local -- cmd /c npx -y vibe-diagnosis-mcp
+$env:VIBE_DIAG_PROVIDER='anthropic'
+$env:VIBE_DIAG_MODEL='사용할-모델명'
+$env:VIBE_DIAG_API_KEY='사용자-API-키'
 ```
 
----
+로컬 설정으로 입력한 키는 공유 설정이 아니라 Git에서 제외되는 `.vibe-diagnosis/byok.local.json`에 저장됩니다. 공용 PC에서는 셸 기록에 남을 수 있으므로 API 키를 명령 인수에 직접 넣지 마세요.
 
-## 📊 1.3.3 차세대 성과 대시보드 위젯 안내
+진단·수리 출력은 일반적인 Bearer 토큰, JWT, 자격증명이 포함된 데이터베이스 URL, 개인키, 민감한 객체 필드를 마스킹합니다. 수리 대상은 프로젝트 내부로 제한되며 보호된 비밀 파일은 거부됩니다.
 
-대시보드(`http://localhost:7700`) 상단에는 AI 에이전트와 이룩한 개발 품질에 대한 '종합 신뢰 계기판'이 입체적으로 표시됩니다.
-
-1. **📈 TDD Timeline Tracker**:
-   - 최초 오류 시점(RED)부터 성공(GREEN)에 이르기까지 점진적으로 올라가는 자가진단 통과율 추이를 실시간 SVG 꺾은선 차트로 가시화합니다.
-   - 버그를 몇 분 만에 완벽히 격파했는지 소요 시간(TDD Cycle)을 자동 요약해 줍니다.
-   - **진단 블록 카드 클릭 연동 (v1.3.2 신규)**: 사용자가 대시보드에 전시된 특정 진단 카드(예: `task-001-runner` 등)를 마우스로 클릭하면, 차트(SVG)가 해당 카드 고유의 개별 이력만 정밀 필터링하여 '해당 테스트 룰만의 단독 성장 꺾은선(0% ➔ 50% ➔ 100%)'으로 우아하게 실시간 트랜지션(전환) 드로잉됩니다. 차트 타이틀바의 배지를 눌러 실시간 필터 해제도 가능합니다.
-2. **🛡️ QC & Prevention Scoreboard (정적 코드 정밀 수치)**:
-   - **Build Success Predictor**: 진단 통과율과 설정 파일 정교함을 측정해 **컴파일 안전도(%)**를 과학적으로 연산합니다.
-   - **UI Layer Integrity (반응형 UI 등급)**: CSS 반응형 그리드 속성 비중을 분석하여 **A+ ~ F 등급**으로 판정합니다.
-   - **Asset Independence**: 이미지/사운드의 로컬 패키징 및 Web Audio API 가동 감지 후 오프라인 완전 독립성 시 **GOLD 배지**를 수여합니다.
-   - **Dead-Code Debt Index**: 선언만 되고 참조되지 않는 미사용 코드 부채 지수를 측정해 클린 코드 점수를 실시간 도출합니다.
-3. **✍️ TDD Milestone Archive (v1.3.1 신규)**:
-   - 대시보드 하단에 배치된 미려한 폼을 통해, 사용자가 직접 해당 TDD 사이클의 오류 비율과 소성 회고록을 영구 보관할 수 있습니다.
-   - 프로젝트 루트의 `.vibe-diagnosis/milestones.json` 로컬 파일에 안전하게 세이브되어 새로고침 후에도 유지됩니다.
-4. **🔒 Port Lock Cache (v1.3.1 신규)**:
-   - 각 프로젝트 루트의 `.vibe-diagnosis/active_port.json` 파일을 포트 락으로 사용하여, 백그라운드 노드 프로세스가 중복 기동되는 리소스 누수를 원천 봉쇄합니다. 여러 프로젝트 창을 동시에 열고 바이브 코딩을 해도 상호 격리된 주소를 평화롭게 유지합니다.
-5. **🛑 대시보드 서버 종료 제어 (v1.3.3 신규)**:
-   - 더 이상 대시보드가 불필요하거나 메모리/포트 점유를 해제하고 싶을 때, 웹 대시보드 화면 내에서 한 번의 클릭 또는 터미널 명령어를 통해 백그라운드 서버 프로세스를 깔끔히 수동 정지시킬 수 있습니다.
-   - **.gitignore 전역 폴더 자동 격리 (v1.3.3 신규)**: 자가진단 MCP 초기화(`init`) 실행 시, `.gitignore`에 자동으로 `.vibe-diagnosis/` 폴더 전체를 무시하도록 추가하여 나만의 테스트 소스나 로컬 임시 환경 정보가 깃허브에 우발적으로 공유되는 사고를 차단합니다.
-6. **🚨 바이브 코딩 UI/기능 누락 방지 (v1.5.1 고도화)**:
-   - **Monolithic File Adaptive Scanner**: UI 파일(`*.jsx`, `*.tsx`, `*.vue`)은 **300줄 이상**, 백엔드/로직 파일(`*.js`, `*.ts`, `*.py`)은 **600줄 이상** 시 AI 수정 중 코드 상실 위험 사전 경고(`WARNING`).
-   - **Cartridge Integrity Check**: 필수 UI 카드가 오버라이트되어 삭제되는 상실 사고 무결성 검증.
-   - **Symbol Diff Guard (`check_symbol_diff`)**: 코드 변경 전/후 지워진 JSX UI 태그, Export 심볼, 수식 함수 정밀 추적.
-   - **Cartridge Splitter Blueprint (`recommend_cartridge_split`)**: 거대 컴포넌트를 소형 카트리지로 자동 분리하는 모듈화 청사진 제공.
-   - **승인 우선 누락 복구 (`repair_omission`)**: 로컬 백업 또는 Git 스냅샷에서 복구 계획과 diff만 만들며 승인 전에는 파일을 변경하지 않습니다.
-7. **🧠 AI-Native 완결성 & 세션 승계 (v1.5.0 신규)**:
-   - **AI Context Handover (`sync_ai_context`)**: `.vibe-diagnosis/active_context.json`에 AI 작업 목표와 상태를 영속화하여 대화 세션 교체 시 완벽 승계.
-   - **Build Safety Verifier (`verify_build_safety`)**: AI 작업 종료 직전 백그라운드 빌드(`npm run build` 등) 자가검증으로 compilation error 0개 체크.
-   - **Agent Rules Injector (`sync_agent_rules`)**: `.cursorrules`, `AGENTS.md` 등에 자가진단 실행 필수 수칙 자동 주입.
-
----
-
-## 🛠️ CLI 명령어 모음 (복사 전용)
-
-한 줄씩 또는 통째로 긁어 터미널에 붙여넣고 즉시 구동하세요.
+## 개발 검증
 
 ```bash
-npx -y vibe-diagnosis init                  # 1. 자가진단 환경 초기화 (.diag.js 예제 생성)
-npx -y vibe-diagnosis run                   # 2. 모든 검증 가동 및 대시보드 서버 실행
-npx -y vibe-diagnosis dashboard             # 3. 대시보드 전용 웹뷰 서버 실행
-npx -y vibe-diagnosis stop                  # 4. 백그라운드 대시보드 서버 정상 프로세스 종료
-npx -y vibe-diagnosis repair --all          # 5. 실패 진단의 검토 가능한 수리 계획 생성
+npm test
+npm run test:rollback
+npm run test:packed
 ```
 
----
-
-## 📦 MCP 도구 일람
-
-| 도구 이름 | 상세 용도 |
-|---|---|
-| `init_diagnostics` | 진단 폴더 구조 및 예제 템플릿 생성 (프로젝트 시작 시 최우선 필수 실행) |
-| `list_diagnostics` | 프로젝트에 작성된 모든 .diag.js 목록 조회 (작업 개시 전 필수 실행) |
-| `run_diagnostics` | 전체 또는 선택 진단 실행과 실행 이력 기록; 대시보드는 명시적 요청 시에만 실행 |
-| `complete_task_diagnostics` | 작업 완료 직전 전체 비캐시 진단을 대시보드 없이 실행하고 완료 가능 여부 판정 |
-| `verify_completion_receipt` | 저장된 완료 영수증이 현재 작업공간과 여전히 일치하는지 검증 |
-| `open_dashboard` | 로컬 대시보드 서버 기동 및 브라우저 열기 |
-| `stop_dashboard` | 실행 중인 대시보드 서버 프로세스를 강제 종료하고 포트 자원 반환 |
-| `repair_diagnostic` | 파일을 적용하지 않고 검토 가능한 수리 계획 생성 |
-| `heal_all` | 실패 진단 전체의 계획만 생성하며 변경은 적용하지 않음 |
-| `plan_repair` | 위험도와 파일별 diff를 포함한 수리 계획 생성 |
-| `apply_repair_plan` | 검토한 checksum과 함께 명시적으로 승인된 계획 적용, 전수 재검증 및 회귀 롤백 |
-| `list_repair_incidents` | 계획·승인·검증·회귀·롤백 이력 조회 |
-| `audit_diagnostics` | 중복 진단, 취약 문자열 검사, 사라진 참조 분석 |
-| `read_error_pattern` | 자주 발생하는 에러 패턴 지식 정보 조회 |
-| `write_error_pattern` | 신규 또는 반복 오류에 대한 대응 패턴 마크다운 저장 |
-| `check_symbol_diff` | **(v1.5.0)** 코드 수정 전/후 상실된 JSX 카드 태그, export 심볼, 수식 함수 자동 추적 감시 |
-| `recommend_cartridge_split` | **(v1.5.0)** 500줄 초과 거대 UI 컴포넌트의 소형 카트리지 모듈화 분리 청사진 자동 생성 |
-| `repair_omission` | 백업 또는 Git 스냅샷 기반 승인 필수 복구 계획 생성 |
-| `sync_ai_context` | **(v1.5.0)** AI 작업 목표 및 진단 메모리를 영속화하여 대화 세션 간 완벽 승계 |
-| `verify_build_safety` | **(v1.5.0)** 백그라운드 빌드/구문 자가검증으로 컴파일 에러 0개 확인 |
-| `sync_agent_rules` | **(v1.5.0)** AI 규칙 파일(.cursorrules, AGENTS.md)에 자가진단 수행 수칙 자동 동기화 |
-
----
-
-## 🤝 라이선스
+## 라이선스
 
 [Apache License 2.0](./LICENSE)
-

@@ -1,108 +1,90 @@
-# Vibe Diagnosis (vibe-diagnosis)
+# Vibe Diagnosis for VS Code
 
 [![VS Code Marketplace](https://img.shields.io/visual-studio-marketplace/v/Rejard.vibe-diagnosis-vscode?style=flat-square&color=blue)](https://marketplace.visualstudio.com/items?itemName=Rejard.vibe-diagnosis-vscode)
 [![Open VSX](https://img.shields.io/open-vsx/v/Rejard/vibe-diagnosis-vscode?style=flat-square&color=purple)](https://open-vsx.org/extension/Rejard/vibe-diagnosis-vscode)
-[![License](https://img.shields.io/github/license/Rejard/vibe-diagnosis?style=flat-square&color=lightgray)](./LICENSE)
 
-> **"Never write code without a safety net."**
-> Bring the discipline of Test-Driven Development (TDD) directly into your AI-assisted "vibe coding" sessions. Keep your agent grounded, prevent regressions, and automatically self-heal bugs before you even notice them.
+VS Code integration for Vibe Diagnosis 1.6.0. Run project diagnostics, inspect failures in the Problems panel, open the optional local dashboard, and review a repair plan before approving any file change.
 
----
+## Requirements
 
-## 🚀 Key Features (Version 1.6.0)
+- VS Code 1.80 or newer
+- Node.js 18 or newer
+- An opened workspace folder
 
-* **Evidence-First Isolated Runner**: Separates each diagnostic process, preserves structured execution failures, distinguishes flaky infrastructure from test failures, and displays release/live gates independently from health percentage.
-* **Approval-First Safe Repair**: The command creates a risk-rated plan and displays its diff. Applying it requires explicit confirmation, with a second confirmation for high-risk files; failed validation rolls changes back.
+The extension invokes the `vibe-diagnosis` CLI through `npx` unless it is running from the source repository. MCP agent integration is installed separately with `vibe-diagnosis-mcp`.
 
-* **🚨 Adaptive Monolithic Component Omission Protection (v1.5.1 NEW)**: Scans UI files (`*.jsx`, `*.tsx`, `*.vue`) at 300+ lines and Backend files (`*.js`, `*.ts`, `*.py`) at 600+ lines to issue WARNINGs before AI rewrites. Includes Symbol Diff Tracking (`check_symbol_diff`), Cartridge Splitter Blueprints (`recommend_cartridge_split`), and Auto-Revert Repairs (`repair_omission`).
-* **🧠 AI-Native Completeness & Session Handover (v1.5.0 NEW)**: Synchronizes AI task context and diagnostic state via `.vibe-diagnosis/active_context.json` for seamless handover between AI sessions (`sync_ai_context`). Includes background compilation verification (`verify_build_safety`) and automatic rule injection (`sync_agent_rules`).
-* **AI Agent Self-Diagnosis**: Enforces AI coding assistants (Cursor, Windsurf, Gemini/Antigravity) to prove their code works through mechanical `.diag.js` scripts.
-* **📈 TDD Timeline Tracker & Shutdown Controls**: Renders dynamic SVG charts showing the path from failure (RED) to success (GREEN). Includes interactive card-linking to filter SVG charts with smooth transitions, plus server shutdown controls.
-* **🛡️ QC & Prevention Scoreboard & Isolation**: Renders overall Build Success Predictor, Responsive UI CSS viewport grades, Asset Independence, and Dead-Code Debt metrics with automated `.gitignore` isolation.
-* **AI Repair Planning (BYOK)**: Supports OpenAI, Anthropic, Gemini, and OpenRouter while keeping all file application behind review and explicit approval.
-* **Agent Completion Gate (v1.6.0)**: `complete_task_diagnostics` runs the complete uncached suite without launching the dashboard before an agent reports a development task complete.
-* **Command Palette Integration**: Easily initialize, run, and launch the dashboard directly from VS Code (`Ctrl+Shift+P`).
-* **Active Status Bar Indicators**: Monitor your workspace's health at a glance.
+## Commands
 
----
+Open the Command Palette with `Ctrl+Shift+P` or `Cmd+Shift+P`:
 
-## 🛠️ Step 1: Tell Your AI Agent to Start (Choose ONE)
+| Command | Behavior |
+|---|---|
+| `Vibe Diagnosis: Init` | Creates `.vibe-diagnosis/`, a sample diagnostic, and supported agent rule blocks |
+| `Vibe Diagnosis: Run` | Runs diagnostics and shows health, gates, and failures |
+| `Vibe Diagnosis: Run (JSON)` | Runs diagnostics and prints the complete version 1.6 report |
+| `Vibe Diagnosis: Open Dashboard` | Starts the optional project dashboard on its allocated local port |
+| `Vibe Diagnosis: Plan Safe Repair` | Runs current diagnostics, shows a risk-rated plan and diff, then asks separately before application |
 
-> 💡 **Pick One**: Do not copy all prompts. Choose the **single template** below that matches your current goal.
+When an initialized workspace opens, the extension runs its diagnostics and updates the status bar. Errors and warnings are also shown in the Problems panel.
 
-### 🆕 [Scenario A] Initialize & Setup Diagnostics (First-time)
-```text
-Set up Vibe-Diagnosis for this project. Initialize the folder, write relevant `.diag.js` validations for our features, run the diagnostics, and start the local dashboard.
+## Safe repair behavior
+
+The repair command starts or connects to the dashboard registered for the current project. It reads the project-specific port and authentication token from `.vibe-diagnosis/active_port.json`; it does not assume that port 7700 belongs to the workspace.
+
+The extension then:
+
+1. Runs current diagnostics through the authenticated local dashboard.
+2. Lets you choose a failing diagnostic.
+3. Displays the proposed files, diff preview, risk, and plan identifier.
+4. Requires explicit confirmation before applying the reviewed plan.
+5. Requires a second confirmation for high-risk targets.
+6. Sends the approved plan checksum and reports whether validation succeeded or changes were rolled back.
+
+Planning never changes project files. BYOK provider access is used only when a repair plan needs AI reasoning and only with credentials configured by the user.
+
+## Agent completion gate
+
+The VS Code extension is a manual development interface. Automatic agent completion checks come from the MCP package and synchronized agent rules:
+
+```bash
+Use Vibe Diagnosis for this task. Before reporting completion, call complete_task_diagnostics for the project, require completion.eligible=true, and verify that its receipt still matches the current workspace. Do not open the dashboard unless visual inspection is requested. Never apply a repair plan without explicit approval.
 ```
 
-### 📈 [Scenario B] React / Web Feature Development (Strict TDD)
-```text
-We are building a React-based feature. First, initialize Vibe-Diagnosis and write `.diag.js` tests to verify core requirements. Make sure they fail first, then implement the code step-by-step.
+Install the MCP server separately:
+
+```json
+{
+  "mcpServers": {
+    "vibe-diagnosis": {
+      "command": "npx",
+      "args": ["-y", "vibe-diagnosis-mcp@1.6.0"]
+    }
+  }
+}
 ```
 
----
+## 한국어 안내
 
-## ⚙️ Step 2: VS Code Command Palette (`Ctrl+Shift+P`)
+Vibe Diagnosis 1.6.0 확장은 현재 프로젝트의 진단을 실행하고, 상태 표시줄과 Problems 패널에 결과를 보여주며, 선택형 로컬 대시보드와 승인 기반 안전수리를 제공합니다.
 
-Use the following commands to control the framework directly:
+명령 팔레트에서 다음 명령을 사용할 수 있습니다.
 
-* 🩺 **Vibe Diagnosis: Init** — Creates `.vibe-diagnosis/` folder and sample checks.
-* ▶️ **Vibe Diagnosis: Run** — Runs all diagnostics and updates the active SVG timeline.
-* 📊 **Vibe Diagnosis: Open Dashboard** — Launches the private browser dashboard.
-* ⚡ **Vibe Diagnosis: Plan Safe Repair** — Shows risk and diff before a separately approved application.
+- `Vibe Diagnosis: Init`: 진단 폴더, 예제 진단, 지원되는 에이전트 규칙 블록 생성
+- `Vibe Diagnosis: Run`: 진단 실행 및 건강도·게이트·실패 표시
+- `Vibe Diagnosis: Run (JSON)`: 전체 1.6 JSON 보고서 출력
+- `Vibe Diagnosis: Open Dashboard`: 현재 프로젝트의 로컬 대시보드 실행
+- `Vibe Diagnosis: Plan Safe Repair`: 실패 진단의 수리 계획과 diff를 검토하고 별도 승인 후 적용
 
----
+안전수리는 현재 프로젝트의 포트와 인증 토큰을 확인합니다. 계획 단계에서는 파일을 바꾸지 않으며, 적용 시 검토한 체크섬과 명시적 승인이 필요합니다. 인증·데이터·자격증명·의존성·런타임 설정·거래 로직 같은 고위험 대상은 두 번째 승인을 요구합니다. 적용 후 진단이 실패하거나 회귀가 생기면 변경을 롤백합니다.
 
-## 🔒 Automated Workspace Quality Rules
+에이전트가 작업 완료 때 자동으로 진단하게 하려면 확장만 설치하는 것이 아니라 `vibe-diagnosis-mcp`를 연결하고 `init_diagnostics` 또는 `sync_agent_rules`로 규칙을 명시적으로 동기화해야 합니다. 완료 판정은 대시보드 실행 여부와 무관합니다.
 
-The extension automatically creates workspace quality rules for major AI assistants inside your root folder.
+## Links
 
-* **Antigravity / Gemini**: `.agents/AGENTS.md`
-* **Cursor**: `.cursorrules`
-* **Windsurf**: `.windsurfrules`
+- [Project documentation](https://github.com/Rejard/vibe-diagnosis)
+- [CLI package](https://www.npmjs.com/package/vibe-diagnosis)
+- [MCP package](https://www.npmjs.com/package/vibe-diagnosis-mcp)
 
----
+## License
 
-## 🌐 공식 한국어 가이드 (Official Korean Guide)
-
-> **"안전망 없는 코딩은 이제 그만."**
-> AI 에이전트와 협업하는 "바이브 코딩" 환경에 TDD(테스트 주도 개발)의 엄격함을 불어넣으세요.
->
-> 🚀 **v1.6.0 핵심 고도화**:
-> 1. **거대 파일 가변 임계값 누락 방지(Adaptive Omission Protection)**: UI 파일 300줄 이상, 백엔드/로직 파일 600줄 이상 시 AI 수정 중 코드 상실 방지 경고(WARNING) 스캐너 탑재.
-> 2. **심볼 Diff 감시기 (`check_symbol_diff`)**: AI 코드 변경 시 지워진 JSX UI 태그, Export 심볼, 수식 함수 정밀 추적.
-> 3. **카트리지 모듈화 청사진 (`recommend_cartridge_split`)**: 거대 컴포넌트의 소형 카트리지 자동 분리 가이드 제공.
-> 4. **승인 우선 복구 (`repair_omission`)**: 백업 또는 Git 스냅샷에서 계획과 diff를 만들고 승인 전에는 변경하지 않습니다.
-> 5. **AI 세션 메모리 승계 (`sync_ai_context`)**: AI 목표 및 진단 메모리를 저장하여 대화 세션 교체 시 완벽 승계.
-> 6. **백그라운드 빌드 자가검증 (`verify_build_safety`)**: AI 작업 종료 전 백그라운드 컴파일 실행으로 오류 0개 검증.
-
-### 📋 에이전트 지시 프롬프트 템플릿 (상황별 택1 복사)
-
-> 💡 **주의**: 두 템플릿을 동시에 복사하는 것이 아닙니다! 상황에 맞춰 **단 1개만 선택해서** 사용하세요.
-
-#### 🆕 [상황 A] 처음부터 폴더를 세팅하고 TDD 진단을 켜고 싶을 때
-```text
-{새로운 프로젝트 내용} 구현해줘. 단, 코드를 짜기 전에 Vibe-Diagnosis(자가진단) 도구를 초기화(init_diagnostics)하고, 해당 기능의 핵심 성공 여부를 기계적으로 검증할 수 있는 `.diag.js` 검사 스크립트를 먼저 만들어서 실패(FAIL)하는 상태를 보여줘. 그 다음 실제 코드를 구현해가며 자가진단을 수시로 구동하고, 최종 통과(OK)하면 대시보드(open_dashboard)를 띄워줘.
-```
-
-#### 🔍 [상황 B] 이미 구성된 검사를 가볍게 돌리고 상태만 보고 싶을 때
-```text
-이 프로젝트에 자가진단을 먼저 실행(run_diagnostics)해줘. 기존에 구현되어 있는 기능들이 현재 무결하게 정상 작동하는지 베이스라인을 검증한 뒤, 대시보드 주소를 안내하고 다음 작업을 이어서 시작해줘.
-```
-
-### ⚙️ VS Code 명령어 목록 (`Ctrl+Shift+P`)
-* `Vibe Diagnosis: Init` — `.vibe-diagnosis/` 설정 폴더 및 샘플 진단서 생성
-* `Vibe Diagnosis: Run` — 모든 자가진단 실행 및 SVG 그래프 타임라인 갱신
-* `Vibe Diagnosis: Open Dashboard` — 로컬 대시보드 서버 실행 및 웹 브라우저 자동 오픈
-* `Vibe Diagnosis: Plan Safe Repair` — 실패 원인의 위험도와 diff를 검토하고 별도로 승인
-
----
-
-## 🤝 Contributing & Support
-
-* **GitHub Repository**: [Rejard/vibe-diagnosis](https://github.com/Rejard/vibe-diagnosis)
-* **NPM Packages**:
-  * [CLI: vibe-diagnosis](https://www.npmjs.com/package/vibe-diagnosis)
-  * [MCP: vibe-diagnosis-mcp](https://www.npmjs.com/package/vibe-diagnosis-mcp)
-
-Developed with 💖 by **Rejard** to bring absolute trust to AI-assisted software development.
+[Apache License 2.0](./LICENSE)

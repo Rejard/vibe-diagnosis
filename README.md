@@ -1,214 +1,210 @@
-# 🩺 vibe-diagnosis
+# Vibe Diagnosis
 
-Self-diagnosis and self-healing framework for AI-assisted coding projects. Place lightweight diagnostic scripts (`.diag.js`) alongside your code, run the engine, and visualize qualitative/quantitative QC metrics and TDD timeline graphs in real-time.
+Evidence-first diagnostics and approval-gated repair for AI-assisted coding.
 
-[한국어 README](./README.ko.md)
+[한국어 문서](./README.ko.md)
 
-> 🚀 **Latest Version: 1.6.0** (Isolated diagnostics, structured failure evidence, release/live gates, semantic assertions, baselines, safe selection/cache, root-cause grouping, and approval-first repair)
+Vibe Diagnosis gives coding agents a mechanical way to prove that a task works before they report completion. Projects define lightweight `.diag.js` checks; the runner executes them in isolation, records structured evidence, evaluates release or live-operation gates, and issues a completion receipt bound to the current workspace.
 
-## V1.6 evidence-first diagnostics
+Version: **1.6.0**
 
-- Every diagnostic runs in an isolated Node worker with its own cwd, environment view, module cache, and optional Prisma connection. Runner/timeouts are retried once in a fresh worker and recovery is reported as `FLAKY`.
-- Legacy `status: OK | WARNING | ERROR` remains compatible. `classification` adds `CONTRACT_ERROR`, `TEST_FAILURE`, `RUNNER_ERROR`, `TIMEOUT`, and `FLAKY`, while execution records preserve exit code, signal, timeout, stdout, stderr, and all attempts.
-- Optional diagnostic metadata supports `severity`, `scope`, `evidenceType`, `blocksRelease`, `blocksLiveTrading`, `confidence`, `lastVerifiedAt`, `tags`, `dependencies`, and input `files`.
-- `RELEASE_BLOCKED` and `LIVE_BLOCKED` are independent of health percentage. Static success and missing/stale live evidence can be shown at the same time.
-- `run_diagnostics` can select by ID, tag, scope, or severity and can use opt-in cache only for explicitly cacheable `STATIC`/`TEST` checks. Each saved run includes Git and environment fingerprints plus baseline comparisons.
-- Repairs always begin with a reviewable plan. Inspect the risk, complete diff preview, and checksum, then call `apply_repair_plan` with that approved checksum. High-risk areas require a separate approval and failed validation or regressions are rolled back.
-- Agent integration now requires `complete_task_diagnostics` immediately before a development task is reported complete. It runs the full suite without filters, cache, or dashboard and never edits agent rule files; use `init_diagnostics` or `sync_agent_rules` for explicit rule updates.
-- Completion results include a receipt with the run ID, Git SHA, workspace fingerprint, and checksum. Agents must not reuse a receipt from an earlier workspace state.
-- `stop_dashboard` is available through MCP and CLI and uses the project dashboard's local shutdown token instead of terminating an arbitrary recorded PID.
-- BYOK API keys are sent only to the selected provider for repair planning. Prefer `VIBE_DIAG_API_KEY`; dashboard-entered keys are stored only in ignored `.vibe-diagnosis/byok.local.json`, never in the shareable config or package.
-- Diagnostic and repair output also redacts Bearer/JWT credentials, credential-bearing database URLs, private keys, and sensitive object properties.
-- Repair plans enforce file-count, size, and changed-line limits plus a plan checksum. Application is rejected if either the target or approved content changed; environment files, private keys, and the local BYOK store are prohibited repair targets.
-- Avoid `vibe-diag config set apiKey ...` on shared machines because command arguments can remain in shell history. Use the environment variable or the local dashboard instead.
-- The dashboard binds only to `127.0.0.1`. Its API requires the per-process token embedded in the local page and rejects cross-origin requests; error-pattern and project file inputs cannot escape their allowed directories.
-- Legacy diagnostics remain runnable, but undeclared release/live gates are reported as `NOT_EVALUATED` and evidence coverage is reported separately from the pass rate.
-- The CLI supports Node.js 18 or newer. The MCP package requires Node.js 20 or newer so its patched transport dependencies can be used without known advisory exposure.
+## What 1.6.0 provides
 
----
+- Isolated diagnostic workers with independent working directory, environment view, and module cache.
+- Structured execution evidence: exit code, signal, timeout, stdout, stderr, duration, and retry attempts.
+- Failure classification: `CONTRACT_ERROR`, `TEST_FAILURE`, `RUNNER_ERROR`, `TIMEOUT`, and `FLAKY`.
+- Diagnostic metadata for severity, scope, evidence type, confidence, dependencies, changed files, and release/live blockers.
+- Separate health, evidence coverage, `RELEASE_BLOCKED`, and `LIVE_BLOCKED` decisions. A high pass rate never overrides a declared critical blocker.
+- Evidence types for `STATIC`, `TEST`, `RUNTIME`, `DATA`, `PROVIDER`, `AUTHORITY`, `UI`, and `LIVE_EVIDENCE`.
+- Git and environment fingerprints, saved baselines, change comparison, and root-cause grouping.
+- Selection by ID, tag, scope, or severity, plus opt-in cache for explicitly cacheable static or test diagnostics.
+- Semantic source assertions for exports, routes, APIs, state transitions, and rendered structures, with warnings for fragile string checks.
+- A mandatory dashboard-independent completion gate and a verifiable completion receipt.
+- Repair plans with risk classification, diff preview, checksum approval, post-change validation, and rollback on regression.
+- BYOK repair planning with OpenAI, Anthropic, Google Gemini, or OpenRouter. API keys are supplied by the user and are not bundled with the package.
+- An optional local dashboard bound to `127.0.0.1` with project-specific port and token authentication.
 
-## 🎯 Why Vibe Diagnosis?
+Legacy `.diag.js` files that return `OK`, `WARNING`, or `ERROR` continue to run without migration. Undeclared evidence and gate coverage are reported as not evaluated instead of being inferred.
 
-**"Equip your Vibe Coding with a razor-sharp safety net and robust telemetry."**
+## Packages
 
-AI agents (Antigravity, Cursor, Windsurf, Claude, etc.) generate code at breakneck speeds, but they are highly susceptible to **overclaiming success** and suffering from **hallucinations** that silently break your builds.
+| Package | Purpose | Requirement |
+|---|---|---|
+| `vibe-diagnosis` | CLI, diagnostic runner, dashboard, and repair engine | Node.js 18+ |
+| `vibe-diagnosis-mcp` | MCP server used by coding agents | Node.js 20+ |
+| `vibe-diagnosis-vscode` | VS Code commands, status, Problems integration, and reviewed repair UI | VS Code 1.80+ and Node.js 18+ |
 
-`vibe-diagnosis` enforces a strict TDD (Test-Driven Development) loop: **"Prove that your feature works mechanically by writing a lightweight `.diag.js` script first."** This keeps the speed of vibe coding intact while bulletproofing your codebase against regressions. 
-
-Starting from version 1.3.0, the framework goes beyond pass/fail states to calculate **TDD Bug Resolution Timelines**, **Responsive UI Layout Grades (A+ to F)**, **Asset Offline Independence (GOLD/SILVER Badges)**, and **Unreferenced Code Debt Indices**—visualized as stunning widgets in your local dashboard to validate your engineering achievements.
-
----
-
-## 🧮 Live Example (Experience Immediately)
-
-This repository includes a pre-configured calculator project under `examples/calculator` so you can instantly experience Vibe-Diagnosis and visual telemetry. Clone this project and run the command below to see it in action!
+## Quick start with the CLI
 
 ```bash
-# 1. Clone the repository and install dependencies
-git clone https://github.com/Rejard/vibe-diagnosis.git
-cd vibe-diagnosis
-npm install
-
-# 2. Run the pre-configured calculator example instantly!
-npm run test:example
+npx -y vibe-diagnosis@1.6.0 init
+npx -y vibe-diagnosis@1.6.0 run --json
+npx -y vibe-diagnosis@1.6.0 complete
 ```
 
----
+Initialization creates `.vibe-diagnosis/`, a sample diagnostic, and the Vibe Diagnosis rule block for supported agent rule files. The directory contains local diagnostics, run evidence, repair plans, and optional BYOK data; it is added to `.gitignore` by default.
 
-## 📋 Ready-to-Copy Agent Prompts (Choose ONE Scenario)
+The dashboard is optional and starts only when requested:
 
-> 💡 **Important**: Do not copy all three prompts at once! Select and copy only the **single prompt** below that matches your current development phase.
-
-### 🆕 [Scenario A] Starting a New Feature / Game from Scratch (Enforce TDD)
-```text
-Initialize Vibe-Diagnosis (init_diagnostics) and write a lightweight `.diag.js` script to mechanically verify the core success criteria for [Feature/Game Name] BEFORE writing any implementation code. Show me the failing (FAIL) test first, then implement the code piece-by-piece, running diagnostics continuously until everything is green. Finally, launch the dashboard (open_dashboard).
+```bash
+npx -y vibe-diagnosis@1.6.0 dashboard
+npx -y vibe-diagnosis@1.6.0 stop
 ```
 
-### 🔍 [Scenario B] Checking if Existing Features still Work (Pre-development Diagnostic)
-```text
-Run diagnostics (run_diagnostics) first on this project to verify that the existing base-line features are completely green and intact. Show me the dashboard local URL, and then let's proceed to the next development task.
-```
+## MCP setup
 
-### 🔧 [Scenario C] Fixing Failing Diagnostics via MCP (Autonomous AI Healing)
-```text
-If diagnostics fail, use `plan_repair` or the compatibility `repair_diagnostic` tool to create a plan. Review its risk and diff before separately invoking `apply_repair_plan`; no repair tool applies changes during planning.
-```
-
----
-
-## 🔒 Global Rules Integration for AI Agents
-
-Create a rules config file in your project root corresponding to your AI workspace to force agents to run self-diagnostics autonomously.
-
-* **Antigravity / Gemini**: `.agents/AGENTS.md`
-* **Cursor**: `.cursorrules`
-* **Windsurf**: `.windsurfrules`
-
-### 📝 Content to copy into your rules file:
-```markdown
-## Vibe Diagnosis Rules (Self-Diagnosis Guidelines)
-- Before writing any feature or fixing a bug, always create/modify a corresponding `.diag.js` file under `.vibe-diagnosis/diagnostics/` to verify requirements (TDD methodology).
-- Use `run_diagnostics` during implementation. Immediately before reporting completion, call `complete_task_diagnostics` and require `completion.eligible: true`.
-- If a diagnostic fails, create and review a repair plan. Never apply it without explicit approval and separate high-risk approval when required.
-- Open the dashboard only when the user requests visual inspection; completion eligibility does not depend on it.
-```
-
----
-
-## 🚀 Get Started in 3 Steps (MCP Setup)
-
-Add this JSON block into your AI agent's MCP configuration panel and restart the application.
+Add the server to the MCP configuration used by your coding agent:
 
 ```json
 {
   "mcpServers": {
     "vibe-diagnosis": {
       "command": "npx",
-      "args": ["-y", "vibe-diagnosis-mcp"]
+      "args": ["-y", "vibe-diagnosis-mcp@1.6.0"]
     }
   }
 }
 ```
 
-### 📍 Configuration File Locations
+Claude Code on macOS, Linux, or WSL:
 
-| AI Agent | MCP Settings Path |
+```bash
+claude mcp add vibe-diagnosis --scope local -- npx -y vibe-diagnosis-mcp@1.6.0
+```
+
+Claude Code on native Windows:
+
+```powershell
+claude mcp add vibe-diagnosis --scope local -- cmd /c npx -y vibe-diagnosis-mcp@1.6.0
+```
+
+Common configuration locations:
+
+| Client | Location |
 |---|---|
-| Gemini / Antigravity | Project-level `.gemini/settings.json` or global `~/.gemini/config/mcp_config.json` |
-| Claude Code | Project-local registration with `claude mcp add`; shared project configuration is `.mcp.json` |
+| Claude Code | Local registration with `claude mcp add`; shared project configuration uses `.mcp.json` |
 | Claude Desktop | `%APPDATA%/Claude/claude_desktop_config.json` |
 | Cursor | `.cursor/mcp.json` |
 | Windsurf | `~/.codeium/windsurf/mcp_config.json` |
+| Gemini / Antigravity | Project `.gemini/settings.json` or the client MCP configuration |
 
-For a private Claude Code registration on macOS, Linux, or WSL:
+## Agent workflow
+
+Give the agent one clear instruction:
 
 ```bash
-claude mcp add vibe-diagnosis --scope local -- npx -y vibe-diagnosis-mcp
+Use Vibe Diagnosis for this task. Inspect or initialize the project diagnostics before implementation, keep the relevant checks current while working, and call complete_task_diagnostics immediately before reporting completion. Require completion.eligible=true and verify the current completion receipt. Do not open the dashboard unless I request it. If a check fails, show a repair plan and diff first; never apply it without my explicit approval and separate high-risk approval when required.
 ```
 
-Native Windows requires the command wrapper documented by Claude Code:
+Expected sequence:
+
+1. `init_diagnostics` for a new project, or `list_diagnostics` for an initialized project.
+2. Add or update diagnostics that represent the task's actual success criteria.
+3. Use `run_diagnostics` for focused feedback during implementation.
+4. Use `complete_task_diagnostics` immediately before declaring the task complete.
+5. Accept completion only when `completion.eligible` is `true`; use `verify_completion_receipt` when the workspace may have changed.
+
+`run_diagnostics` does not launch the dashboard by default. Use `open_dashboard` explicitly when visual inspection is wanted.
+
+## Writing a diagnostic
+
+Create `.vibe-diagnosis/diagnostics/example.diag.js`:
+
+```js
+module.exports = {
+  id: 'example-behavior',
+  name: 'Example behavior',
+  layer: 'TASK',
+  severity: 'HIGH',
+  scope: 'RELEASE',
+  evidenceType: 'TEST',
+  blocksRelease: true,
+  blocksLiveTrading: false,
+  confidence: 1,
+  tags: ['example'],
+  dependencies: [],
+  files: ['src/example.js'],
+  cache: false,
+
+  async run(ctx) {
+    const verified = true; // Replace with an executable assertion.
+    return verified
+      ? {
+          status: 'OK',
+          details: 'Example behavior executed successfully.',
+          evidence: [{
+            type: 'TEST',
+            summary: 'Executable behavior check passed.',
+            verifiedAt: new Date().toISOString(),
+          }],
+        }
+      : { status: 'ERROR', classification: 'TEST_FAILURE', details: 'Example behavior failed.' };
+  },
+};
+```
+
+Prefer executable behavior, AST, route, API, state-transition, UI, provider, or authenticated runtime evidence over exact source-text matching.
+
+## CLI reference
+
+```bash
+vibe-diag init
+vibe-diag run [--json] [--ids a,b] [--tags security] [--scope RELEASE] [--severity HIGH] [--cache]
+vibe-diag complete
+vibe-diag dashboard [--port 8080]
+vibe-diag stop
+vibe-diag audit
+vibe-diag repair <diagId>
+vibe-diag repair --all
+vibe-diag apply-repair <planId> --approve --checksum <sha256> [--approve-high-risk]
+vibe-diag config get
+vibe-diag config set <provider|model|apiKey> <value>
+```
+
+Use `--cwd <path>` to target another project.
+
+## MCP tool groups
+
+- Diagnosis: `init_diagnostics`, `list_diagnostics`, `run_diagnostics`, `audit_diagnostics`
+- Completion: `complete_task_diagnostics`, `verify_completion_receipt`
+- Repair: `repair_diagnostic`, `heal_all`, `plan_repair`, `apply_repair_plan`, `list_repair_incidents`, `repair_omission`
+- Project checks: `check_symbol_diff`, `recommend_cartridge_split`, `verify_build_safety`
+- Agent context: `sync_ai_context`, `sync_agent_rules`
+- Knowledge: `read_error_pattern`, `write_error_pattern`
+- Dashboard: `open_dashboard`, `stop_dashboard`
+
+Planning tools do not change project files. `apply_repair_plan` requires the reviewed plan checksum and a separate approval for high-risk targets such as authentication, data, credentials, dependencies, runtime settings, or trading logic.
+
+## BYOK and local security
+
+Use environment variables when possible:
+
+```bash
+export VIBE_DIAG_PROVIDER=anthropic
+export VIBE_DIAG_MODEL=your-model-name
+export VIBE_DIAG_API_KEY=your-api-key
+```
+
+On PowerShell:
 
 ```powershell
-claude mcp add vibe-diagnosis --scope local -- cmd /c npx -y vibe-diagnosis-mcp
+$env:VIBE_DIAG_PROVIDER='anthropic'
+$env:VIBE_DIAG_MODEL='your-model-name'
+$env:VIBE_DIAG_API_KEY='your-api-key'
 ```
 
----
+Keys entered through local configuration are stored in ignored `.vibe-diagnosis/byok.local.json`, not in the shareable configuration. Avoid putting keys directly in shell command arguments on shared machines because shell history may retain them.
 
-## 📊 1.3.3 Next-Gen Telemetry Dashboard
+The runner and repair logs redact common bearer tokens, JWTs, credential-bearing database URLs, private keys, and sensitive object fields. Repair targets are restricted to the project and protected secret files are rejected.
 
-Open `http://localhost:7700` to find a premium Glassmorphism cockpit summarizing your code health:
-
-1. **📈 TDD Timeline Tracker**:
-   - Renders a lightweight, high-fidelity SVG line chart showing pass rate progression from initial RED failures to the final GREEN success.
-   - Summarizes the active **TDD Cycle** (total minutes elapsed in fixing the bugs).
-   - **Card-Linked Interactive Filter (NEW in v1.3.2)**: Click on any diagnostic card (e.g., `task-001-runner`) to isolate and filter the SVG line chart. It dynamically transitions to draw only that card's specific timeline progression (0% ➔ 50% ➔ 100%), with a beautiful filled gradient. Clicking the active filter badge in the header instantly resets the view to global average metrics.
-2. **🛡️ QC & Prevention Scoreboard (Static Code Analysis)**:
-   - **Build Success Predictor**: Gauges test coverage and system configuration to predict overall compile safety (%).
-   - **UI Layer Integrity**: Parses CSS layouts to compute flex/grid viewport adaptability, awarding grades from **A+ to F**.
-   - **Asset Independence**: Scans for hardcoded external URLs and Web Audio synthesis hookups, awarding a **GOLD Badge** for pure offline execution.
-   - **Dead-Code Debt Index**: Detects unreferenced local bindings to display code cleanliness metrics.
-3. **✍️ TDD Milestone Archive (NEW in v1.3.1)**:
-   - Input retrospective notes and initial error/success ratios manually inside a dedicated Glassmorphism input form.
-   - Saves records inside your repo at `.vibe-diagnosis/milestones.json` for a beautiful, scrollable engineering chronology!
-4. **🔒 Port Lock Cache (NEW in v1.3.1)**:
-   - Prevents duplicate backend process spawns by binding your current repo to an allocated port recorded at `.vibe-diagnosis/active_port.json`. Perfect for working with multiple vibe-coding workspaces simultaneously!
-5. **🛑 Server Shutdown Controls (NEW in v1.3.3)**:
-   - Close the background dashboard server with a single click inside the web interface or via the CLI to instantly free up port 7700 and memory resources.
-   - **Automated .gitignore Isolation (NEW in v1.3.3)**: Initializing vibe-diagnosis automatically ignores the entire `.vibe-diagnosis/` folder, ensuring no local tests or temp configs are accidentally uploaded to GitHub.
-6. **🚨 Monolithic Component Omission Protection (v1.5.1 Enhanced)**:
-   - **Monolithic Adaptive Scanner**: Scans UI files (`*.jsx`, `*.tsx`, `*.vue`) exceeding **300 lines** and Logic/Backend files (`*.js`, `*.ts`, `*.py`) exceeding **600 lines** to emit WARNINGs against accidental block omission during AI rewrites.
-   - **Cartridge Integrity Check**: Guarantees required sub-components are not overwritten or dropped.
-   - **Symbol Diff Guard (`check_symbol_diff`)**: Tracks lost JSX UI card tags, export symbols, and formula functions before and after AI modifications.
-   - **Cartridge Splitter Blueprint (`recommend_cartridge_split`)**: Parses monolithic files to generate modular sub-cartridge component blueprints.
-   - **Approval-First Omission Repair (`repair_omission`)**: Creates a restoration plan and diff from `.bak` or Git; it does not alter the target before approval.
-7. **🧠 AI-Native Completeness & Session Handover (NEW in v1.5.0)**:
-   - **AI Context Sync (`sync_ai_context`)**: Persists current goals and diagnostic state to `.vibe-diagnosis/active_context.json` for seamless handover between AI sessions.
-   - **Build Safety Verifier (`verify_build_safety`)**: Runs background compilation (`npm run build`, etc.) to confirm 0 build or syntax errors before finishing tasks.
-   - **Agent Rules Injector (`sync_agent_rules`)**: Auto-injects self-testing rules into `.cursorrules`, `AGENTS.md`, and `CLAUDE.md`.
-
----
-
-## 🛠️ CLI Cheatsheet (One-Line Copy)
+## Development verification
 
 ```bash
-npx -y vibe-diagnosis init                  # 1. Initialize diagnostic workspace & create boilerplate
-npx -y vibe-diagnosis run                   # 2. Run all diagnostics and spin up the private web server
-npx -y vibe-diagnosis dashboard             # 3. Fire up the dashboard GUI server stand-alone
-npx -y vibe-diagnosis stop                  # 4. Stop the active background dashboard server cleanly
-npx -y vibe-diagnosis heal                  # 5. Trigger bulk AI self-healing repairs for failed tests
+npm test
+npm run test:rollback
+npm run test:packed
 ```
 
----
-
-## 📦 Discovered MCP Tools
-
-| Tool Name | Purpose |
-|---|---|
-| `init_diagnostics` | Sets up directory structure & copies default boilerplate template |
-| `list_diagnostics` | Discovers and validates all written `.diag.js` files |
-| `run_diagnostics` | Runs all diagnostic checks and records data history |
-| `complete_task_diagnostics` | Mandatory final full-suite, uncached, dashboard-free completion gate |
-| `verify_completion_receipt` | Verifies that the saved completion receipt still matches the current workspace |
-| `open_dashboard` | Launches the local dashboard web interface |
-| `stop_dashboard` | Shuts down the active dashboard server and frees up port resources |
-| `repair_diagnostic` | Compatibility tool that creates a reviewable repair plan without applying it |
-| `heal_all` | Creates plans for failing diagnostics without applying changes |
-| `plan_repair` | Creates a risk-rated plan with file-level diff previews |
-| `apply_repair_plan` | Applies a plan whose reviewed checksum is explicitly approved, validates the full suite, and rolls back regressions |
-| `list_repair_incidents` | Reads local plan, validation, regression, and rollback history |
-| `audit_diagnostics` | Reports duplicates, fragile source-string checks, and missing references |
-| `read_error_pattern` | Loads known common error resolution knowledge |
-| `write_error_pattern` | Documents new recursive error patterns in markdown |
-| `check_symbol_diff` | **(v1.5.0)** Tracks lost JSX UI card tags, export symbols, and formula functions after code edits |
-| `recommend_cartridge_split` | **(v1.5.0)** Generates modular sub-cartridge splitting blueprints for monolithic UI files |
-| `repair_omission` | Creates an approval-required restoration plan from a backup or Git snapshot |
-| `sync_ai_context` | **(v1.5.0)** Persists and syncs AI goals and diagnostic state for seamless session handover |
-| `verify_build_safety` | **(v1.5.0)** Runs background build/syntax checks to confirm 0 compilation errors |
-| `sync_agent_rules` | **(v1.5.0)** Auto-injects self-diagnosis guidelines into AI agent rules files |
-
----
-
-## 🤝 License
+## License
 
 [Apache License 2.0](./LICENSE)
-
