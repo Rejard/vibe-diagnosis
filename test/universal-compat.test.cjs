@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const path = require('path');
 const { spawn, spawnSync } = require('child_process');
+const fs = require('fs');
 
 async function handshake(clientName) {
   const child = spawn(process.execPath, ['index.js'], { cwd: path.join(__dirname, '..', 'mcp-server'), stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true });
@@ -50,4 +51,24 @@ test('synthetic diagnostic catalog scales to 1000 entries without project coupli
   assert.equal(report.valid, true);
   assert.deepEqual(report.results.map(item => item.count), [100, 500, 1000]);
   assert.equal(report.fixture, 'synthetic-temporary');
+});
+
+test('all three package READMEs lead with agent-directed vibe workflows', () => {
+  const root = path.join(__dirname, '..');
+  const documents = [
+    fs.readFileSync(path.join(root, 'README.md'), 'utf8'),
+    fs.readFileSync(path.join(root, 'README.ko.md'), 'utf8'),
+    fs.readFileSync(path.join(root, 'mcp-server', 'README.md'), 'utf8'),
+  ];
+  for (const document of documents) {
+    assert.match(document, /1\.6\.3/);
+    assert.match(document, /complete_task_diagnostics/);
+    assert.match(document, /verify_completion_receipt/);
+    assert.match(document, /open_dashboard/);
+    assert.match(document, /apply_repair_plan/);
+    assert.match(document, /DIAGNOSTICS_ALREADY_RUNNING/);
+  }
+  assert.match(documents[0], /Paste a diagnostic error back to the AI for repair/);
+  assert.match(documents[1], /진단 오류를 복사해 AI에게 수리 요청/);
+  assert.match(documents[2], /Repair from a copied diagnostic error/);
 });
