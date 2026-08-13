@@ -3,6 +3,7 @@
 const path = require('path');
 const net = require('net');
 const { spawn, exec } = require('child_process');
+const { conflictPayload } = require('../src/diagnostics-lock');
 
 const args = process.argv.slice(2);
 const command = args[0];
@@ -135,6 +136,7 @@ async function main() {
 
       const report = await runDiagnosticsReport(targetDir, {
         persist: true,
+        executionKind: 'cli-run',
         useCache: flags.useCache,
         baselineId: flags.baselineId,
         filters: { ids: flags.ids, tags: flags.tags, scope: flags.scope, severity: flags.severity },
@@ -173,7 +175,7 @@ async function main() {
     case 'complete': {
       const { runCompletionDiagnostics } = require('../src/runner');
       const { formatResults, formatResultsJson } = require('../src/reporter');
-      const report = await runCompletionDiagnostics(targetDir, { persist: true });
+      const report = await runCompletionDiagnostics(targetDir, { persist: true, executionKind: 'cli-complete' });
       process.stdout.write(flags.json ? formatResultsJson(report) : formatResults(report, targetDir));
       if (!report.completion.eligible) process.exitCode = 1;
       break;
@@ -360,6 +362,13 @@ async function handleStop() {
 }
 
 main().catch(err => {
+  const conflict = conflictPayload(err);
+  if (conflict) {
+    if (flags.json) process.stdout.write(JSON.stringify(conflict, null, 2) + '\n');
+    else process.stderr.write(`\n  ${conflict.code}: ${conflict.error}${conflict.startedAt ? ` Started at ${conflict.startedAt}.` : ''}\n`);
+    process.exitCode = 2;
+    return;
+  }
   console.error('\n  Fatal:', err.message);
   process.exitCode = 1;
 });

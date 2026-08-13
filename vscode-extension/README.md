@@ -3,7 +3,9 @@
 [![VS Code Marketplace](https://img.shields.io/visual-studio-marketplace/v/Rejard.vibe-diagnosis-vscode?style=flat-square&color=blue)](https://marketplace.visualstudio.com/items?itemName=Rejard.vibe-diagnosis-vscode)
 [![Open VSX](https://img.shields.io/open-vsx/v/Rejard/vibe-diagnosis-vscode?style=flat-square&color=purple)](https://open-vsx.org/extension/Rejard/vibe-diagnosis-vscode)
 
-VS Code integration for Vibe Diagnosis 1.6.0. Run project diagnostics, inspect failures in the Problems panel, open the optional local dashboard, and review a repair plan before approving any file change.
+VS Code integration for Vibe Diagnosis 1.6.1. Run project diagnostics, inspect failures in the Problems panel, open the optional local dashboard, and review a repair plan before approving any file change.
+
+Version 1.6.1 prevents overlapping executions for the same project across VS Code, dashboard, MCP, CLI, and separate Node processes. A duplicate dashboard request receives HTTP `409` and an immediate “already running” message with elapsed time when available; the Run button is always restored. Locks live in the operating system temporary directory and dead-process locks are safely reclaimed without changing the project workspace.
 
 ## Requirements
 
@@ -57,7 +59,7 @@ Install the MCP server separately:
   "mcpServers": {
     "vibe-diagnosis": {
       "command": "npx",
-      "args": ["-y", "vibe-diagnosis-mcp@1.6.0"]
+      "args": ["-y", "vibe-diagnosis-mcp@1.6.1"]
     }
   }
 }
@@ -65,7 +67,7 @@ Install the MCP server separately:
 
 ## 한국어 안내
 
-Vibe Diagnosis 1.6.0 확장은 현재 프로젝트의 진단을 실행하고, 상태 표시줄과 Problems 패널에 결과를 보여주며, 선택형 로컬 대시보드와 승인 기반 안전수리를 제공합니다.
+Vibe Diagnosis 1.6.1 확장은 현재 프로젝트의 진단을 실행하고, 상태 표시줄과 Problems 패널에 결과를 보여주며, 선택형 로컬 대시보드와 승인 기반 안전수리를 제공합니다. 같은 프로젝트에 대한 중복 실행은 프로세스 간 공통 잠금으로 즉시 차단되고 대시보드는 HTTP 409와 명확한 실행 중 안내를 표시합니다. 잠금은 운영체제 임시 디렉터리에 저장되며 종료된 프로세스의 잠금만 안전하게 회수합니다.
 
 명령 팔레트에서 다음 명령을 사용할 수 있습니다.
 

@@ -66,6 +66,7 @@ async function main() {
   assert.equal(rootFiles.some(file => file.startsWith('test/') || file.startsWith('examples/')), false);
   assert.ok(rootFiles.includes('src/dashboard-control.js'));
   assert.ok(rootFiles.includes('src/completion-receipt.js'));
+  assert.ok(rootFiles.includes('src/diagnostics-lock.js'));
   assert.deepEqual(mcpPack.files.map(file => file.path).sort(), ['LICENSE', 'README.md', 'index.js', 'package.json']);
   runNpm(['init', '-y'], consumerDir);
   runNpm(['install', '--ignore-scripts', rootTarball], consumerDir);
@@ -73,8 +74,8 @@ async function main() {
 
   const installedPackage = require(path.join(consumerDir, 'node_modules', 'vibe-diagnosis', 'package.json'));
   const installedMcpPackage = require(path.join(consumerDir, 'node_modules', 'vibe-diagnosis-mcp', 'package.json'));
-  assert.equal(installedPackage.version, '1.6.0');
-  assert.equal(installedMcpPackage.version, '1.6.0');
+  assert.equal(installedPackage.version, '1.6.1');
+  assert.equal(installedMcpPackage.version, '1.6.1');
   assert.ok(fs.existsSync(path.join(consumerDir, 'node_modules', 'vibe-diagnosis', 'src', 'dashboard-control.js')));
 
   const entry = path.join(consumerDir, 'node_modules', 'vibe-diagnosis-mcp', 'index.js');

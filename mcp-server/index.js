@@ -44,6 +44,7 @@ function loadCore() {
       selector: require("vibe-diagnosis/src/selector"),
       pathPolicy: require("vibe-diagnosis/src/path-policy"),
       completionReceipt: require("vibe-diagnosis/src/completion-receipt"),
+      diagnosticsLock: require("vibe-diagnosis/src/diagnostics-lock"),
     };
   } catch {
     return {
@@ -62,6 +63,7 @@ function loadCore() {
       selector: require("../src/selector"),
       pathPolicy: require("../src/path-policy"),
       completionReceipt: require("../src/completion-receipt"),
+      diagnosticsLock: require("../src/diagnostics-lock"),
     };
   }
 }
@@ -70,10 +72,11 @@ const core = loadCore();
 const { runDiagnostics, runDiagnosticsReport, runCompletionDiagnostics, discoverDiagnostics } = core.runner;
 const { initialize } = core.init;
 const { repairDiagnostic, createRepairPlan, applyRepairPlan, readAudit, autoRevertOrRepairOmission } = core.repairer;
+const { conflictPayload } = core.diagnosticsLock;
 
 const server = new McpServer({
   name: "vibe-diagnosis",
-  version: "1.6.0",
+  version: "1.6.1",
 });
 
 const READ_ONLY_TOOLS = new Set(["list_repair_incidents", "audit_diagnostics", "list_diagnostics", "read_error_pattern", "check_symbol_diff", "recommend_cartridge_split", "verify_completion_receipt"]);
@@ -189,7 +192,7 @@ server.tool(
   },
   async ({ projectDir, autoLaunchDashboard, ids, tags, scope, severity, useCache, baselineId }) => {
     try {
-      const report = await runDiagnosticsReport(projectDir, { persist: true, useCache, baselineId, filters: { ids, tags, scope, severity } });
+      const report = await runDiagnosticsReport(projectDir, { persist: true, executionKind: "mcp-run", useCache, baselineId, filters: { ids, tags, scope, severity } });
 
       if (autoLaunchDashboard) {
         autoStartDashboardIfNeeded(projectDir, 7700, false).catch(() => {});
@@ -208,8 +211,9 @@ server.tool(
         ],
       };
     } catch (err) {
+      const conflict = conflictPayload(err);
       return {
-        content: [{ type: "text", text: `Error running diagnostics: ${err.message}` }],
+        content: [{ type: "text", text: JSON.stringify(conflict || { error: `Error running diagnostics: ${err.message}` }, null, 2) }],
         isError: true,
       };
     }
@@ -314,14 +318,15 @@ server.tool(
   },
   async ({ projectDir }) => {
     try {
-      const report = await runCompletionDiagnostics(projectDir, { persist: true });
+      const report = await runCompletionDiagnostics(projectDir, { persist: true, executionKind: "mcp-complete" });
       report.agentIntegration = { modified: false, instruction: "Use init_diagnostics or sync_agent_rules to update agent rule files explicitly." };
       return {
         content: [{ type: "text", text: JSON.stringify(report, null, 2) }],
         isError: !report.completion.eligible,
       };
     } catch (err) {
-      return { content: [{ type: "text", text: `Completion diagnostics failed: ${err.message}` }], isError: true };
+      const conflict = conflictPayload(err);
+      return { content: [{ type: "text", text: JSON.stringify(conflict || { error: `Completion diagnostics failed: ${err.message}` }, null, 2) }], isError: true };
     }
   }
 );

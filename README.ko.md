@@ -6,9 +6,19 @@ AI 보조 코딩을 위한 증거 우선 자가진단 및 승인 기반 자가�
 
 Vibe Diagnosis는 코딩 에이전트가 작업 완료를 보고하기 전에 실제 동작을 기계적으로 증명하게 합니다. 프로젝트에 가벼운 `.diag.js` 진단을 작성하면 각 진단을 격리 실행하고, 구조화된 증거를 보존하며, 배포·운영 차단 여부를 판정하고, 현재 작업공간에 결합된 완료 영수증을 발급합니다.
 
-버전: **1.6.0**
+버전: **1.6.1**
 
-## 1.6.0 핵심 기능
+## 1.6.1 추가 기능
+
+- 정규화된 프로젝트 경로마다 진단을 한 번만 실행하며 대시보드, MCP, CLI, 별도 Node 프로세스가 같은 잠금을 사용합니다.
+- 중복 요청은 기존 실행을 기다리거나 합류하지 않고 `DIAGNOSTICS_ALREADY_RUNNING` 코드로 즉시 충돌 응답을 반환합니다.
+- 대시보드 중복 요청은 HTTP `409`를 반환하며 가능한 경우 현재 실행의 안전한 `startedAt`도 제공합니다.
+- 잠금 파일은 프로젝트 내부가 아닌 운영체제 임시 디렉터리에 저장되므로 대상 Git 작업공간을 dirty 상태로 만들지 않습니다.
+- 원자적 잠금 생성으로 경쟁 조건을 막습니다. 살아 있는 PID의 잠금은 절대 덮어쓰지 않고, 종료된 PID의 잠금과 충분히 오래된 잘못된 잠금만 별도 이름으로 원자 이동한 뒤 회수합니다.
+- 소유 토큰을 확인하므로 각 실행은 정상 완료, 진단 실패, 예외 발생 후 `finally`에서 자신의 잠금만 해제합니다.
+- 서로 다른 프로젝트는 SHA-256 잠금 키가 달라 동시에 실행할 수 있습니다.
+
+## 1.6 진단 기반 기능
 
 - 진단별 독립 작업 디렉터리·환경·모듈 캐시를 사용하는 격리 실행기
 - 종료 코드, 시그널, 제한 시간, stdout, stderr, 실행 시간, 재시도 기록을 포함한 구조화된 실행 증거
@@ -37,9 +47,9 @@ Vibe Diagnosis는 코딩 에이전트가 작업 완료를 보고하기 전에 �
 ## CLI 빠른 시작
 
 ```bash
-npx -y vibe-diagnosis@1.6.0 init
-npx -y vibe-diagnosis@1.6.0 run --json
-npx -y vibe-diagnosis@1.6.0 complete
+npx -y vibe-diagnosis@1.6.1 init
+npx -y vibe-diagnosis@1.6.1 run --json
+npx -y vibe-diagnosis@1.6.1 complete
 ```
 
 초기화하면 `.vibe-diagnosis/`, 예제 진단, 지원되는 에이전트 규칙 파일의 Vibe Diagnosis 규칙 블록이 생성됩니다. 이 디렉터리에는 로컬 진단, 실행 증거, 수리 계획, 선택적 BYOK 정보가 저장되며 기본적으로 `.gitignore`에 추가됩니다.
@@ -47,8 +57,8 @@ npx -y vibe-diagnosis@1.6.0 complete
 대시보드는 필수가 아니며 요청할 때만 실행됩니다.
 
 ```bash
-npx -y vibe-diagnosis@1.6.0 dashboard
-npx -y vibe-diagnosis@1.6.0 stop
+npx -y vibe-diagnosis@1.6.1 dashboard
+npx -y vibe-diagnosis@1.6.1 stop
 ```
 
 ## MCP 설정
@@ -60,7 +70,7 @@ npx -y vibe-diagnosis@1.6.0 stop
   "mcpServers": {
     "vibe-diagnosis": {
       "command": "npx",
-      "args": ["-y", "vibe-diagnosis-mcp@1.6.0"]
+      "args": ["-y", "vibe-diagnosis-mcp@1.6.1"]
     }
   }
 }
@@ -69,13 +79,13 @@ npx -y vibe-diagnosis@1.6.0 stop
 macOS, Linux, WSL의 Claude Code:
 
 ```bash
-claude mcp add vibe-diagnosis --scope local -- npx -y vibe-diagnosis-mcp@1.6.0
+claude mcp add vibe-diagnosis --scope local -- npx -y vibe-diagnosis-mcp@1.6.1
 ```
 
 Windows의 Claude Code:
 
 ```powershell
-claude mcp add vibe-diagnosis --scope local -- cmd /c npx -y vibe-diagnosis-mcp@1.6.0
+claude mcp add vibe-diagnosis --scope local -- cmd /c npx -y vibe-diagnosis-mcp@1.6.1
 ```
 
 주요 설정 위치:

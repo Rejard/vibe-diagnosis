@@ -1,6 +1,8 @@
 # vibe-diagnosis-mcp
 
-MCP server for Vibe Diagnosis 1.6.0. It lets coding agents initialize and run project diagnostics, enforce a final completion gate, inspect evidence, and prepare approval-gated repairs.
+MCP server for Vibe Diagnosis 1.6.1. It lets coding agents initialize and run project diagnostics, enforce a final completion gate, inspect evidence, and prepare approval-gated repairs.
+
+All diagnostic entry points share a project-scoped cross-process lock. If the same project is already running, `run_diagnostics` and `complete_task_diagnostics` return an immediate structured error with code `DIAGNOSTICS_ALREADY_RUNNING` and a safe `startedAt` value. They do not wait, join, or start another run. Locks are stored in the operating system temporary directory; live PID locks are preserved and dead or old invalid locks are safely reclaimed.
 
 ## Requirements
 
@@ -14,7 +16,7 @@ MCP server for Vibe Diagnosis 1.6.0. It lets coding agents initialize and run pr
   "mcpServers": {
     "vibe-diagnosis": {
       "command": "npx",
-      "args": ["-y", "vibe-diagnosis-mcp@1.6.0"]
+      "args": ["-y", "vibe-diagnosis-mcp@1.6.1"]
     }
   }
 }
@@ -23,13 +25,13 @@ MCP server for Vibe Diagnosis 1.6.0. It lets coding agents initialize and run pr
 Claude Code on macOS, Linux, or WSL:
 
 ```bash
-claude mcp add vibe-diagnosis --scope local -- npx -y vibe-diagnosis-mcp@1.6.0
+claude mcp add vibe-diagnosis --scope local -- npx -y vibe-diagnosis-mcp@1.6.1
 ```
 
 Claude Code on native Windows:
 
 ```powershell
-claude mcp add vibe-diagnosis --scope local -- cmd /c npx -y vibe-diagnosis-mcp@1.6.0
+claude mcp add vibe-diagnosis --scope local -- cmd /c npx -y vibe-diagnosis-mcp@1.6.1
 ```
 
 ## Required agent workflow

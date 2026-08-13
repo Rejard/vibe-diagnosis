@@ -9,6 +9,7 @@ const { loadBaseline, compareToBaseline, linkChangedFiles, saveRunReport } = req
 const { summarizeResults } = require('./run-summary');
 const { detectFragileStringChecks } = require('./assertions');
 const { createCompletionReceipt } = require('./completion-receipt');
+const { withDiagnosticsLock } = require('./diagnostics-lock');
 
 const DIAG_DIR = '.vibe-diagnosis/diagnostics';
 const DIAG_PATTERN = /\.diag\.js$/;
@@ -26,7 +27,7 @@ function clearProjectRequireCache(projectDir) {
   }
 }
 
-async function runDiagnosticsReport(projectDir, options = {}) {
+async function runDiagnosticsReportUnlocked(projectDir, options = {}) {
   const resolvedProjectDir = path.resolve(projectDir);
   const allFiles = discoverDiagnostics(resolvedProjectDir);
   const environment = captureEnvironment(resolvedProjectDir);
@@ -65,40 +66,48 @@ async function runDiagnosticsReport(projectDir, options = {}) {
   return report;
 }
 
+async function runDiagnosticsReport(projectDir, options = {}) {
+  return withDiagnosticsLock(projectDir, {
+    executionKind: options.executionKind || 'diagnostics',
+  }, () => runDiagnosticsReportUnlocked(projectDir, options));
+}
+
 async function runDiagnostics(projectDir, options = {}) {
   const report = await runDiagnosticsReport(projectDir, { ...options, persist: options.persist === true });
   return report.results;
 }
 
 async function runCompletionDiagnostics(projectDir, options = {}) {
-  const report = await runDiagnosticsReport(projectDir, {
-    ...options,
-    persist: false,
-    useCache: false,
-    filters: {},
+  return withDiagnosticsLock(projectDir, { executionKind: options.executionKind || 'completion' }, async () => {
+    const report = await runDiagnosticsReportUnlocked(projectDir, {
+      ...options,
+      persist: false,
+      useCache: false,
+      filters: {},
+    });
+    const reasons = [];
+    report.completionEnvironment = captureEnvironment(path.resolve(projectDir));
+    if (report.discovered === 0) reasons.push('NO_DIAGNOSTICS');
+    if (report.selected !== report.discovered) reasons.push('INCOMPLETE_SELECTION');
+    if (report.summary.error > 0) reasons.push('DIAGNOSTIC_FAILURES');
+    if (report.gates.releaseStatus === 'RELEASE_BLOCKED') reasons.push('RELEASE_BLOCKED');
+    if (report.environment.fingerprint !== report.completionEnvironment.fingerprint) reasons.push('WORKSPACE_CHANGED_DURING_DIAGNOSTICS');
+    report.completion = {
+      eligible: reasons.length === 0,
+      reasons,
+      fullSuite: report.selected === report.discovered,
+      cacheUsed: false,
+      dashboardRequired: false,
+      warnings: report.summary.warning,
+      verifiedFingerprint: report.completionEnvironment.fingerprint,
+      instruction: reasons.length
+        ? 'Do not report the development task complete. Resolve or accurately report the blocking diagnostics.'
+        : 'The full uncached diagnostic suite completed. Report any warnings and evidence limitations with the result.',
+    };
+    report.completion.receipt = createCompletionReceipt(report);
+    if (options.persist !== false) report.runFile = saveRunReport(path.resolve(projectDir), report);
+    return report;
   });
-  const reasons = [];
-  report.completionEnvironment = captureEnvironment(path.resolve(projectDir));
-  if (report.discovered === 0) reasons.push('NO_DIAGNOSTICS');
-  if (report.selected !== report.discovered) reasons.push('INCOMPLETE_SELECTION');
-  if (report.summary.error > 0) reasons.push('DIAGNOSTIC_FAILURES');
-  if (report.gates.releaseStatus === 'RELEASE_BLOCKED') reasons.push('RELEASE_BLOCKED');
-  if (report.environment.fingerprint !== report.completionEnvironment.fingerprint) reasons.push('WORKSPACE_CHANGED_DURING_DIAGNOSTICS');
-  report.completion = {
-    eligible: reasons.length === 0,
-    reasons,
-    fullSuite: report.selected === report.discovered,
-    cacheUsed: false,
-    dashboardRequired: false,
-    warnings: report.summary.warning,
-    verifiedFingerprint: report.completionEnvironment.fingerprint,
-    instruction: reasons.length
-      ? 'Do not report the development task complete. Resolve or accurately report the blocking diagnostics.'
-      : 'The full uncached diagnostic suite completed. Report any warnings and evidence limitations with the result.',
-  };
-  report.completion.receipt = createCompletionReceipt(report);
-  if (options.persist !== false) report.runFile = saveRunReport(path.resolve(projectDir), report);
-  return report;
 }
 
 module.exports = { runDiagnostics, runDiagnosticsReport, runCompletionDiagnostics, discoverDiagnostics, clearProjectRequireCache };

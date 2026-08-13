@@ -9,6 +9,7 @@ const { listProviders } = require('./ai-provider');
 const { runHeuristicMetrics } = require('./analyzer');
 const { resolveWithin } = require('./path-policy');
 const { inspectDiagnosticSource } = require('./selector');
+const { conflictPayload } = require('./diagnostics-lock');
 
 const HTML_PATH = path.join(__dirname, 'dashboard.html');
 
@@ -178,7 +179,7 @@ function startDashboard(projectDir, port = 7700, options = {}) {
 
     if (req.method === 'POST' && url.pathname === '/api/run') {
       try {
-        const report = await runDiagnosticsReport(projectDir, { persist: true });
+        const report = await runDiagnosticsReport(projectDir, { persist: true, executionKind: 'dashboard' });
         const results = report.results;
         lastRunResults = results;
         lastRunReport = report;
@@ -191,7 +192,8 @@ function startDashboard(projectDir, port = 7700, options = {}) {
 
         sendJson(res, report);
       } catch (err) {
-        sendJson(res, { error: err.message }, 500);
+        const conflict = conflictPayload(err);
+        sendJson(res, conflict || { error: err.message }, conflict ? 409 : 500);
       }
       return;
     }

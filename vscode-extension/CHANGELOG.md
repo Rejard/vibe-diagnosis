@@ -1,6 +1,13 @@
 # Change Log
 
-## 1.6.0 (Current)
+## 1.6.1 (Current)
+
+- Prevented overlapping diagnostics for the same project across dashboard, MCP, CLI, and separate Node processes.
+- Added immediate dashboard HTTP 409 handling with a clear running-state message and reliable button reset.
+- Added safe recovery for dead-process locks stored outside the project workspace.
+- Pinned patched packaging dependencies so the release audit reports no known vulnerabilities.
+
+## 1.6.0
 
 - Rewrote the extension documentation around the current 1.6 diagnostic, completion, dashboard, and approval-gated repair behavior.
 - Fixed safe repair to use the current project's allocated dashboard port and authentication token.

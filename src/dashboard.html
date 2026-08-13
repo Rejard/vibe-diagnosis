@@ -942,6 +942,16 @@ async function runDiagnostics() {
     const res = await apiFetch(API + '/api/run', { method: 'POST' });
     const data = await res.json();
 
+    if (!res.ok) {
+      if (res.status === 409 && data.code === 'DIAGNOSTICS_ALREADY_RUNNING') {
+        const elapsed = data.startedAt ? Math.max(0, Math.floor((Date.now() - Date.parse(data.startedAt)) / 1000)) : null;
+        const elapsedText = Number.isFinite(elapsed) ? ' (' + elapsed + '초 경과)' : '';
+        throw new Error('이미 이 프로젝트의 진단이 실행 중입니다' + elapsedText);
+      }
+      throw new Error(data.error || 'Diagnostics request failed with HTTP ' + res.status);
+    }
+    if (!Array.isArray(data.results)) throw new Error('Diagnostics response did not include results.');
+
     lastResults = {};
     data.results.forEach(r => { lastResults[r.id] = r; });
 
@@ -965,7 +975,7 @@ async function runDiagnostics() {
       showToast('⚠️ ' + data.overallStatus + ' — Health ' + data.healthPercent + '% · Live evidence ' + data.evidenceSummary.liveEvidenceStatus, 'error');
     }
   } catch (err) {
-    showToast('❌ Failed to run diagnostics', 'error');
+    showToast('❌ ' + (err.message || 'Failed to run diagnostics'), 'error');
   } finally {
     btn.classList.remove('running');
   }
@@ -1009,7 +1019,7 @@ async function repairDiagnostic(diagId) {
     }
     const applyRes = await apiFetch(API + '/api/repair/apply', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ planId: plan.id, approved: true, approvedHighRisk }),
+      body: JSON.stringify({ planId: plan.id, approved: true, approvedChecksum: plan.integrity.checksum, approvedHighRisk }),
     });
     const applied = await applyRes.json();
     if (applied.error) throw new Error(applied.error);
