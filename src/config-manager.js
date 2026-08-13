@@ -108,22 +108,30 @@ function getResolvedByok(projectDir) {
 
 function ensureGitignore(projectDir) {
   const gitignorePath = path.join(projectDir, '.gitignore');
-  const entry = '.vibe-diagnosis/';
+  const localEntries = [
+    '.vibe-diagnosis/active_port.json',
+    '.vibe-diagnosis/active_context.json',
+    '.vibe-diagnosis/config.json',
+    '.vibe-diagnosis/byok.local.json',
+    '.vibe-diagnosis/history.json',
+    '.vibe-diagnosis/milestones.json',
+    '.vibe-diagnosis/runs/',
+    '.vibe-diagnosis/cache.json',
+    '.vibe-diagnosis/repair-plans/',
+    '.vibe-diagnosis/repair-history.json',
+  ];
 
   let content = '';
   if (fs.existsSync(gitignorePath)) {
     content = fs.readFileSync(gitignorePath, 'utf-8');
   }
 
-  const alreadyIgnored = content.split('\n').some(line => {
-    const trimmed = line.trim();
-    return trimmed === entry || trimmed === '.vibe-diagnosis' || trimmed === '.vibe-diagnosis/config.json';
-  });
-
-  if (alreadyIgnored) return;
-
+  const existing = new Set(content.split(/\r?\n/).map(line => line.trim()).filter(Boolean));
+  if (existing.has('.vibe-diagnosis/') || existing.has('.vibe-diagnosis')) return;
+  const missing = localEntries.filter(entry => !existing.has(entry));
+  if (!missing.length) return;
   const newline = content.length > 0 && !content.endsWith('\n') ? '\n' : '';
-  fs.writeFileSync(gitignorePath, content + newline + entry + '\n', 'utf-8');
+  fs.writeFileSync(gitignorePath, content + newline + missing.join('\n') + '\n', 'utf-8');
 }
 
 module.exports = {

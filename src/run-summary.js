@@ -11,8 +11,8 @@ function summarizeResults(results) {
   };
   const healthPercentExact = summary.total ? (summary.ok / summary.total) * 100 : 100;
   const healthPercent = Number(healthPercentExact.toFixed(2));
-  const releaseBlockedBy = results.filter(r => r.status === 'ERROR' && r.severity === 'CRITICAL' && r.blocksRelease).map(r => r.id);
-  const liveBlockedBy = results.filter(r => r.status === 'ERROR' && r.severity === 'CRITICAL' && r.blocksLiveTrading).map(r => r.id);
+  const releaseBlockedBy = results.filter(r => r.status === 'ERROR' && r.blocksRelease).map(r => r.id);
+  const liveBlockedBy = results.filter(r => r.status === 'ERROR' && r.blocksLiveTrading).map(r => r.id);
   const releaseEvaluated = results.some(r => r.gateDeclarations?.release);
   const liveEvaluated = results.some(r => r.gateDeclarations?.liveTrading);
   const overallStatus = releaseBlockedBy.length ? 'RELEASE_BLOCKED'

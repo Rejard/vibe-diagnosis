@@ -199,7 +199,7 @@ test('initialization refreshes agent rules for an existing diagnostic project', 
   assert.equal(result.refreshed, true);
   assert.match(fs.readFileSync(path.join(root, 'AGENTS.md'), 'utf8'), /Preserve me/);
   assert.match(fs.readFileSync(path.join(root, 'AGENTS.md'), 'utf8'), /complete_task_diagnostics/);
-  assert.match(fs.readFileSync(path.join(root, 'GEMINI.md'), 'utf8'), /complete_task_diagnostics/);
+  assert.equal(fs.existsSync(path.join(root, 'GEMINI.md')), false);
   assert.ok(fs.existsSync(path.join(root, '.gemini', 'settings.json')));
 });
 
@@ -213,7 +213,7 @@ test('BYOK secrets stay in an ignored local file instead of shareable config', t
   assert.equal(local.apiKey, 'local-test-key-123456');
   assert.equal(getResolvedByok(root).apiKey, 'local-test-key-123456');
   assert.match(getByokConfig(root, { maskKey: true }).apiKey, /\*\*\*\*/);
-  assert.match(fs.readFileSync(path.join(root, '.gitignore'), 'utf8'), /^\.vibe-diagnosis\/$/m);
+  assert.match(fs.readFileSync(path.join(root, '.gitignore'), 'utf8'), /^\.vibe-diagnosis\/byok\.local\.json$/m);
 });
 
 test('legacy BYOK secrets migrate out of config on first read', t => {

@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const http = require('http');
+const { projectKey } = require('./diagnostics-lock');
 
 function lockPath(projectDir) {
   return path.join(path.resolve(projectDir), '.vibe-diagnosis', 'active_port.json');
@@ -41,6 +42,46 @@ function requestShutdown(lock, timeoutMs) {
   });
 }
 
+function requestHealth(lock, timeoutMs) {
+  return new Promise((resolve, reject) => {
+    const request = http.request({
+      hostname: '127.0.0.1',
+      port: lock.port,
+      path: '/api/health',
+      method: 'GET',
+      headers: lock.token ? { 'x-vibe-dashboard-token': lock.token } : {},
+      timeout: timeoutMs,
+    }, response => {
+      let body = '';
+      response.on('data', chunk => { body += chunk; });
+      response.on('end', () => {
+        if (response.statusCode !== 200) { resolve(null); return; }
+        try { resolve(JSON.parse(body)); } catch { resolve(null); }
+      });
+    });
+    request.on('timeout', () => request.destroy(new Error('Dashboard health request timed out.')));
+    request.on('error', reject);
+    request.end();
+  });
+}
+
+async function probeDashboard(projectDir, options = {}) {
+  let lock;
+  try { lock = readDashboardLock(projectDir); } catch { return { running: false, lock: null }; }
+  if (!lock?.token || !lock.projectDir) return { running: false, lock };
+  try {
+    const health = await requestHealth(lock, options.timeoutMs || 1000);
+    const running = Boolean(
+      health?.service === 'vibe-diagnosis-dashboard' &&
+      health.projectKey === projectKey(projectDir) &&
+      health.pid === lock.pid
+    );
+    return { running, lock, health: running ? health : null };
+  } catch {
+    return { running: false, lock };
+  }
+}
+
 async function stopDashboard(projectDir, options = {}) {
   const lock = readDashboardLock(projectDir);
   if (!lock) return { stopped: false, status: 'NOT_RUNNING', projectDir: path.resolve(projectDir) };
@@ -57,4 +98,4 @@ async function stopDashboard(projectDir, options = {}) {
   return { stopped: true, status: 'STOPPED', projectDir: path.resolve(projectDir), port: lock.port, pid: lock.pid || null, authenticated: Boolean(lock.token) };
 }
 
-module.exports = { stopDashboard, readDashboardLock };
+module.exports = { stopDashboard, readDashboardLock, probeDashboard };

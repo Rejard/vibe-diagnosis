@@ -3,9 +3,10 @@ const assert = require('node:assert/strict');
 const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const http = require('http');
 const { spawnSync } = require('child_process');
 const { startDashboard } = require('../src/dashboard');
-const { stopDashboard } = require('../src/dashboard-control');
+const { stopDashboard, probeDashboard } = require('../src/dashboard-control');
 const { readDashboardConnection, postJson, buildRepairApproval } = require('../vscode-extension/src/dashboard-client');
 
 test('dashboard API returns the centralized V1.6 report', async t => {
@@ -19,12 +20,19 @@ test('dashboard API returns the centralized V1.6 report', async t => {
   const lock = JSON.parse(fs.readFileSync(path.join(root, '.vibe-diagnosis', 'active_port.json'), 'utf8'));
   const unauthorized = await fetch(`http://127.0.0.1:${port}/api/run`, { method: 'POST' });
   assert.equal(unauthorized.status, 403);
+  const metricsBeforeRun = await fetch(`http://127.0.0.1:${port}/api/metrics`, { headers: { 'X-Vibe-Dashboard-Token': lock.token } });
+  assert.equal((await metricsBeforeRun.json()).diagnosticsEvaluated, false);
   const response = await fetch(`http://127.0.0.1:${port}/api/run`, { method: 'POST', headers: { 'X-Vibe-Dashboard-Token': lock.token } });
   const report = await response.json();
   assert.equal(report.schemaVersion, 2);
   assert.equal(report.summary.ok, 1);
   assert.equal(report.gates.releaseStatus, 'NOT_EVALUATED');
   assert.equal(report.evidenceSummary.liveEvidenceStatus, 'UNVERIFIED');
+  const metricsAfterRun = await fetch(`http://127.0.0.1:${port}/api/metrics`, { headers: { 'X-Vibe-Dashboard-Token': lock.token } });
+  assert.equal((await metricsAfterRun.json()).diagnosticsEvaluated, true);
+  const health = await fetch(`http://127.0.0.1:${port}/api/health`, { headers: { 'X-Vibe-Dashboard-Token': lock.token } });
+  assert.equal(health.status, 200);
+  assert.equal((await health.json()).service, 'vibe-diagnosis-dashboard');
 });
 
 test('dashboard returns HTTP 409 and CLI conflict while one project run is active', async t => {
@@ -124,4 +132,19 @@ test('dashboard control stops only the project dashboard and removes its lock', 
   assert.equal(result.authenticated, true);
   await new Promise(resolve => setTimeout(resolve, 600));
   assert.equal(fs.existsSync(lockFile), false);
+});
+
+test('dashboard probe rejects an unrelated listener recorded in a stale lock', async t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'vibe-dashboard-probe-'));
+  fs.mkdirSync(path.join(root, '.vibe-diagnosis'), { recursive: true });
+  const unrelated = http.createServer((req, res) => { res.writeHead(200, { 'content-type': 'application/json' }); res.end('{"service":"other"}'); });
+  t.after(() => { unrelated.close(); fs.rmSync(root, { recursive: true, force: true }); });
+  await new Promise(resolve => unrelated.listen(0, '127.0.0.1', resolve));
+  fs.writeFileSync(path.join(root, '.vibe-diagnosis', 'active_port.json'), JSON.stringify({
+    port: unrelated.address().port,
+    pid: process.pid,
+    projectDir: root,
+    token: 'not-a-dashboard-token',
+  }));
+  assert.equal((await probeDashboard(root, { timeoutMs: 500 })).running, false);
 });

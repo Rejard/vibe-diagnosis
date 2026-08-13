@@ -8,6 +8,7 @@ const { runDiagnosticsReport, discoverDiagnostics, clearProjectRequireCache } = 
 const { captureEnvironment } = require('./environment');
 const { redactString, redactValue } = require('./redaction');
 const { resolveWithin } = require('./path-policy');
+const { withDiagnosticsLock } = require('./diagnostics-lock');
 
 const SYSTEM_PROMPT = `You are a code repair specialist. Return only JSON with a summary and complete proposed file contents. Fix the functional root cause. Never weaken, delete, or bypass diagnostics and never insert text solely to satisfy a source-string check. Do not modify live trading, authentication, database schema/data, credentials, deployment, or runtime settings unless the plan explicitly marks those files high risk.`;
 const HIGH_RISK = /(^|\/)(\.env|auth|credentials?|secrets?|database|db|schema|migrations?|deploy|runtime|trading|orders?|wallet|payments?)(\/|\.|$)|(?:package-lock|pnpm-lock|yarn\.lock)/i;
@@ -16,6 +17,8 @@ const MAX_FILES = 20;
 const MAX_FILE_BYTES = 1024 * 1024;
 const MAX_TOTAL_BYTES = 2 * 1024 * 1024;
 const MAX_CHANGED_LINES = 5000;
+const MAX_CONTEXT_FILE_BYTES = 256 * 1024;
+const MAX_CONTEXT_TOTAL_BYTES = 512 * 1024;
 
 function safePath(projectDir, relativePath) {
   return resolveWithin(projectDir, relativePath);
@@ -32,7 +35,14 @@ function planIntegrityPayload(plan) {
     diagId: plan.diagId,
     summary: plan.summary,
     source: plan.source,
-    files: plan.files.map(file => ({ path: file.path, beforeHash: file.beforeHash, afterHash: file.afterHash })),
+    diagnostic: plan.diagnostic,
+    verification: plan.verification || null,
+    files: plan.files.map(file => ({ path: file.path, beforeHash: file.beforeHash, afterHash: file.afterHash, changedLines: file.changedLines })),
+    risk: plan.risk,
+    gamingWarnings: plan.gamingWarnings || [],
+    baselineResults: plan.baselineResults,
+    environmentBefore: plan.environmentBefore,
+    status: plan.status,
   };
 }
 
@@ -137,15 +147,30 @@ function collectContext(projectDir, diagnostic) {
   const files = discoverDiagnostics(projectDir);
   const diagFile = files.find(file => path.basename(file, '.diag.js') === diagnostic.id);
   const pkgFile = path.join(projectDir, 'package.json');
+  const sourceFiles = [];
+  let contextBytes = 0;
+  for (const relativePath of diagnostic.files || []) {
+    const normalized = relativePath.replace(/\\/g, '/');
+    if (PROHIBITED_PATH.test(normalized)) continue;
+    try {
+      const absolute = safePath(projectDir, normalized);
+      if (!fs.existsSync(absolute) || !fs.statSync(absolute).isFile()) continue;
+      const bytes = fs.statSync(absolute).size;
+      if (bytes > MAX_CONTEXT_FILE_BYTES || contextBytes + bytes > MAX_CONTEXT_TOTAL_BYTES) continue;
+      sourceFiles.push({ path: normalized, content: redactString(fs.readFileSync(absolute, 'utf8')) });
+      contextBytes += bytes;
+    } catch {}
+  }
   return {
     diagnostic,
     diagnosticSource: diagFile ? fs.readFileSync(diagFile, 'utf8') : null,
     packageJson: fs.existsSync(pkgFile) ? JSON.parse(fs.readFileSync(pkgFile, 'utf8')) : null,
+    sourceFiles,
   };
 }
 
 function promptFor(context) {
-  return `DIAGNOSTIC FAILURE\n${JSON.stringify(redactValue(context.diagnostic), null, 2)}\n\nDIAGNOSTIC SOURCE\n${redactString(context.diagnosticSource || 'unavailable')}\n\nPACKAGE\n${JSON.stringify(redactValue(context.packageJson), null, 2)}\n\nReturn {"summary":"...","files":[{"path":"...","content":"complete file"}]}.`;
+  return `DIAGNOSTIC FAILURE\n${JSON.stringify(redactValue(context.diagnostic), null, 2)}\n\nDIAGNOSTIC SOURCE\n${redactString(context.diagnosticSource || 'unavailable')}\n\nDECLARED SOURCE FILES\n${JSON.stringify(context.sourceFiles, null, 2)}\n\nPACKAGE\n${JSON.stringify(redactValue(context.packageJson), null, 2)}\n\nReturn {"summary":"...","files":[{"path":"...","content":"complete file"}]}.`;
 }
 
 function prepareFiles(projectDir, proposed) {
@@ -224,7 +249,7 @@ function rollback(projectDir, snapshots) {
   clearProjectRequireCache(projectDir);
 }
 
-async function applyRepairPlan(projectDir, planId, approval = {}) {
+async function applyRepairPlanLocked(projectDir, planId, approval = {}) {
   if (approval.approved !== true) throw new Error('Explicit approval is required before applying a repair plan.');
   const plan = loadPlan(projectDir, planId);
   if (plan.status !== 'PENDING_APPROVAL') throw new Error(`Repair plan is ${plan.status}.`);
@@ -264,6 +289,10 @@ async function applyRepairPlan(projectDir, planId, approval = {}) {
     appendAudit(projectDir, { type: 'REPAIR_ROLLED_BACK', planId: plan.id, diagId: plan.diagId, timestamp: new Date().toISOString(), risk: plan.risk.level, summary: error.message, files: plan.files.map(file => file.path) });
     throw error;
   }
+}
+
+async function applyRepairPlan(projectDir, planId, approval = {}) {
+  return withDiagnosticsLock(projectDir, { executionKind: 'repair-apply' }, () => applyRepairPlanLocked(projectDir, planId, approval));
 }
 
 async function repairDiagnostic(projectDir, diagnostic) {

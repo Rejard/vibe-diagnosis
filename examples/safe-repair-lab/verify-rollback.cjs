@@ -19,7 +19,21 @@ function fileChange(relativePath, content) {
 }
 
 function seal(plan) {
-  const payload = { id: plan.id, createdAt: plan.createdAt, diagId: plan.diagId, summary: plan.summary, source: plan.source, files: plan.files.map(file => ({ path: file.path, beforeHash: file.beforeHash, afterHash: file.afterHash })) };
+  const payload = {
+    id: plan.id,
+    createdAt: plan.createdAt,
+    diagId: plan.diagId,
+    summary: plan.summary,
+    source: plan.source,
+    diagnostic: plan.diagnostic,
+    verification: plan.verification || null,
+    files: plan.files.map(file => ({ path: file.path, beforeHash: file.beforeHash, afterHash: file.afterHash, changedLines: file.changedLines })),
+    risk: plan.risk,
+    gamingWarnings: plan.gamingWarnings || [],
+    baselineResults: plan.baselineResults,
+    environmentBefore: plan.environmentBefore,
+    status: plan.status,
+  };
   plan.integrity = { algorithm: 'sha256', checksum: crypto.createHash('sha256').update(JSON.stringify(payload)).digest('hex') };
   return plan;
 }

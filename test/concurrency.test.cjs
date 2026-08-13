@@ -32,6 +32,26 @@ module.exports={id:'slow',name:'slow',layer:'SYSTEM',async run(){
   return marker.replace(/\\\\/g, '\\');
 }
 
+test('expired async execution context cannot bypass a later project lock', async t => {
+  const root = project('vibe-expired-context-');
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  let resolveAttempt;
+  const delayedAttempt = new Promise(resolve => { resolveAttempt = resolve; });
+  await withDiagnosticsLock(root, { executionKind: 'outer' }, async () => {
+    setTimeout(async () => {
+      try {
+        await withDiagnosticsLock(root, { executionKind: 'delayed' }, async () => 'unexpected');
+        resolveAttempt('BYPASSED');
+      } catch (error) {
+        resolveAttempt(error.code);
+      }
+    }, 30);
+  });
+  const owner = acquireDiagnosticsLock(root, { executionKind: 'new-owner' });
+  t.after(() => owner.release());
+  assert.equal(await delayedAttempt, ERROR_CODE);
+});
+
 async function waitForFile(file, timeoutMs = 5000) {
   const started = Date.now();
   while (!fs.existsSync(file)) {

@@ -45,6 +45,7 @@ function loadCore() {
       pathPolicy: require("vibe-diagnosis/src/path-policy"),
       completionReceipt: require("vibe-diagnosis/src/completion-receipt"),
       diagnosticsLock: require("vibe-diagnosis/src/diagnostics-lock"),
+      redaction: require("vibe-diagnosis/src/redaction"),
     };
   } catch {
     return {
@@ -64,6 +65,7 @@ function loadCore() {
       pathPolicy: require("../src/path-policy"),
       completionReceipt: require("../src/completion-receipt"),
       diagnosticsLock: require("../src/diagnostics-lock"),
+      redaction: require("../src/redaction"),
     };
   }
 }
@@ -76,19 +78,23 @@ const { conflictPayload } = core.diagnosticsLock;
 
 const server = new McpServer({
   name: "vibe-diagnosis",
-  version: "1.6.1",
+  version: "1.6.2",
 });
 
 const READ_ONLY_TOOLS = new Set(["list_repair_incidents", "audit_diagnostics", "list_diagnostics", "read_error_pattern", "check_symbol_diff", "recommend_cartridge_split", "verify_completion_receipt"]);
 const DESTRUCTIVE_TOOLS = new Set(["apply_repair_plan", "init_diagnostics", "write_error_pattern", "stop_dashboard", "sync_ai_context", "sync_agent_rules"]);
 const OPEN_WORLD_TOOLS = new Set(["repair_diagnostic", "heal_all", "plan_repair"]);
+const projectDirSchema = z.string().refine(value => path.isAbsolute(value), "projectDir must be an absolute path").describe("Absolute path to the project root directory");
 const registerLegacyTool = server.tool.bind(server);
-server.tool = (name, description, schema, handler) => registerLegacyTool(name, description, schema, {
-  readOnlyHint: READ_ONLY_TOOLS.has(name),
-  destructiveHint: DESTRUCTIVE_TOOLS.has(name),
-  idempotentHint: READ_ONLY_TOOLS.has(name),
-  openWorldHint: OPEN_WORLD_TOOLS.has(name),
-}, handler);
+server.tool = (name, description, schema, handler) => {
+  const hardenedSchema = schema?.projectDir ? { ...schema, projectDir: projectDirSchema } : schema;
+  return registerLegacyTool(name, description, hardenedSchema, {
+    readOnlyHint: READ_ONLY_TOOLS.has(name),
+    destructiveHint: DESTRUCTIVE_TOOLS.has(name),
+    idempotentHint: READ_ONLY_TOOLS.has(name),
+    openWorldHint: OPEN_WORLD_TOOLS.has(name),
+  }, async args => core.redaction.redactValue(await handler(args)));
+};
 
 function isPortInUse(port) {
   return new Promise((resolve) => {
@@ -120,22 +126,14 @@ function openBrowser(url) {
 }
 
 async function autoStartDashboardIfNeeded(projectDir, defaultPort = 7700, isExplicitPort = false) {
-  const lockPath = path.join(projectDir, ".vibe-diagnosis", "active_port.json");
   let port = defaultPort;
   let shouldSpawn = true;
 
-  if (!isExplicitPort && fs.existsSync(lockPath)) {
-    try {
-      const lock = JSON.parse(fs.readFileSync(lockPath, "utf8"));
-      if (lock && lock.port) {
-        const inUse = await isPortInUse(lock.port);
-        if (inUse) {
-          port = lock.port;
-          shouldSpawn = false;
-        }
-      }
-    } catch (e) {
-      // Safe skip
+  if (!isExplicitPort) {
+    const existing = await core.dashboardControl.probeDashboard(projectDir);
+    if (existing.running) {
+      port = existing.lock.port;
+      shouldSpawn = false;
     }
   }
 
@@ -168,8 +166,10 @@ async function autoStartDashboardIfNeeded(projectDir, defaultPort = 7700, isExpl
     } catch (e) {
       // Safe skip if background spawn fails
     }
-    // 서버가 기동 완료되어 바인딩될 때까지 최소 안전 시간 대기
-    await new Promise((resolve) => setTimeout(resolve, 1000));
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      if ((await core.dashboardControl.probeDashboard(projectDir)).running) break;
+    }
   }
 
   const url = `http://localhost:${port}`;
@@ -339,7 +339,9 @@ server.tool(
   },
   async ({ projectDir }) => {
     try {
-      const latestPath = path.join(projectDir, ".vibe-diagnosis", "runs", "latest.json");
+      const runsDir = path.join(projectDir, ".vibe-diagnosis", "runs");
+      const completionPath = path.join(runsDir, "latest-completion.json");
+      const latestPath = fs.existsSync(completionPath) ? completionPath : path.join(runsDir, "latest.json");
       if (!fs.existsSync(latestPath)) throw new Error("No saved diagnostic run was found.");
       const latest = JSON.parse(fs.readFileSync(latestPath, "utf8"));
       const verification = core.completionReceipt.verifyCompletionReceipt(projectDir, latest.completion?.receipt);

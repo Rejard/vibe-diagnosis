@@ -26,6 +26,7 @@ function referencedFiles(projectDir, diagnosticFile, source) {
 
 function auditDiagnostics(projectDir, files) {
   const descriptors = files.map(inspectDiagnosticSource);
+  const knownIds = new Set(descriptors.map(item => item.id));
   const ids = new Map();
   const hashes = new Map();
   const diagnostics = descriptors.map(item => {
@@ -35,12 +36,14 @@ function auditDiagnostics(projectDir, files) {
     if (!hashes.has(hash)) hashes.set(hash, []);
     hashes.get(hash).push(item.filePath);
     const refs = referencedFiles(projectDir, item.filePath, item.source);
+    const declaredMissingFiles = item.files.filter(file => !existsModule(path.resolve(projectDir, file)));
     return {
       id: item.id,
       file: path.relative(projectDir, item.filePath),
       fragileStringChecks: detectFragileStringChecks(item.source),
-      missingReferences: refs.filter(ref => !ref.exists).map(ref => ref.file),
+      missingReferences: [...new Set([...refs.filter(ref => !ref.exists).map(ref => ref.file), ...declaredMissingFiles])],
       dependencies: item.dependencies,
+      missingDependencies: item.dependencies.filter(dependency => !knownIds.has(dependency)),
     };
   });
   return {
@@ -51,6 +54,7 @@ function auditDiagnostics(projectDir, files) {
       diagnostics: diagnostics.length,
       fragileStringChecks: diagnostics.reduce((sum, item) => sum + item.fragileStringChecks.length, 0),
       missingReferences: diagnostics.reduce((sum, item) => sum + item.missingReferences.length, 0),
+      missingDependencies: diagnostics.reduce((sum, item) => sum + item.missingDependencies.length, 0),
     },
   };
 }

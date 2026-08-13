@@ -88,23 +88,15 @@ function openBrowser(url) {
 }
 
 async function autoStartDashboardIfNeeded() {
-  const fs = require('fs');
-  const lockPath = path.join(targetDir, '.vibe-diagnosis', 'active_port.json');
+  const { probeDashboard } = require('../src/dashboard-control');
   let port = flags.port;
   let shouldSpawn = true;
 
-  if (!args.includes('--port') && fs.existsSync(lockPath)) {
-    try {
-      const lock = JSON.parse(fs.readFileSync(lockPath, 'utf8'));
-      if (lock && lock.port) {
-        const inUse = await isPortInUse(lock.port);
-        if (inUse) {
-          port = lock.port;
-          shouldSpawn = false;
-        }
-      }
-    } catch (e) {
-      // Safe skip
+  if (!args.includes('--port')) {
+    const existing = await probeDashboard(targetDir);
+    if (existing.running) {
+      port = existing.lock.port;
+      shouldSpawn = false;
     }
   }
 
@@ -112,7 +104,10 @@ async function autoStartDashboardIfNeeded() {
     const hasExplicitPort = args.includes('--port');
     port = hasExplicitPort ? flags.port : await findFreePort(flags.port);
     startDashboardBackground(targetDir, port);
-    await new Promise((resolve) => setTimeout(resolve, 800));
+    for (let attempt = 0; attempt < 20; attempt += 1) {
+      await new Promise((resolve) => setTimeout(resolve, 100));
+      if ((await probeDashboard(targetDir)).running) break;
+    }
   }
 
   const url = `http://localhost:${port}`;
@@ -129,10 +124,6 @@ async function main() {
     case 'run': {
       const { runDiagnosticsReport } = require('../src/runner');
       const { formatResults, formatResultsJson } = require('../src/reporter');
-
-      if (!flags.json) {
-        autoStartDashboardIfNeeded().catch(() => {});
-      }
 
       const report = await runDiagnosticsReport(targetDir, {
         persist: true,

@@ -9,6 +9,9 @@ function saveRunReport(projectDir, report) {
   const target = path.join(dir, `${report.runId}.json`);
   fs.writeFileSync(target, JSON.stringify(report, null, 2), 'utf8');
   fs.writeFileSync(path.join(dir, 'latest.json'), JSON.stringify(report, null, 2), 'utf8');
+  if (report.completion?.receipt) {
+    fs.writeFileSync(path.join(dir, 'latest-completion.json'), JSON.stringify(report, null, 2), 'utf8');
+  }
   return target;
 }
 

@@ -3,7 +3,10 @@ const path = require('path');
 
 const START_MARKER = '<!-- vibe-diagnosis-rules:start -->';
 const END_MARKER = '<!-- vibe-diagnosis-rules:end -->';
-const LEGACY_HEADING = '## Vibe Diagnosis — MCP AI Self-Diagnostics Rules';
+const LEGACY_HEADINGS = [
+  '## Vibe Diagnosis — MCP AI Self-Diagnostics Rules',
+  '## Vibe Diagnosis 규칙 (자가진단 가이드라인)',
+];
 const VIBE_DIAG_RULE_BLOCK = `${START_MARKER}
 ## Vibe Diagnosis MCP self-diagnostics
 
@@ -16,9 +19,10 @@ const VIBE_DIAG_RULE_BLOCK = `${START_MARKER}
 ${END_MARKER}`;
 
 function replaceLegacyBlock(content) {
-  const index = content.indexOf(LEGACY_HEADING);
-  if (index === -1) return null;
-  const nextHeading = content.indexOf('\n## ', index + LEGACY_HEADING.length);
+  const heading = LEGACY_HEADINGS.find(value => content.includes(value));
+  if (!heading) return null;
+  const index = content.indexOf(heading);
+  const nextHeading = content.indexOf('\n## ', index + heading.length);
   const end = nextHeading === -1 ? content.length : nextHeading + 1;
   return `${content.slice(0, index)}${VIBE_DIAG_RULE_BLOCK}\n${content.slice(end)}`;
 }
@@ -45,8 +49,12 @@ function ensureAgentRules(projectDir) {
     path.join(projectDir, 'GEMINI.md'),
   ];
   const updatedFiles = [];
+  const existingTargets = targetFiles.filter(filePath => fs.existsSync(filePath));
+  const selectedTargets = existingTargets.length
+    ? existingTargets
+    : [path.join(projectDir, '.agents', 'AGENTS.md')];
 
-  for (const filePath of targetFiles) {
+  for (const filePath of selectedTargets) {
     fs.mkdirSync(path.dirname(filePath), { recursive: true });
     const existing = fs.existsSync(filePath) ? fs.readFileSync(filePath, 'utf8') : '';
     const next = upsertRules(existing);

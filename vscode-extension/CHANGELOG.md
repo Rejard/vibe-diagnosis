@@ -1,6 +1,14 @@
 # Change Log
 
-## 1.6.1 (Current)
+## 1.6.2 (Current)
+
+- Sealed all safety-relevant repair fields and made repair application share the project execution lock.
+- Added legacy BYOK ignore migration and protected ignored-file mutation detection.
+- Made blocker and live-evidence states conservative and preserved completion receipts separately.
+- Replaced conflicting legacy agent rules and authenticated dashboard identity before reuse.
+- Kept CLI diagnostics dashboard-independent and added provider timeout/response limits.
+
+## 1.6.1
 
 - Prevented overlapping diagnostics for the same project across dashboard, MCP, CLI, and separate Node processes.
 - Added immediate dashboard HTTP 409 handling with a clear running-state message and reliable button reset.

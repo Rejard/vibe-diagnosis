@@ -49,6 +49,8 @@ test('MCP exposes V1.6 report filters and approval-first repair tools', async ()
     assert.equal(tools.get('verify_completion_receipt').annotations.readOnlyHint, true);
     assert.equal(tools.get('apply_repair_plan').annotations.destructiveHint, true);
     assert.equal(tools.get('plan_repair').annotations.openWorldHint, true);
+    const relative = await request('tools/call', { name: 'list_diagnostics', arguments: { projectDir: '.' } });
+    assert.equal(relative.result.isError, true);
     const metadata = await request('tools/call', { name: 'list_diagnostics', arguments: { projectDir } });
     assert.equal(metadata.result.isError, undefined);
     assert.equal(fs.existsSync(path.join(projectDir, 'module-loaded.txt')), false);

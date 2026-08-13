@@ -1,6 +1,8 @@
 # vibe-diagnosis-mcp
 
-MCP server for Vibe Diagnosis 1.6.1. It lets coding agents initialize and run project diagnostics, enforce a final completion gate, inspect evidence, and prepare approval-gated repairs.
+MCP server for Vibe Diagnosis 1.6.2. It lets coding agents initialize and run project diagnostics, enforce a final completion gate, inspect evidence, and prepare approval-gated repairs. Version 1.6.2 seals all safety-relevant repair fields, detects protected ignored-file changes, preserves the latest completion receipt separately, and validates dashboard identity before reuse.
+
+Diagnostics are trusted project code and run with the permissions of the MCP process. Review third-party diagnostics before running them. Pending repair plans created before 1.6.2 must be regenerated before approval.
 
 All diagnostic entry points share a project-scoped cross-process lock. If the same project is already running, `run_diagnostics` and `complete_task_diagnostics` return an immediate structured error with code `DIAGNOSTICS_ALREADY_RUNNING` and a safe `startedAt` value. They do not wait, join, or start another run. Locks are stored in the operating system temporary directory; live PID locks are preserved and dead or old invalid locks are safely reclaimed.
 
@@ -16,7 +18,7 @@ All diagnostic entry points share a project-scoped cross-process lock. If the sa
   "mcpServers": {
     "vibe-diagnosis": {
       "command": "npx",
-      "args": ["-y", "vibe-diagnosis-mcp@1.6.1"]
+      "args": ["-y", "vibe-diagnosis-mcp@1.6.2"]
     }
   }
 }
@@ -25,13 +27,13 @@ All diagnostic entry points share a project-scoped cross-process lock. If the sa
 Claude Code on macOS, Linux, or WSL:
 
 ```bash
-claude mcp add vibe-diagnosis --scope local -- npx -y vibe-diagnosis-mcp@1.6.1
+claude mcp add vibe-diagnosis --scope local -- npx -y vibe-diagnosis-mcp@1.6.2
 ```
 
 Claude Code on native Windows:
 
 ```powershell
-claude mcp add vibe-diagnosis --scope local -- cmd /c npx -y vibe-diagnosis-mcp@1.6.1
+claude mcp add vibe-diagnosis --scope local -- cmd /c npx -y vibe-diagnosis-mcp@1.6.2
 ```
 
 ## Required agent workflow

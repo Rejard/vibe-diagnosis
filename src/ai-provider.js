@@ -45,11 +45,11 @@ const PROVIDERS = {
     name: 'Google Gemini',
     baseUrl: 'https://generativelanguage.googleapis.com',
     chatPath: null,
-    buildChatUrl(model, apiKey) {
-      return `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+    buildChatUrl(model) {
+      return `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
     },
-    buildHeaders() {
-      return { 'Content-Type': 'application/json' };
+    buildHeaders(apiKey) {
+      return { 'x-goog-api-key': apiKey, 'Content-Type': 'application/json' };
     },
     buildBody(model, messages) {
       const systemMsg = messages.find(m => m.role === 'system');
@@ -88,6 +88,30 @@ const PROVIDERS = {
   },
 };
 
+const REQUEST_TIMEOUT_MS = 60000;
+const MAX_RESPONSE_BYTES = 4 * 1024 * 1024;
+
+async function readLimitedText(response, limit = MAX_RESPONSE_BYTES) {
+  const length = Number(response.headers.get('content-length'));
+  if (Number.isFinite(length) && length > limit) throw new Error(`Provider response exceeds ${limit} bytes`);
+  if (!response.body?.getReader) {
+    const text = await response.text();
+    if (Buffer.byteLength(text) > limit) throw new Error(`Provider response exceeds ${limit} bytes`);
+    return text;
+  }
+  const reader = response.body.getReader();
+  const chunks = [];
+  let total = 0;
+  while (true) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > limit) { await reader.cancel(); throw new Error(`Provider response exceeds ${limit} bytes`); }
+    chunks.push(Buffer.from(value));
+  }
+  return Buffer.concat(chunks).toString('utf8');
+}
+
 async function chat(providerName, apiKey, model, messages) {
   const provider = PROVIDERS[providerName];
   if (!provider) throw new Error(`Unknown provider: ${providerName}`);
@@ -101,24 +125,32 @@ async function chat(providerName, apiKey, model, messages) {
   const headers = provider.buildHeaders(apiKey);
   const body = provider.buildBody(model, messages);
 
-  const response = await fetch(url, { method: 'POST', headers, body });
-
-  if (!response.ok) {
-    const errText = await response.text().catch(() => 'Unknown error');
-    let errMsg = `${provider.name} API error (${response.status})`;
-    try {
-      const errJson = JSON.parse(errText);
-      errMsg += ': ' + (errJson.error?.message || errJson.error?.type || errText);
-    } catch {
-      errMsg += ': ' + errText.slice(0, 200);
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  try {
+    const response = await fetch(url, { method: 'POST', headers, body, signal: controller.signal });
+    if (!response.ok) {
+      const errText = await readLimitedText(response, 64 * 1024).catch(() => 'Unknown error');
+      let errMsg = `${provider.name} API error (${response.status})`;
+      try {
+        const errJson = JSON.parse(errText);
+        errMsg += ': ' + (errJson.error?.message || errJson.error?.type || errText);
+      } catch {
+        errMsg += ': ' + errText.slice(0, 200);
+      }
+      throw new Error(errMsg);
     }
-    throw new Error(errMsg);
-  }
 
-  const json = await response.json();
-  const content = provider.extractContent(json);
-  if (!content) throw new Error(`Empty response from ${provider.name}`);
-  return content;
+    const json = JSON.parse(await readLimitedText(response));
+    const content = provider.extractContent(json);
+    if (!content) throw new Error(`Empty response from ${provider.name}`);
+    return content;
+  } catch (error) {
+    if (error.name === 'AbortError') throw new Error(`${provider.name} API request timed out after ${REQUEST_TIMEOUT_MS}ms`);
+    throw error;
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 function listProviders() {

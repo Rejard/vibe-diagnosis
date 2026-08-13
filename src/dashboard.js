@@ -9,7 +9,7 @@ const { listProviders } = require('./ai-provider');
 const { runHeuristicMetrics } = require('./analyzer');
 const { resolveWithin } = require('./path-policy');
 const { inspectDiagnosticSource } = require('./selector');
-const { conflictPayload } = require('./diagnostics-lock');
+const { conflictPayload, projectKey } = require('./diagnostics-lock');
 
 const HTML_PATH = path.join(__dirname, 'dashboard.html');
 
@@ -159,6 +159,11 @@ function startDashboard(projectDir, port = 7700, options = {}) {
       return;
     }
 
+    if (req.method === 'GET' && url.pathname === '/api/health') {
+      sendJson(res, { service: 'vibe-diagnosis-dashboard', projectKey: projectKey(projectDir), pid: process.pid });
+      return;
+    }
+
     if (req.method === 'GET' && url.pathname === '/api/errors') {
       const errors = listErrorPatterns(projectDir);
       sendJson(res, errors);
@@ -289,12 +294,13 @@ function startDashboard(projectDir, port = 7700, options = {}) {
       try {
         const list = listDiagnosticMeta(projectDir);
         const total = list.length;
-        const passed = lastRunResults.length > 0
+        const diagnosticsEvaluated = lastRunResults.length > 0;
+        const passed = diagnosticsEvaluated
           ? lastRunResults.filter(r => r.status === 'OK').length
-          : list.filter(d => d.valid).length;
+          : 0;
 
         const metrics = runHeuristicMetrics(projectDir, total, passed);
-        sendJson(res, metrics);
+        sendJson(res, { ...metrics, diagnosticsEvaluated });
       } catch (err) {
         sendJson(res, { error: err.message }, 500);
       }
@@ -424,9 +430,10 @@ function startDashboard(projectDir, port = 7700, options = {}) {
           port: actualPort,
           pid: process.pid,
           projectDir: path.resolve(projectDir),
+          projectKey: projectKey(projectDir),
           token: shutdownToken,
           timestamp: new Date().toISOString()
-        }, null, 2), 'utf8');
+        }, null, 2), { encoding: 'utf8', mode: 0o600 });
       }
     } catch (e) {
       // Safe skip if lock file write fails

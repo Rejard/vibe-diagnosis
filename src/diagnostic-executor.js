@@ -1,5 +1,5 @@
 const path = require('path');
-const { fork, spawn } = require('child_process');
+const { fork, spawnSync } = require('child_process');
 const { normalizeEvidence } = require('./evidence');
 const { redactValue } = require('./redaction');
 
@@ -14,7 +14,9 @@ function appendLimited(current, chunk) {
 function terminateTree(child) {
   if (!child || child.killed) return;
   if (process.platform === 'win32' && child.pid) {
-    try { spawn('taskkill', ['/pid', String(child.pid), '/t', '/f'], { windowsHide: true, stdio: 'ignore' }); } catch {}
+    try { spawnSync('taskkill', ['/pid', String(child.pid), '/t', '/f'], { windowsHide: true, stdio: 'ignore', timeout: 5000 }); } catch {}
+  } else if (child.pid) {
+    try { process.kill(-child.pid, 'SIGKILL'); } catch {}
   }
   try { child.kill('SIGKILL'); } catch {}
 }
@@ -36,6 +38,7 @@ function runAttempt(projectDir, filePath, options = {}) {
       env: { ...process.env, VIBE_DIAG_ISOLATED: '1' },
       silent: true,
       windowsHide: true,
+      detached: process.platform !== 'win32',
       execArgv: [],
     });
     child.stdout?.on('data', chunk => { stdout = appendLimited(stdout, chunk); });

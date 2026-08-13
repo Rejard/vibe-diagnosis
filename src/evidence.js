@@ -15,7 +15,7 @@ function normalizeEvidence(result, metadata, finishedAt) {
 
 function summarizeEvidence(results) {
   const byType = {};
-  let liveEvidenceStatus = 'UNVERIFIED';
+  const liveItems = [];
   for (const result of results) {
     for (const item of result.evidence || []) {
       if (!byType[item.type]) byType[item.type] = { total: 0, fresh: 0, stale: 0, unknown: 0 };
@@ -24,10 +24,14 @@ function summarizeEvidence(results) {
       if (item.freshness === 'FRESH') bucket.fresh++;
       else if (item.freshness === 'STALE') bucket.stale++;
       else bucket.unknown++;
-      if (item.live && item.freshness === 'FRESH') liveEvidenceStatus = 'VERIFIED';
-      else if (item.live && liveEvidenceStatus !== 'VERIFIED') liveEvidenceStatus = item.freshness === 'STALE' ? 'STALE' : 'UNVERIFIED';
+      if (item.live) liveItems.push({ status: result.status, freshness: item.freshness });
     }
   }
+  let liveEvidenceStatus = 'UNVERIFIED';
+  if (liveItems.some(item => item.status === 'ERROR')) liveEvidenceStatus = 'FAILED';
+  else if (liveItems.some(item => item.freshness === 'STALE')) liveEvidenceStatus = 'STALE';
+  else if (liveItems.some(item => item.status === 'WARNING' || item.freshness !== 'FRESH')) liveEvidenceStatus = 'PARTIAL';
+  else if (liveItems.length > 0) liveEvidenceStatus = 'VERIFIED';
   const diagnosticsWithEvidence = results.filter(result => (result.evidence || []).length > 0).length;
   return {
     byType,

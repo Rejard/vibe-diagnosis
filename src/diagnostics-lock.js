@@ -2,10 +2,12 @@ const fs = require('fs');
 const os = require('os');
 const path = require('path');
 const crypto = require('crypto');
+const { AsyncLocalStorage } = require('async_hooks');
 
 const ERROR_CODE = 'DIAGNOSTICS_ALREADY_RUNNING';
 const LOCK_ROOT = path.join(os.tmpdir(), 'vibe-diagnosis', 'diagnostic-locks');
 const INVALID_LOCK_GRACE_MS = 5000;
+const executionStorage = new AsyncLocalStorage();
 
 class DiagnosticsAlreadyRunningError extends Error {
   constructor(lock = {}) {
@@ -132,11 +134,11 @@ function acquireDiagnosticsLock(projectDir, options = {}) {
         startedAt,
         release() {
           if (released) return;
-          released = true;
           const current = readExistingLock(lockPath);
           if (current?.lock?.ownerToken === ownerToken) {
             try { fs.unlinkSync(lockPath); } catch (error) { if (error.code !== 'ENOENT') throw error; }
           }
+          released = true;
         },
       };
     } catch (error) {
@@ -157,10 +159,17 @@ function acquireDiagnosticsLock(projectDir, options = {}) {
 }
 
 async function withDiagnosticsLock(projectDir, options, operation) {
+  const key = projectKey(projectDir);
+  const active = executionStorage.getStore();
+  if (active?.active && active.projectKey === key) {
+    return operation({ startedAt: active.startedAt, reentrant: true });
+  }
   const lock = acquireDiagnosticsLock(projectDir, options);
+  const context = { active: true, projectKey: key, startedAt: lock.startedAt };
   try {
-    return await operation({ startedAt: lock.startedAt });
+    return await executionStorage.run(context, () => operation({ startedAt: lock.startedAt, reentrant: false }));
   } finally {
+    context.active = false;
     lock.release();
   }
 }

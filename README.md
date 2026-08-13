@@ -6,9 +6,18 @@ Evidence-first diagnostics and approval-gated repair for AI-assisted coding.
 
 Vibe Diagnosis gives coding agents a mechanical way to prove that a task works before they report completion. Projects define lightweight `.diag.js` checks; the runner executes them in isolation, records structured evidence, evaluates release or live-operation gates, and issues a completion receipt bound to the current workspace.
 
-Version: **1.6.1**
+Version: **1.6.2**
 
-## What 1.6.1 adds
+## What 1.6.2 adds
+
+- Repair-plan integrity now seals risk classification, high-risk approval requirements, regression baselines, verification mode, and gaming decisions. Repair application and its validation share the project execution lock.
+- Legacy projects receive explicit Git ignores for `byok.local.json` and other runtime state without hiding tracked diagnostics. Gemini keys use a request header, and provider calls have timeout and response-size limits.
+- Completion fingerprints detect ignored protected-file changes such as `.env`, credentials, private keys, and BYOK configuration. Normal focused runs no longer replace the latest completion receipt.
+- Explicit release/live blocker flags are authoritative, and live evidence cannot report `VERIFIED` when evidence is failed, stale, unknown, or warning-level.
+- Korean and English legacy agent rules are replaced with the current approval-first, dashboard-optional completion contract.
+- CLI diagnostics remain dashboard-independent. Dashboard reuse requires an authenticated project health response instead of accepting any listener on a cached port.
+
+## 1.6.1 project execution lock
 
 - One diagnostic execution at a time for each normalized project path, shared by dashboard, MCP, CLI, and separate Node processes.
 - Immediate structured conflicts with code `DIAGNOSTICS_ALREADY_RUNNING`; duplicate requests never wait for or join the active execution.
@@ -47,18 +56,20 @@ Legacy `.diag.js` files that return `OK`, `WARNING`, or `ERROR` continue to run 
 ## Quick start with the CLI
 
 ```bash
-npx -y vibe-diagnosis@1.6.1 init
-npx -y vibe-diagnosis@1.6.1 run --json
-npx -y vibe-diagnosis@1.6.1 complete
+npx -y vibe-diagnosis@1.6.2 init
+npx -y vibe-diagnosis@1.6.2 run --json
+npx -y vibe-diagnosis@1.6.2 complete
 ```
 
-Initialization creates `.vibe-diagnosis/`, a sample diagnostic, and the Vibe Diagnosis rule block for supported agent rule files. The directory contains local diagnostics, run evidence, repair plans, and optional BYOK data; it is added to `.gitignore` by default.
+Initialization creates `.vibe-diagnosis/`, a sample diagnostic, and the Vibe Diagnosis rule block for supported agent rule files. The directory contains project diagnostics plus local run evidence, repair plans, and optional BYOK data. Runtime and secret-bearing paths are added to `.gitignore` while diagnostics remain trackable.
+
+Diagnostics are trusted project code and run with the permissions of the invoking process. Review third-party diagnostics before running them. Version 1.6.2 strengthens repair-plan integrity; pending plans created by an older version must be regenerated before approval.
 
 The dashboard is optional and starts only when requested:
 
 ```bash
-npx -y vibe-diagnosis@1.6.1 dashboard
-npx -y vibe-diagnosis@1.6.1 stop
+npx -y vibe-diagnosis@1.6.2 dashboard
+npx -y vibe-diagnosis@1.6.2 stop
 ```
 
 ## MCP setup
@@ -70,7 +81,7 @@ Add the server to the MCP configuration used by your coding agent:
   "mcpServers": {
     "vibe-diagnosis": {
       "command": "npx",
-      "args": ["-y", "vibe-diagnosis-mcp@1.6.1"]
+      "args": ["-y", "vibe-diagnosis-mcp@1.6.2"]
     }
   }
 }
@@ -79,13 +90,13 @@ Add the server to the MCP configuration used by your coding agent:
 Claude Code on macOS, Linux, or WSL:
 
 ```bash
-claude mcp add vibe-diagnosis --scope local -- npx -y vibe-diagnosis-mcp@1.6.1
+claude mcp add vibe-diagnosis --scope local -- npx -y vibe-diagnosis-mcp@1.6.2
 ```
 
 Claude Code on native Windows:
 
 ```powershell
-claude mcp add vibe-diagnosis --scope local -- cmd /c npx -y vibe-diagnosis-mcp@1.6.1
+claude mcp add vibe-diagnosis --scope local -- cmd /c npx -y vibe-diagnosis-mcp@1.6.2
 ```
 
 Common configuration locations:

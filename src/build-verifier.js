@@ -1,14 +1,16 @@
 const fs = require('fs');
 const path = require('path');
-const { exec } = require('child_process');
+const { execFile } = require('child_process');
+const { redactString } = require('./redaction');
 
-function runCmdAsync(cmd, cwd) {
+function runNpmAsync(args, cwd) {
   return new Promise((resolve) => {
-    exec(cmd, { cwd, windowsHide: true }, (error, stdout, stderr) => {
+    const command = process.platform === 'win32' ? 'npm.cmd' : 'npm';
+    execFile(command, args, { cwd, windowsHide: true, timeout: 120000, maxBuffer: 2 * 1024 * 1024 }, (error, stdout, stderr) => {
       if (error) {
-        resolve({ success: false, output: stderr || stdout || error.message });
+        resolve({ success: false, output: redactString(stderr || stdout || error.message), timedOut: error.killed === true || error.code === 'ETIMEDOUT' });
       } else {
-        resolve({ success: true, output: stdout });
+        resolve({ success: true, output: redactString(stdout), timedOut: false });
       }
     });
   });
@@ -39,19 +41,20 @@ async function verifyBuildSafety(projectDir) {
   const scripts = pkg.scripts || {};
 
   if (scripts.build) {
-    const res = await runCmdAsync('npm run build', projectDir);
+    const res = await runNpmAsync(['run', 'build'], projectDir);
     return {
       success: res.success,
       command: 'npm run build',
       details: res.success
         ? 'Build succeeded with 0 compilation errors.'
-        : `Build failed: ${res.output.slice(0, 300)}`
+        : `Build failed${res.timedOut ? ' or timed out' : ''}: ${res.output.slice(0, 300)}`
     };
   }
 
   if (scripts.check || scripts.typecheck) {
-    const cmd = scripts.check ? 'npm run check' : 'npm run typecheck';
-    const res = await runCmdAsync(cmd, projectDir);
+    const script = scripts.check ? 'check' : 'typecheck';
+    const cmd = `npm run ${script}`;
+    const res = await runNpmAsync(['run', script], projectDir);
     return {
       success: res.success,
       command: cmd,
@@ -62,9 +65,11 @@ async function verifyBuildSafety(projectDir) {
   }
 
   return {
-    success: true,
-    command: 'syntax-pass',
-    details: 'No build script found in package.json. Syntax structure verified as safe.'
+    success: null,
+    skipped: true,
+    command: 'none',
+    status: 'NOT_EVALUATED',
+    details: 'No build, check, or typecheck script was found. Build safety was not evaluated.'
   };
 }
 
