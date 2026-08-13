@@ -25,4 +25,8 @@ jobs:
       - run: npm run test:rollback
       - run: npm run test:packed
       - run: npm run test:secrets
+      - name: Install MCP dependencies for integration diagnostics
+        run: |
+          root_tarball=$(npm pack --silent --pack-destination "$RUNNER_TEMP")
+          npm install --prefix mcp-server --ignore-scripts --no-package-lock "$RUNNER_TEMP/$root_tarball"
       - run: node bin/vibe-diag.js complete --json
