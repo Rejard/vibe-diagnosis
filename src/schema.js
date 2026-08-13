@@ -3,6 +3,7 @@ const VALID_LAYERS = ['TASK', 'FUNCTION', 'SYSTEM'];
 const VALID_CLASSIFICATIONS = ['CONTRACT_ERROR', 'TEST_FAILURE', 'RUNNER_ERROR', 'TIMEOUT', 'FLAKY'];
 const VALID_SEVERITIES = ['INFO', 'LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
 const VALID_EVIDENCE_TYPES = ['STATIC', 'TEST', 'RUNTIME', 'DATA', 'PROVIDER', 'AUTHORITY', 'UI', 'LIVE_EVIDENCE', 'UNSPECIFIED'];
+const VALID_EXECUTION_PROFILES = ['RESTRICTED', 'STANDARD', 'LIVE'];
 
 function isNonEmptyString(value) {
   return typeof value === 'string' && value.trim().length > 0;
@@ -25,6 +26,9 @@ function validateDiagnosticModule(mod, filePath) {
   if (mod.evidenceType !== undefined && !VALID_EVIDENCE_TYPES.includes(mod.evidenceType)) {
     errors.push(`invalid "evidenceType" (must be one of: ${VALID_EVIDENCE_TYPES.join(', ')})`);
   }
+  if (mod.executionProfile !== undefined && !VALID_EXECUTION_PROFILES.includes(mod.executionProfile)) {
+    errors.push(`invalid "executionProfile" (must be one of: ${VALID_EXECUTION_PROFILES.join(', ')})`);
+  }
   if (mod.scope !== undefined && !isNonEmptyString(mod.scope)) errors.push('invalid "scope" (must be a non-empty string)');
   if (mod.lastVerifiedAt !== undefined && Number.isNaN(Date.parse(mod.lastVerifiedAt))) errors.push('invalid "lastVerifiedAt" (must be an ISO date)');
   if (mod.confidence !== undefined && (typeof mod.confidence !== 'number' || mod.confidence < 0 || mod.confidence > 1)) {
@@ -33,7 +37,7 @@ function validateDiagnosticModule(mod, filePath) {
   for (const field of ['blocksRelease', 'blocksLiveTrading']) {
     if (mod[field] !== undefined && typeof mod[field] !== 'boolean') errors.push(`invalid "${field}" (must be boolean)`);
   }
-  for (const field of ['tags', 'dependencies', 'files']) {
+  for (const field of ['tags', 'dependencies', 'files', 'allowedEnv']) {
     if (mod[field] !== undefined && (!Array.isArray(mod[field]) || mod[field].some(v => !isNonEmptyString(v)))) {
       errors.push(`invalid "${field}" (must be an array of non-empty strings)`);
     }
@@ -96,6 +100,8 @@ function normalizeMetadata(mod = {}) {
     files: Array.isArray(mod.files) ? mod.files : [],
     cache: mod.cache === true,
     timeoutMs: Number.isFinite(mod.timeoutMs) ? Math.max(100, mod.timeoutMs) : null,
+    executionProfile: mod.executionProfile || null,
+    allowedEnv: Array.isArray(mod.allowedEnv) ? mod.allowedEnv : [],
   };
 }
 
@@ -109,4 +115,5 @@ module.exports = {
   VALID_CLASSIFICATIONS,
   VALID_SEVERITIES,
   VALID_EVIDENCE_TYPES,
+  VALID_EXECUTION_PROFILES,
 };

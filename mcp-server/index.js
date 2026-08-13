@@ -11,12 +11,12 @@ import { exec, spawn } from "child_process";
 const require = createRequire(import.meta.url);
 
 const rawStdoutWrite = process.stdout.write.bind(process.stdout);
+const protocolOutput = {
+  write: rawStdoutWrite,
+  once: process.stdout.once.bind(process.stdout),
+};
 process.stdout.write = (chunk, encoding, cb) => {
-  const str = typeof chunk === "string" ? chunk : chunk?.toString("utf8") || "";
-  if (!str.includes('"jsonrpc"')) {
-    return process.stderr.write(chunk, encoding, cb);
-  }
-  return rawStdoutWrite(chunk, encoding, cb);
+  return process.stderr.write(chunk, encoding, cb);
 };
 console.log = (...args) => {
   process.stderr.write(args.map(a => typeof a === "object" ? JSON.stringify(a) : String(a)).join(" ") + "\n");
@@ -78,7 +78,7 @@ const { conflictPayload } = core.diagnosticsLock;
 
 const server = new McpServer({
   name: "vibe-diagnosis",
-  version: "1.6.2",
+  version: "1.6.3",
 });
 
 const READ_ONLY_TOOLS = new Set(["list_repair_incidents", "audit_diagnostics", "list_diagnostics", "read_error_pattern", "check_symbol_diff", "recommend_cartridge_split", "verify_completion_receipt"]);
@@ -713,5 +713,5 @@ server.tool(
   }
 );
 
-const transport = new StdioServerTransport();
+const transport = new StdioServerTransport(process.stdin, protocolOutput);
 await server.connect(transport);

@@ -1,6 +1,6 @@
 # vibe-diagnosis-mcp
 
-MCP server for Vibe Diagnosis 1.6.2. It lets coding agents initialize and run project diagnostics, enforce a final completion gate, inspect evidence, and prepare approval-gated repairs. Version 1.6.2 seals all safety-relevant repair fields, detects protected ignored-file changes, preserves the latest completion receipt separately, and validates dashboard identity before reuse.
+MCP server for Vibe Diagnosis 1.6.3. It lets coding agents initialize and run project diagnostics, enforce a final completion gate, inspect evidence, and prepare approval-gated repairs. Version 1.6.3 adds restricted STATIC/TEST environments, transport-owned protocol stdout, AST metadata inspection, neutral 100/500/1,000-diagnostic scale fixtures, and generic Codex, Claude Code, and Gemini CLI handshake coverage.
 
 Diagnostics are trusted project code and run with the permissions of the MCP process. Review third-party diagnostics before running them. Pending repair plans created before 1.6.2 must be regenerated before approval.
 
@@ -18,7 +18,7 @@ All diagnostic entry points share a project-scoped cross-process lock. If the sa
   "mcpServers": {
     "vibe-diagnosis": {
       "command": "npx",
-      "args": ["-y", "vibe-diagnosis-mcp@1.6.2"]
+      "args": ["-y", "vibe-diagnosis-mcp@1.6.3"]
     }
   }
 }
@@ -27,13 +27,13 @@ All diagnostic entry points share a project-scoped cross-process lock. If the sa
 Claude Code on macOS, Linux, or WSL:
 
 ```bash
-claude mcp add vibe-diagnosis --scope local -- npx -y vibe-diagnosis-mcp@1.6.2
+claude mcp add vibe-diagnosis --scope local -- npx -y vibe-diagnosis-mcp@1.6.3
 ```
 
 Claude Code on native Windows:
 
 ```powershell
-claude mcp add vibe-diagnosis --scope local -- cmd /c npx -y vibe-diagnosis-mcp@1.6.2
+claude mcp add vibe-diagnosis --scope local -- cmd /c npx -y vibe-diagnosis-mcp@1.6.3
 ```
 
 ## Required agent workflow

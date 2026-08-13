@@ -6,7 +6,8 @@ const path = require('path');
 const { runDiagnosticsReport, runCompletionDiagnostics } = require('../src/runner');
 const { summarizeResults } = require('../src/run-summary');
 const { assertAst, detectFragileStringChecks } = require('../src/assertions');
-const { selectDiagnostics } = require('../src/selector');
+const { inspectDiagnosticSource, selectDiagnostics } = require('../src/selector');
+const { analyzeCartridgeIntegrity } = require('../src/analyzer');
 const { applyRepairPlan, autoRevertOrRepairOmission } = require('../src/repairer');
 const { upsertRules } = require('../src/rules-injector');
 const { initialize } = require('../src/init');
@@ -133,6 +134,46 @@ test('selects by metadata and includes declared dependencies', t => {
   const base = diagnostic(root, 'base', `module.exports={id:'base',name:'base',layer:'TASK',tags:['base'],async run(){return {status:'OK'}}}`);
   const selected = diagnostic(root, 'selected', `module.exports={id:'selected',name:'selected',layer:'TASK',scope:'AUTHORITY',severity:'CRITICAL',tags:['security'],dependencies:['base'],async run(){return {status:'OK'}}}`);
   assert.deepEqual(selectDiagnostics([base, selected], { tags: ['security'] }).map(item => item.id).sort(), ['base', 'selected']);
+});
+
+test('inspects diagnostic metadata from the exported object AST', t => {
+  const root = project();
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const file = diagnostic(root, 'ast-metadata', `const decoy={id:'wrong',name:'wrong',layer:'SYSTEM',tags:['wrong']};module.exports={['id']:'right',name:'right',layer:'TASK',tags:['real'],executionProfile:'RESTRICTED',allowedEnv:['PUBLIC_FIXTURE'],run:async()=>({status:'OK'})}`);
+  const descriptor = inspectDiagnosticSource(file);
+  assert.equal(descriptor.id, 'right');
+  assert.deepEqual(descriptor.tags, ['real']);
+  assert.equal(descriptor.executionProfile, 'RESTRICTED');
+  assert.deepEqual(descriptor.allowedEnv, ['PUBLIC_FIXTURE']);
+  assert.equal(descriptor.valid, true);
+});
+
+test('restricted diagnostics do not inherit undeclared environment secrets', async t => {
+  const root = project();
+  const prior = process.env.VIBE_PRIVATE_FIXTURE;
+  process.env.VIBE_PRIVATE_FIXTURE = 'must-not-leak';
+  t.after(() => {
+    if (prior === undefined) delete process.env.VIBE_PRIVATE_FIXTURE;
+    else process.env.VIBE_PRIVATE_FIXTURE = prior;
+    fs.rmSync(root, { recursive: true, force: true });
+  });
+  diagnostic(root, 'restricted', `module.exports={id:'restricted',name:'restricted',layer:'TASK',evidenceType:'STATIC',async run(){return {status:process.env.VIBE_PRIVATE_FIXTURE?'ERROR':'OK',details:'restricted'}}}`);
+  diagnostic(root, 'allowed', `module.exports={id:'allowed',name:'allowed',layer:'TASK',evidenceType:'TEST',allowedEnv:['VIBE_PRIVATE_FIXTURE'],async run(){return {status:process.env.VIBE_PRIVATE_FIXTURE==='must-not-leak'?'OK':'ERROR',details:'allowed'}}}`);
+  const report = await runDiagnosticsReport(root, { persist: false, compareBaseline: false });
+  assert.deepEqual(report.results.map(item => item.status), ['OK', 'OK']);
+});
+
+test('cartridge and symbol checks use exact semantic matches', t => {
+  const root = project();
+  t.after(() => fs.rmSync(root, { recursive: true, force: true }));
+  const dir = path.join(root, 'src', 'components', 'cartridges');
+  fs.mkdirSync(dir, { recursive: true });
+  fs.writeFileSync(path.join(dir, 'PaymentPanelExtra.js'), 'const PaymentPanelExtra = 1; // RequiredAction only in comment\n');
+  const missing = analyzeCartridgeIntegrity(root, { requiredCartridges: ['PaymentPanel'], requiredSymbols: ['RequiredAction'] });
+  assert.equal(missing.errors.length, 2);
+  fs.writeFileSync(path.join(dir, 'PaymentPanel.js'), 'function RequiredAction() {}\nmodule.exports = { RequiredAction };\n');
+  const present = analyzeCartridgeIntegrity(root, { requiredCartridges: ['PaymentPanel'], requiredSymbols: ['RequiredAction'] });
+  assert.deepEqual(present.errors, []);
 });
 
 test('refuses repair application without explicit approval', async t => {

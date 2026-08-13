@@ -74,8 +74,8 @@ async function main() {
 
   const installedPackage = require(path.join(consumerDir, 'node_modules', 'vibe-diagnosis', 'package.json'));
   const installedMcpPackage = require(path.join(consumerDir, 'node_modules', 'vibe-diagnosis-mcp', 'package.json'));
-  assert.equal(installedPackage.version, '1.6.2');
-  assert.equal(installedMcpPackage.version, '1.6.2');
+  assert.equal(installedPackage.version, '1.6.3');
+  assert.equal(installedMcpPackage.version, '1.6.3');
   assert.ok(fs.existsSync(path.join(consumerDir, 'node_modules', 'vibe-diagnosis', 'src', 'dashboard-control.js')));
 
   const entry = path.join(consumerDir, 'node_modules', 'vibe-diagnosis-mcp', 'index.js');

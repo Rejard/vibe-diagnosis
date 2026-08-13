@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { parseAst, walk } = require('./assertions');
 
 function extractLiteral(source, key) {
   const match = source.match(new RegExp(`(?:^|[,{])\\s*${key}\\s*:\\s*['\"]([^'\"]+)['\"]`));
@@ -11,11 +12,50 @@ function extractArray(source, key) {
   return match ? [...match[1].matchAll(/['\"]([^'\"]+)['\"]/g)].map(item => item[1]) : [];
 }
 
+function propertyName(property) {
+  if (!property?.computed && property?.key?.name) return property.key.name;
+  if (property?.key?.type === 'Literal') return property.key.value;
+  return null;
+}
+
+function moduleExportObject(source) {
+  const ast = parseAst(source);
+  let exported = null;
+  walk(ast, node => {
+    if (exported || node.type !== 'AssignmentExpression' || node.right?.type !== 'ObjectExpression') return;
+    const left = node.left;
+    if (left?.type === 'MemberExpression' && left.object?.name === 'module' && propertyName({ key: left.property, computed: left.computed }) === 'exports') exported = node.right;
+  });
+  return exported;
+}
+
+function staticValue(object, key) {
+  const property = object?.properties?.find(item => propertyName(item) === key);
+  if (!property) return undefined;
+  if (property.value?.type === 'Literal') return property.value.value;
+  if (property.value?.type === 'ArrayExpression') {
+    const values = property.value.elements.map(item => item?.type === 'Literal' ? item.value : undefined);
+    return values.every(value => typeof value === 'string') ? values : undefined;
+  }
+  return undefined;
+}
+
+function hasRunFunction(object) {
+  return Boolean(object?.properties?.some(property => propertyName(property) === 'run' && (
+    property.method || ['FunctionExpression', 'ArrowFunctionExpression'].includes(property.value?.type)
+  )));
+}
+
 function inspectDiagnosticSource(filePath) {
   const source = fs.readFileSync(filePath, 'utf8');
-  const declaredId = extractLiteral(source, 'id');
-  const declaredName = extractLiteral(source, 'name');
-  const declaredLayer = extractLiteral(source, 'layer');
+  let object = null;
+  let astError = null;
+  try { object = moduleExportObject(source); } catch (error) { astError = error; }
+  const value = key => object ? staticValue(object, key) : extractLiteral(source, key);
+  const array = key => object ? (staticValue(object, key) || []) : extractArray(source, key);
+  const declaredId = value('id');
+  const declaredName = value('name');
+  const declaredLayer = value('layer');
   const id = declaredId || path.basename(filePath, '.diag.js');
   const name = declaredName || path.basename(filePath);
   const layer = declaredLayer || 'UNKNOWN';
@@ -23,20 +63,23 @@ function inspectDiagnosticSource(filePath) {
   if (!declaredId) errors.push('Static metadata inspection could not find a literal id.');
   if (!declaredName) errors.push('Static metadata inspection could not find a literal name.');
   if (!['TASK', 'FUNCTION', 'SYSTEM'].includes(layer)) errors.push(`Invalid or missing layer: ${layer}`);
-  if (!/(?:async\s+)?run\s*(?:\(|:)/.test(source)) errors.push('Static metadata inspection could not find run().');
+  if (astError) errors.push(`AST metadata inspection failed: ${astError.message}`);
+  if (object ? !hasRunFunction(object) : !/(?:async\s+)?run\s*(?:\(|:)/.test(source)) errors.push('Static metadata inspection could not find run().');
   return {
     filePath,
     id,
     name,
     layer,
-    linkedTask: extractLiteral(source, 'linkedTask'),
-    severity: extractLiteral(source, 'severity') || 'UNSPECIFIED',
-    scope: extractLiteral(source, 'scope') || 'GENERAL',
-    evidenceType: extractLiteral(source, 'evidenceType') || 'UNSPECIFIED',
-    tags: extractArray(source, 'tags'),
-    dependencies: extractArray(source, 'dependencies'),
-    files: extractArray(source, 'files'),
-    cache: /(?:^|[,{])\s*cache\s*:\s*true\b/.test(source),
+    linkedTask: value('linkedTask') || null,
+    severity: value('severity') || 'UNSPECIFIED',
+    scope: value('scope') || 'GENERAL',
+    evidenceType: value('evidenceType') || 'UNSPECIFIED',
+    executionProfile: value('executionProfile') || null,
+    allowedEnv: array('allowedEnv'),
+    tags: array('tags'),
+    dependencies: array('dependencies'),
+    files: array('files'),
+    cache: object ? staticValue(object, 'cache') === true : /(?:^|[,{])\s*cache\s*:\s*true\b/.test(source),
     valid: errors.length === 0,
     errors,
     source,

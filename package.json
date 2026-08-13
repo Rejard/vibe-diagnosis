@@ -1,6 +1,6 @@
 {
   "name": "vibe-diagnosis",
-  "version": "1.6.2",
+  "version": "1.6.3",
   "description": "Self-diagnosis framework for vibe coding projects",
   "main": "src/runner.js",
   "bin": {
@@ -22,7 +22,8 @@
     "test:example": "node bin/vibe-diag.js run --cwd examples/calculator --json",
     "test:rollback": "node examples/safe-repair-lab/verify-rollback.cjs",
     "test:packed": "node scripts/verify-packed-install.cjs",
-    "test:secrets": "node scripts/scan-secrets.cjs"
+    "test:secrets": "node scripts/scan-secrets.cjs",
+    "test:scale": "node scripts/benchmark-scale.cjs"
   },
   "dependencies": {
     "acorn": "^8.15.0"

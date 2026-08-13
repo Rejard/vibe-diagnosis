@@ -6,7 +6,16 @@ Evidence-first diagnostics and approval-gated repair for AI-assisted coding.
 
 Vibe Diagnosis gives coding agents a mechanical way to prove that a task works before they report completion. Projects define lightweight `.diag.js` checks; the runner executes them in isolation, records structured evidence, evaluates release or live-operation gates, and issues a completion receipt bound to the current workspace.
 
-Version: **1.6.2**
+Version: **1.6.3**
+
+## What 1.6.3 adds
+
+- Neutral synthetic catalogs validate discovery, selection, and audit behavior at 100, 500, and 1,000 diagnostics without depending on any external project.
+- `STATIC` and `TEST` diagnostics default to a restricted environment. They receive only process-launch essentials plus names explicitly declared in `allowedEnv`; `STANDARD` and explicitly privileged `LIVE` profiles remain available for runtime evidence.
+- MCP protocol output now uses a transport-owned stdout writer. Application logs and accidental stdout writes are routed to stderr without guessing from a `jsonrpc` substring.
+- Diagnostic metadata selection reads the exported object through AST inspection, avoiding decoy literals elsewhere in source code.
+- Cartridge names require exact file basenames, and required JavaScript symbols use AST identifiers or exact JSX tags instead of substring matches.
+- Executable stdio handshakes cover generic Codex, Claude Code, and Gemini CLI client identities.
 
 ## What 1.6.2 adds
 
@@ -56,9 +65,9 @@ Legacy `.diag.js` files that return `OK`, `WARNING`, or `ERROR` continue to run 
 ## Quick start with the CLI
 
 ```bash
-npx -y vibe-diagnosis@1.6.2 init
-npx -y vibe-diagnosis@1.6.2 run --json
-npx -y vibe-diagnosis@1.6.2 complete
+npx -y vibe-diagnosis@1.6.3 init
+npx -y vibe-diagnosis@1.6.3 run --json
+npx -y vibe-diagnosis@1.6.3 complete
 ```
 
 Initialization creates `.vibe-diagnosis/`, a sample diagnostic, and the Vibe Diagnosis rule block for supported agent rule files. The directory contains project diagnostics plus local run evidence, repair plans, and optional BYOK data. Runtime and secret-bearing paths are added to `.gitignore` while diagnostics remain trackable.
@@ -68,8 +77,8 @@ Diagnostics are trusted project code and run with the permissions of the invokin
 The dashboard is optional and starts only when requested:
 
 ```bash
-npx -y vibe-diagnosis@1.6.2 dashboard
-npx -y vibe-diagnosis@1.6.2 stop
+npx -y vibe-diagnosis@1.6.3 dashboard
+npx -y vibe-diagnosis@1.6.3 stop
 ```
 
 ## MCP setup
@@ -81,7 +90,7 @@ Add the server to the MCP configuration used by your coding agent:
   "mcpServers": {
     "vibe-diagnosis": {
       "command": "npx",
-      "args": ["-y", "vibe-diagnosis-mcp@1.6.2"]
+      "args": ["-y", "vibe-diagnosis-mcp@1.6.3"]
     }
   }
 }
@@ -90,13 +99,13 @@ Add the server to the MCP configuration used by your coding agent:
 Claude Code on macOS, Linux, or WSL:
 
 ```bash
-claude mcp add vibe-diagnosis --scope local -- npx -y vibe-diagnosis-mcp@1.6.2
+claude mcp add vibe-diagnosis --scope local -- npx -y vibe-diagnosis-mcp@1.6.3
 ```
 
 Claude Code on native Windows:
 
 ```powershell
-claude mcp add vibe-diagnosis --scope local -- cmd /c npx -y vibe-diagnosis-mcp@1.6.2
+claude mcp add vibe-diagnosis --scope local -- cmd /c npx -y vibe-diagnosis-mcp@1.6.3
 ```
 
 Common configuration locations:

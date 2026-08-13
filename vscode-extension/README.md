@@ -3,9 +3,9 @@
 [![VS Code Marketplace](https://img.shields.io/visual-studio-marketplace/v/Rejard.vibe-diagnosis-vscode?style=flat-square&color=blue)](https://marketplace.visualstudio.com/items?itemName=Rejard.vibe-diagnosis-vscode)
 [![Open VSX](https://img.shields.io/open-vsx/v/Rejard/vibe-diagnosis-vscode?style=flat-square&color=purple)](https://open-vsx.org/extension/Rejard/vibe-diagnosis-vscode)
 
-VS Code integration for Vibe Diagnosis 1.6.2. Run project diagnostics, inspect failures in the Problems panel, open the optional authenticated local dashboard, and review a fully sealed repair plan before approving any file change.
+VS Code integration for Vibe Diagnosis 1.6.3. Run project diagnostics, inspect failures in the Problems panel, open the optional authenticated local dashboard, and review a fully sealed repair plan before approving any file change.
 
-Version 1.6.2 retains the 1.6.1 project execution lock and adds complete repair-plan integrity, protected-file mutation detection, legacy BYOK ignore migration, preserved completion receipts, and authenticated dashboard identity checks.
+Version 1.6.3 retains the 1.6 safety contracts and adds restricted STATIC/TEST environments, AST-based metadata inspection, stronger MCP stdio isolation, and neutral large-catalog validation.
 
 ## Requirements
 
@@ -59,7 +59,7 @@ Install the MCP server separately:
   "mcpServers": {
     "vibe-diagnosis": {
       "command": "npx",
-      "args": ["-y", "vibe-diagnosis-mcp@1.6.2"]
+      "args": ["-y", "vibe-diagnosis-mcp@1.6.3"]
     }
   }
 }
@@ -67,7 +67,7 @@ Install the MCP server separately:
 
 ## 한국어 안내
 
-Vibe Diagnosis 1.6.2 확장은 프로젝트 단일 실행 잠금에 더해 수리 계획 전체 무결성, 보호 파일 변경 감지, BYOK Git 제외 마이그레이션, 완료 영수증 보존, 인증된 대시보드 식별을 제공합니다.
+Vibe Diagnosis 1.6.3 확장은 기존 안전 계약에 더해 제한된 STATIC·TEST 환경, AST 기반 메타데이터 검사, 강화된 MCP stdio 분리, 중립적인 대규모 진단 검증을 제공합니다.
 
 명령 팔레트에서 다음 명령을 사용할 수 있습니다.
 

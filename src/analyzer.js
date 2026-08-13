@@ -1,5 +1,6 @@
 const fs = require('fs');
 const path = require('path');
+const { parseAst, walk } = require('./assertions');
 
 /**
  * Recursively find all files with specific extensions in a directory
@@ -285,7 +286,8 @@ function analyzeCartridgeIntegrity(projectDir, customConfig) {
     const found = [cartridgeDir, altCartridgeDir].some(dir => {
       if (!fs.existsSync(dir)) return false;
       const files = fs.readdirSync(dir);
-      return files.some(f => f.toLowerCase().includes(req.toLowerCase()));
+      const expected = req.toLowerCase().replace(/\.(?:jsx?|tsx?|vue|svelte)$/i, '');
+      return files.some(file => path.basename(file, path.extname(file)).toLowerCase() === expected);
     });
 
     if (!found) {
@@ -299,7 +301,20 @@ function analyzeCartridgeIntegrity(projectDir, customConfig) {
     for (const file of allSourceFiles) {
       try {
         const content = fs.readFileSync(file, 'utf-8');
-        if (content.includes(sym)) {
+        const expected = String(sym).replace(/^<|\/?\s*>$/g, '').trim();
+        let found = false;
+        if (/^[A-Za-z_$][\w$]*$/.test(expected)) {
+          try {
+            const ast = parseAst(content);
+            walk(ast, node => {
+              if (node.type === 'Identifier' && node.name === expected) found = true;
+            });
+          } catch {
+            const jsxTag = new RegExp(`<\\/?\\s*${expected.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?:\\s|/?>)`);
+            found = jsxTag.test(content);
+          }
+        }
+        if (found) {
           symFound = true;
           break;
         }

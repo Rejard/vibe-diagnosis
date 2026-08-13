@@ -1,6 +1,13 @@
 # Change Log
 
-## 1.6.2 (Current)
+## 1.6.3 (Current)
+
+- Added restricted STATIC/TEST diagnostic environments with explicit environment allowlists.
+- Replaced heuristic MCP stdout filtering with transport-owned protocol output.
+- Added AST metadata and symbol inspection plus neutral 100/500/1,000 diagnostic scale fixtures.
+- Added generic Codex, Claude Code, and Gemini CLI stdio compatibility contracts.
+
+## 1.6.2
 
 - Sealed all safety-relevant repair fields and made repair application share the project execution lock.
 - Added legacy BYOK ignore migration and protected ignored-file mutation detection.

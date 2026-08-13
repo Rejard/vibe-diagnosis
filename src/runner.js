@@ -47,7 +47,12 @@ async function runDiagnosticsReportUnlocked(projectDir, options = {}) {
         results.push({ ...cache[key], cached: true });
         continue;
       }
-      const result = await executeDiagnostic(resolvedProjectDir, descriptor.filePath, options);
+      const result = await executeDiagnostic(resolvedProjectDir, descriptor.filePath, {
+        ...options,
+        evidenceType: descriptor.evidenceType,
+        executionProfile: descriptor.executionProfile,
+        allowedEnv: descriptor.allowedEnv,
+      });
       const fragileWarnings = detectFragileStringChecks(descriptor.source);
       result.warnings = [...(result.warnings || []), ...fragileWarnings];
       results.push(result);

@@ -5,6 +5,23 @@ const { redactValue } = require('./redaction');
 
 const DEFAULT_TIMEOUT_MS = 120000;
 const MAX_OUTPUT_BYTES = 1024 * 1024;
+const RESTRICTED_ENV = new Set(['PATH', 'PATHEXT', 'SYSTEMROOT', 'WINDIR', 'TEMP', 'TMP', 'COMSPEC', 'HOME', 'USERPROFILE', 'LANG', 'LC_ALL', 'TZ', 'CI', 'GITHUB_ACTIONS']);
+
+function resolveExecutionProfile(options = {}) {
+  if (options.executionProfile) return options.executionProfile;
+  return ['STATIC', 'TEST'].includes(options.evidenceType) ? 'RESTRICTED' : 'STANDARD';
+}
+
+function workerEnvironment(options = {}) {
+  const executionProfile = resolveExecutionProfile(options);
+  if (executionProfile !== 'RESTRICTED') return { ...process.env, VIBE_DIAG_ISOLATED: '1', VIBE_DIAG_EXECUTION_PROFILE: executionProfile };
+  const allowed = new Set([...RESTRICTED_ENV, ...(options.allowedEnv || [])].map(name => name.toUpperCase()));
+  const env = {};
+  for (const [name, value] of Object.entries(process.env)) {
+    if (allowed.has(name.toUpperCase())) env[name] = value;
+  }
+  return { ...env, VIBE_DIAG_ISOLATED: '1', VIBE_DIAG_EXECUTION_PROFILE: executionProfile };
+}
 
 function appendLimited(current, chunk) {
   const next = current + chunk.toString('utf8');
@@ -35,7 +52,7 @@ function runAttempt(projectDir, filePath, options = {}) {
     let settled = false;
     const child = fork(workerPath, [projectDir, filePath], {
       cwd: projectDir,
-      env: { ...process.env, VIBE_DIAG_ISOLATED: '1' },
+      env: workerEnvironment(options),
       silent: true,
       windowsHide: true,
       detached: process.platform !== 'win32',
@@ -100,4 +117,4 @@ async function executeDiagnostic(projectDir, filePath, options = {}) {
   return redactValue({ ...secondResult, attempts, firstFailure: firstResult });
 }
 
-module.exports = { executeDiagnostic, runAttempt, DEFAULT_TIMEOUT_MS };
+module.exports = { executeDiagnostic, runAttempt, workerEnvironment, resolveExecutionProfile, DEFAULT_TIMEOUT_MS };
