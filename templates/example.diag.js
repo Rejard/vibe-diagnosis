@@ -13,6 +13,8 @@ module.exports = {
   dependencies: [],
   files: ['src/example.js'],
   cache: false,
+  diagnosticNecessity: 3,
+  necessityReason: 'Run when the declared files change; this example is not a mandatory routine check.',
 
   async run(ctx) {
     const isWorking = true;

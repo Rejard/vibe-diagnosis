@@ -82,7 +82,7 @@ function runAttempt(projectDir, filePath, options = {}) {
 
 function fallbackModule(filePath, packet) {
   const base = path.basename(filePath, '.diag.js');
-  return packet?.module || { id: base, name: path.basename(filePath), layer: 'UNKNOWN', linkedTask: null, severity: 'UNSPECIFIED', scope: 'GENERAL', evidenceType: 'UNSPECIFIED', blocksRelease: false, blocksLiveTrading: false, confidence: null, lastVerifiedAt: null, tags: [], dependencies: [], files: [], cache: false, timeoutMs: null };
+  return packet?.module || { id: base, name: path.basename(filePath), layer: 'UNKNOWN', linkedTask: null, severity: 'UNSPECIFIED', scope: 'GENERAL', evidenceType: 'UNSPECIFIED', blocksRelease: false, blocksLiveTrading: false, confidence: null, lastVerifiedAt: null, tags: [], dependencies: [], files: [], cache: false, timeoutMs: null, diagnosticNecessity: 4, necessityReason: 'Legacy diagnostic default (4/5)' };
 }
 
 function attemptToResult(filePath, attempt) {

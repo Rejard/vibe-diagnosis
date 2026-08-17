@@ -4,6 +4,11 @@ const { summarizeResults } = require('./run-summary');
 const LAYERS = { TASK: 'TASK', FUNCTION: 'FUNC', SYSTEM: 'SYS ', UNKNOWN: '??? ' };
 const ICONS = { OK: '\x1b[32mOK     \x1b[0m', WARNING: '\x1b[33mWARNING\x1b[0m', ERROR: '\x1b[31mERROR  \x1b[0m' };
 
+function stars(value) {
+  const count = Number.isInteger(value) ? Math.max(1, Math.min(5, value)) : 4;
+  return `${'*'.repeat(count)}${'.'.repeat(5 - count)}`;
+}
+
 function asReport(value) {
   if (!Array.isArray(value)) return value;
   return { results: value, ...summarizeResults(value), schemaVersion: 2, timestamp: new Date().toISOString() };
@@ -17,11 +22,13 @@ function formatResults(value, projectDir) {
   for (const result of report.results) {
     const layer = LAYERS[result.layer] || LAYERS.UNKNOWN;
     const classification = result.classification ? `/${result.classification}` : '';
-    lines.push(`  ${layer} | ${result.id.padEnd(28)} | ${ICONS[result.status] || ICONS.ERROR} | ${result.details}${classification}`);
+    lines.push(`  ${layer} | ${stars(result.diagnosticNecessity)} | ${result.id.padEnd(28)} | ${ICONS[result.status] || ICONS.ERROR} | ${result.details}${classification}`);
     if (result.execution?.stderr) lines.push(`       stderr: ${result.execution.stderr.trim().slice(0, 500)}`);
   }
   lines.push('  -----------------------------------------------------------------');
   lines.push(`  Total: ${report.summary.total} | OK: ${report.summary.ok} | WARN: ${report.summary.warning} | ERR: ${report.summary.error} | FLAKY: ${report.summary.flaky || 0}`);
+  if (report.skippedDiagnostics?.length) lines.push(`  Skipped: ${report.skippedDiagnostics.length} | ${report.skippedDiagnostics.map(item => `${item.id}(${item.skipReason})`).join(', ')}`);
+  if (report.removedDiagnostics?.length) lines.push(`  Removed (recoverable): ${report.removedDiagnostics.length}`);
   lines.push(`  Overall: ${report.overallStatus} - Health ${report.healthPercent}%`);
   lines.push(`  Release: ${report.gates.releaseStatus} | Live: ${report.gates.liveTradingStatus} | Live evidence: ${report.evidenceSummary.liveEvidenceStatus}`, '');
   return lines.join('\n');

@@ -74,8 +74,8 @@ async function main() {
 
   const installedPackage = require(path.join(consumerDir, 'node_modules', 'vibe-diagnosis', 'package.json'));
   const installedMcpPackage = require(path.join(consumerDir, 'node_modules', 'vibe-diagnosis-mcp', 'package.json'));
-  assert.equal(installedPackage.version, '1.6.3');
-  assert.equal(installedMcpPackage.version, '1.6.3');
+  assert.equal(installedPackage.version, '1.7.0');
+  assert.equal(installedMcpPackage.version, '1.7.0');
   assert.ok(fs.existsSync(path.join(consumerDir, 'node_modules', 'vibe-diagnosis', 'src', 'dashboard-control.js')));
 
   const entry = path.join(consumerDir, 'node_modules', 'vibe-diagnosis-mcp', 'index.js');
@@ -85,7 +85,7 @@ async function main() {
     client.child.stdin.write(`${JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' })}\n`);
     const listed = await client.request('tools/list', {});
     const tools = new Map(listed.result.tools.map(tool => [tool.name, tool]));
-    for (const name of ['run_diagnostics', 'complete_task_diagnostics', 'verify_completion_receipt', 'open_dashboard', 'stop_dashboard', 'plan_repair', 'apply_repair_plan']) assert.ok(tools.has(name), `Packed MCP missing ${name}`);
+    for (const name of ['run_diagnostics', 'complete_task_diagnostics', 'verify_completion_receipt', 'open_dashboard', 'stop_dashboard', 'plan_repair', 'apply_repair_plan', 'set_diagnostic_state', 'remove_diagnostic', 'restore_diagnostic']) assert.ok(tools.has(name), `Packed MCP missing ${name}`);
     assert.equal(tools.get('run_diagnostics').inputSchema.properties.autoLaunchDashboard.default, false);
     const completed = await client.request('tools/call', { name: 'complete_task_diagnostics', arguments: { projectDir } });
     assert.notEqual(completed.result.isError, true);

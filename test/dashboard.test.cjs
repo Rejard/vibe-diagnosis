@@ -9,7 +9,7 @@ const { startDashboard } = require('../src/dashboard');
 const { stopDashboard, probeDashboard } = require('../src/dashboard-control');
 const { readDashboardConnection, postJson, buildRepairApproval } = require('../vscode-extension/src/dashboard-client');
 
-test('dashboard API returns the centralized V1.6 report', async t => {
+test('dashboard API returns the centralized V1.7 report', async t => {
   const root = fs.mkdtempSync(path.join(os.tmpdir(), 'vibe-dashboard-'));
   fs.mkdirSync(path.join(root, '.vibe-diagnosis', 'diagnostics'), { recursive: true });
   fs.writeFileSync(path.join(root, '.vibe-diagnosis', 'diagnostics', 'ok.diag.js'), `module.exports={id:'ok',name:'ok',layer:'TASK',evidenceType:'STATIC',async run(){return {status:'OK',details:'ok'}}}`, 'utf8');
@@ -24,7 +24,7 @@ test('dashboard API returns the centralized V1.6 report', async t => {
   assert.equal((await metricsBeforeRun.json()).diagnosticsEvaluated, false);
   const response = await fetch(`http://127.0.0.1:${port}/api/run`, { method: 'POST', headers: { 'X-Vibe-Dashboard-Token': lock.token } });
   const report = await response.json();
-  assert.equal(report.schemaVersion, 2);
+  assert.equal(report.schemaVersion, 3);
   assert.equal(report.summary.ok, 1);
   assert.equal(report.gates.releaseStatus, 'NOT_EVALUATED');
   assert.equal(report.evidenceSummary.liveEvidenceStatus, 'UNVERIFIED');
@@ -75,6 +75,34 @@ test('dashboard client handles conflict responses before reading results and alw
   assert.match(html, /DIAGNOSTICS_ALREADY_RUNNING/);
   assert.match(html, /Array\.isArray\(data\.results\)/);
   assert.match(html, /finally\s*\{\s*btn\.classList\.remove\('running'\)/);
+  assert.match(html, /necessityStars/);
+  assert.match(html, /setDiagnosticStateUi/);
+  assert.match(html, /removeDiagnosticUi/);
+});
+
+test('dashboard manages diagnostic state and recoverable removal through authenticated HTTP', async t => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'vibe-dashboard-policy-'));
+  const diagnosticsDir = path.join(root, '.vibe-diagnosis', 'diagnostics');
+  fs.mkdirSync(diagnosticsDir, { recursive: true });
+  fs.writeFileSync(path.join(diagnosticsDir, 'policy.diag.js'), `module.exports={id:'policy',name:'policy',layer:'TASK',diagnosticNecessity:5,necessityReason:'silent regression',async run(){return {status:'OK'}}}`);
+  const server = startDashboard(root, 0, { openBrowser: false });
+  t.after(() => { if (server.listening) server.close(); fs.rmSync(root, { recursive: true, force: true }); });
+  await new Promise(resolve => server.once('listening', resolve));
+  const lock = JSON.parse(fs.readFileSync(path.join(root, '.vibe-diagnosis', 'active_port.json'), 'utf8'));
+  const post = (route, body) => fetch(`http://127.0.0.1:${lock.port}${route}`, { method: 'POST', headers: { 'Content-Type': 'application/json', 'X-Vibe-Dashboard-Token': lock.token }, body: JSON.stringify(body) });
+  const disabled = await post('/api/diagnostics/state', { diagnosticId: 'policy', state: 'DISABLED', reason: 'intentional hold' });
+  assert.equal(disabled.status, 200);
+  const list = await fetch(`http://127.0.0.1:${lock.port}/api/list`, { headers: { 'X-Vibe-Dashboard-Token': lock.token } });
+  const listed = await list.json();
+  assert.equal(listed[0].diagnosticNecessity, 5);
+  assert.equal(listed[0].diagnosticState, 'DISABLED');
+  const removed = await post('/api/diagnostics/remove', { diagnosticId: 'policy', confirmed: true, reason: 'not applicable' });
+  assert.equal(removed.status, 200);
+  const removedList = await fetch(`http://127.0.0.1:${lock.port}/api/list`, { headers: { 'X-Vibe-Dashboard-Token': lock.token } });
+  assert.equal((await removedList.json())[0].diagnosticState, 'REMOVED');
+  const restored = await post('/api/diagnostics/restore', { diagnosticId: 'policy' });
+  assert.equal(restored.status, 200);
+  assert.equal(fs.existsSync(path.join(diagnosticsDir, 'policy.diag.js')), true);
 });
 
 test('VS Code dashboard client uses the project lock port and authentication token', async t => {

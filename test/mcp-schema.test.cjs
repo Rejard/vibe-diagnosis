@@ -5,7 +5,7 @@ const os = require('os');
 const path = require('path');
 const { spawn } = require('child_process');
 
-test('MCP exposes V1.6 report filters and approval-first repair tools', async () => {
+test('MCP exposes V1.7 priority policy, report filters, and approval-first repair tools', async () => {
   const projectDir = fs.mkdtempSync(path.join(os.tmpdir(), 'vibe-mcp-completion-'));
   fs.mkdirSync(path.join(projectDir, '.vibe-diagnosis', 'diagnostics'), { recursive: true });
   fs.writeFileSync(path.join(projectDir, '.vibe-diagnosis', 'diagnostics', 'ok.diag.js'), `module.exports={id:'ok',name:'ok',layer:'TASK',async run(){return {status:'OK',details:'verified'}}}`, 'utf8');
@@ -37,9 +37,9 @@ test('MCP exposes V1.6 report filters and approval-first repair tools', async ()
     child.stdin.write(JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' }) + '\n');
     const listed = await request('tools/list', {});
     const tools = new Map(listed.result.tools.map(tool => [tool.name, tool]));
-    for (const name of ['run_diagnostics', 'complete_task_diagnostics', 'verify_completion_receipt', 'open_dashboard', 'stop_dashboard', 'plan_repair', 'apply_repair_plan', 'list_repair_incidents', 'audit_diagnostics']) assert.ok(tools.has(name), `missing ${name}`);
+    for (const name of ['run_diagnostics', 'complete_task_diagnostics', 'verify_completion_receipt', 'open_dashboard', 'stop_dashboard', 'plan_repair', 'apply_repair_plan', 'list_repair_incidents', 'audit_diagnostics', 'set_diagnostic_state', 'remove_diagnostic', 'restore_diagnostic']) assert.ok(tools.has(name), `missing ${name}`);
     const runProperties = tools.get('run_diagnostics').inputSchema.properties;
-    for (const name of ['ids', 'tags', 'scope', 'severity', 'useCache', 'baselineId']) assert.ok(runProperties[name], `run_diagnostics missing ${name}`);
+    for (const name of ['ids', 'tags', 'scope', 'severity', 'useCache', 'baselineId', 'includeOptional', 'forceDisabled']) assert.ok(runProperties[name], `run_diagnostics missing ${name}`);
     assert.equal(runProperties.autoLaunchDashboard.default, false);
     const applyProperties = tools.get('apply_repair_plan').inputSchema.properties;
     assert.ok(applyProperties.approved);
@@ -48,13 +48,27 @@ test('MCP exposes V1.6 report filters and approval-first repair tools', async ()
     assert.equal(tools.get('list_diagnostics').annotations.readOnlyHint, true);
     assert.equal(tools.get('verify_completion_receipt').annotations.readOnlyHint, true);
     assert.equal(tools.get('apply_repair_plan').annotations.destructiveHint, true);
+    assert.equal(tools.get('set_diagnostic_state').annotations.destructiveHint, true);
     assert.equal(tools.get('plan_repair').annotations.openWorldHint, true);
     const relative = await request('tools/call', { name: 'list_diagnostics', arguments: { projectDir: '.' } });
     assert.equal(relative.result.isError, true);
     const metadata = await request('tools/call', { name: 'list_diagnostics', arguments: { projectDir } });
     assert.equal(metadata.result.isError, undefined);
+    const metadataItems = JSON.parse(metadata.result.content[0].text);
+    assert.equal(metadataItems.find(item => item.id === 'ok').diagnosticNecessity, 4);
+    const disabled = await request('tools/call', { name: 'set_diagnostic_state', arguments: { projectDir, diagnosticId: 'ok', state: 'DISABLED', reason: 'test hold' } });
+    assert.equal(disabled.result.isError, undefined);
+    const disabledList = JSON.parse((await request('tools/call', { name: 'list_diagnostics', arguments: { projectDir } })).result.content[0].text);
+    assert.equal(disabledList.find(item => item.id === 'ok').diagnosticState, 'DISABLED');
+    await request('tools/call', { name: 'set_diagnostic_state', arguments: { projectDir, diagnosticId: 'ok', state: 'ENABLED' } });
     assert.equal(fs.existsSync(path.join(projectDir, 'module-loaded.txt')), false);
     fs.writeFileSync(path.join(projectDir, '.vibe-diagnosis', 'diagnostics', 'metadata.diag.js'), `module.exports={id:'metadata',name:'metadata',layer:'TASK',async run(){return {status:'OK'}}}`, 'utf8');
+    const removed = await request('tools/call', { name: 'remove_diagnostic', arguments: { projectDir, diagnosticId: 'metadata', confirmed: true, reason: 'test recoverable removal' } });
+    assert.equal(removed.result.isError, undefined);
+    const removedList = JSON.parse((await request('tools/call', { name: 'list_diagnostics', arguments: { projectDir } })).result.content[0].text);
+    assert.equal(removedList.find(item => item.id === 'metadata').diagnosticState, 'REMOVED');
+    const restored = await request('tools/call', { name: 'restore_diagnostic', arguments: { projectDir, diagnosticId: 'metadata' } });
+    assert.equal(restored.result.isError, undefined);
     const rulesBefore = fs.existsSync(path.join(projectDir, 'AGENTS.md')) ? fs.readFileSync(path.join(projectDir, 'AGENTS.md'), 'utf8') : null;
     const completed = await request('tools/call', { name: 'complete_task_diagnostics', arguments: { projectDir } });
     const report = JSON.parse(completed.result.content[0].text);

@@ -1,13 +1,13 @@
 # vibe-diagnosis-mcp
 
-The primary Vibe Diagnosis 1.6.3 interface for AI coding agents.
+The primary Vibe Diagnosis 1.7.0 interface for AI coding agents.
 
 This package is designed to be operated through natural-language instructions in Codex, Claude Code, Cursor, Windsurf, Gemini CLI, Antigravity, and other MCP clients. The user describes the desired workflow; the agent maps that request to diagnosis, completion, dashboard, context, or approval-gated repair tools.
 
 ## Give this to your coding agent
 
 ```text
-Connect Vibe Diagnosis 1.6.3 to this coding tool as a project-local MCP server using npx and vibe-diagnosis-mcp@1.6.3. Detect and follow the client's actual MCP configuration format. Verify the server by initializing MCP and listing its tools. Do not initialize or modify the project yet. Do not store API keys in the MCP config. If a client restart is required, tell me exactly what was changed and wait.
+Connect Vibe Diagnosis 1.7.0 to this coding tool as a project-local MCP server using npx and vibe-diagnosis-mcp@1.7.0. Detect and follow the client's actual MCP configuration format. Verify the server by initializing MCP and listing its tools. Do not initialize or modify the project yet. Do not store API keys in the MCP config. If a client restart is required, tell me exactly what was changed and wait.
 ```
 
 After reconnecting:
@@ -21,7 +21,7 @@ Verify that the Vibe Diagnosis MCP exposes init_diagnostics, list_diagnostics, r
 Put this in the project instructions used by the coding agent:
 
 ```text
-For every development task, use Vibe Diagnosis before implementation to inspect existing diagnostics, during implementation for focused executable checks, and immediately before completion for the full uncached completion gate. A task is not complete unless completion.eligible=true and verify_completion_receipt confirms the current workspace. The dashboard is optional. Never apply a repair plan without the user's approval of the exact plan and integrity checksum, and require separate approval for high-risk changes.
+For every development task, use Vibe Diagnosis before implementation to inspect existing diagnostics, during implementation for focused executable checks, and immediately before completion for the uncached priority-aware completion gate. Treat diagnosticNecessity as repeat-check value, not product importance: hidden AI regressions that survive build are 5, while stable checks already guaranteed elsewhere can be 1. Disclose every skipped or user-excluded check. A task is not complete unless completion.eligible=true and verify_completion_receipt confirms the current workspace and policy. The dashboard is optional. Never apply a repair plan without the user's approval of the exact plan and integrity checksum, and require separate approval for high-risk changes.
 ```
 
 The agent can call `sync_agent_rules` to install the maintained Vibe Diagnosis rule block into an existing supported agent-rule file. It preserves surrounding project instructions and does not create every possible agent file.
@@ -45,8 +45,26 @@ Call run_diagnostics for the IDs, tags, scope, or severity related to this chang
 ### Final completion gate
 
 ```text
-Call complete_task_diagnostics immediately before reporting completion. Require the full uncached suite and completion.eligible=true. Then call verify_completion_receipt. If the workspace has changed or the receipt is invalid, rerun completion instead of relying on the old result.
+Call complete_task_diagnostics immediately before reporting completion. Require the uncached priority-aware suite, disclose priority skips and user exclusions, and require completion.eligible=true. Then call verify_completion_receipt. If the workspace or diagnostic policy changed, rerun completion instead of relying on the old receipt.
 ```
+
+### Check necessity and user exclusions
+
+`diagnosticNecessity` is an integer from 1 to 5. A declared value requires `necessityReason`. Legacy diagnostics remain compatible and default to 4.
+
+| Stars | Scheduler behavior |
+|---|---|
+| 5 | Always run; a user pause or disable blocks completion eligibility |
+| 4 | Routine and completion default |
+| 3 | Run when declared files changed |
+| 2 | Explicit optional/full run |
+| 1 | Rare manual or scheduled run |
+
+```text
+Call list_diagnostics and show every diagnostic's stars, reason, and state. Change <diagnostic ID> to SKIP_ONCE, SNOOZED, DISABLED, or ENABLED only because I explicitly requested it. Record my reason and report the completion consequence. Use includeOptional=true only when I request the full enabled catalog; use forceDisabled=true only for an explicitly selected ID that I asked to run now.
+```
+
+`remove_diagnostic` requires `confirmed=true` and a reason. It moves the project `.diag.js` to ignored local trash and records a recoverable tombstone; it does not permanently erase the file. `restore_diagnostic` refuses path conflicts and restores the original path.
 
 ### Dashboard
 
@@ -96,6 +114,7 @@ Call sync_ai_context with action=save and record the current goal, last complete
 |---|---|---|
 | Initialize and inspect | `init_diagnostics`, `list_diagnostics`, `audit_diagnostics` | Initialization creates project diagnostic scaffolding; list/audit are read-only |
 | Diagnose | `run_diagnostics` | Runs project diagnostics and can persist run evidence |
+| Check policy | `set_diagnostic_state`, `remove_diagnostic`, `restore_diagnostic` | Changes ignored local policy or recoverably moves/restores a project diagnostic |
 | Complete | `complete_task_diagnostics`, `verify_completion_receipt` | Runs full verification and validates the workspace-bound receipt |
 | Plan repair | `repair_diagnostic`, `plan_repair`, `heal_all`, `repair_omission` | Creates plans only |
 | Apply repair | `apply_repair_plan` | Mutates files only with exact approval and checksum; validates and rolls back on regression |
@@ -115,7 +134,7 @@ Use this only when the coding agent cannot configure its own MCP client safely:
   "mcpServers": {
     "vibe-diagnosis": {
       "command": "npx",
-      "args": ["-y", "vibe-diagnosis-mcp@1.6.3"]
+      "args": ["-y", "vibe-diagnosis-mcp@1.7.0"]
     }
   }
 }
@@ -124,13 +143,13 @@ Use this only when the coding agent cannot configure its own MCP client safely:
 Claude Code:
 
 ```bash
-claude mcp add vibe-diagnosis --scope local -- npx -y vibe-diagnosis-mcp@1.6.3
+claude mcp add vibe-diagnosis --scope local -- npx -y vibe-diagnosis-mcp@1.7.0
 ```
 
 Native Windows Claude Code:
 
 ```powershell
-claude mcp add vibe-diagnosis --scope local -- cmd /c npx -y vibe-diagnosis-mcp@1.6.3
+claude mcp add vibe-diagnosis --scope local -- cmd /c npx -y vibe-diagnosis-mcp@1.7.0
 ```
 
 Requirements: Node.js 20 or newer, `npx`, and a project workspace writable by the MCP client. Restart or reconnect the client after changing configuration.
@@ -154,7 +173,17 @@ Configure Vibe Diagnosis BYOK locally for <provider and model>. Ask me for the k
 
 Local keys are stored in `.vibe-diagnosis/byok.local.json`, which is ignored. Supported providers are OpenAI, Anthropic, Google Gemini, and OpenRouter.
 
-## Release 1.6.3 contracts
+## Release 1.7.0 contracts
+
+- One-to-five check-necessity metadata with legacy four-star defaults
+- Priority-aware automatic selection: 5/4 routine, 3 change-scoped, 2/1 explicit
+- Explicit enable, skip-once, snooze, and disable states with reasons and expiry
+- Recoverable remove/restore with guarded project and trash paths
+- Dashboard stars and authenticated state/remove/restore controls
+- MCP and CLI parity for policy and focused forced execution
+- Completion blocking for excluded 5-star diagnostics and policy-bound receipts
+
+The following 1.6 contracts remain supported:
 
 - Generic Codex, Claude Code, and Gemini CLI stdio initialization/tool-list handshakes
 - Neutral synthetic 100, 500, and 1,000 diagnostic discovery/selection/audit fixtures
@@ -162,7 +191,7 @@ Local keys are stored in `.vibe-diagnosis/byok.local.json`, which is ignored. Su
 - Restricted `STATIC`/`TEST` worker environments with explicit allowlists
 - Project-scoped cross-process single execution
 - Approval/checksum/high-risk-gated repair with regression rollback
-- Full completion eligibility and current receipt verification
+- Priority-aware completion eligibility and current receipt verification
 
 ## License
 

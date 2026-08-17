@@ -30,7 +30,7 @@ async function handshake(clientName) {
   });
   try {
     const initialized = await request('initialize', { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: clientName, version: 'test' } });
-    assert.equal(initialized.result.serverInfo.version, '1.6.3');
+    assert.equal(initialized.result.serverInfo.version, '1.7.0');
     child.stdin.write(JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' }) + '\n');
     const tools = await request('tools/list', {});
     assert.ok(tools.result.tools.some(tool => tool.name === 'complete_task_diagnostics'));
@@ -61,12 +61,15 @@ test('all three package READMEs lead with agent-directed vibe workflows', () => 
     fs.readFileSync(path.join(root, 'mcp-server', 'README.md'), 'utf8'),
   ];
   for (const document of documents) {
-    assert.match(document, /1\.6\.3/);
+    assert.match(document, /1\.7\.0/);
     assert.match(document, /complete_task_diagnostics/);
     assert.match(document, /verify_completion_receipt/);
     assert.match(document, /open_dashboard/);
     assert.match(document, /apply_repair_plan/);
     assert.match(document, /DIAGNOSTICS_ALREADY_RUNNING/);
+    assert.match(document, /diagnosticNecessity/);
+    assert.match(document, /set_diagnostic_state/);
+    assert.match(document, /restore_diagnostic/);
   }
   assert.match(documents[0], /Paste a diagnostic error back to the AI for repair/);
   assert.match(documents[1], /진단 오류를 복사해 AI에게 수리 요청/);

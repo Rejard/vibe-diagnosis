@@ -21,7 +21,7 @@ function loadBaseline(projectDir, baselineId) {
 }
 
 function stableResult(result) {
-  return JSON.stringify({ status: result.status, classification: result.classification || null, details: result.details || '', severity: result.severity, scope: result.scope });
+  return JSON.stringify({ status: result.status, classification: result.classification || null, details: result.details || '', severity: result.severity, scope: result.scope, diagnosticNecessity: result.diagnosticNecessity });
 }
 
 function compareToBaseline(results, baseline) {

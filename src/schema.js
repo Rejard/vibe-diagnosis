@@ -4,6 +4,7 @@ const VALID_CLASSIFICATIONS = ['CONTRACT_ERROR', 'TEST_FAILURE', 'RUNNER_ERROR',
 const VALID_SEVERITIES = ['INFO', 'LOW', 'MEDIUM', 'HIGH', 'CRITICAL'];
 const VALID_EVIDENCE_TYPES = ['STATIC', 'TEST', 'RUNTIME', 'DATA', 'PROVIDER', 'AUTHORITY', 'UI', 'LIVE_EVIDENCE', 'UNSPECIFIED'];
 const VALID_EXECUTION_PROFILES = ['RESTRICTED', 'STANDARD', 'LIVE'];
+const { DEFAULT_NECESSITY, normalizeNecessity } = require('./diagnostic-policy');
 
 function isNonEmptyString(value) {
   return typeof value === 'string' && value.trim().length > 0;
@@ -33,6 +34,15 @@ function validateDiagnosticModule(mod, filePath) {
   if (mod.lastVerifiedAt !== undefined && Number.isNaN(Date.parse(mod.lastVerifiedAt))) errors.push('invalid "lastVerifiedAt" (must be an ISO date)');
   if (mod.confidence !== undefined && (typeof mod.confidence !== 'number' || mod.confidence < 0 || mod.confidence > 1)) {
     errors.push('invalid "confidence" (must be a number between 0 and 1)');
+  }
+  if (mod.diagnosticNecessity !== undefined && (!Number.isInteger(mod.diagnosticNecessity) || mod.diagnosticNecessity < 1 || mod.diagnosticNecessity > 5)) {
+    errors.push('invalid "diagnosticNecessity" (must be an integer from 1 to 5)');
+  }
+  if (mod.necessityReason !== undefined && !isNonEmptyString(mod.necessityReason)) {
+    errors.push('invalid "necessityReason" (must be a non-empty string)');
+  }
+  if (mod.diagnosticNecessity !== undefined && !isNonEmptyString(mod.necessityReason)) {
+    errors.push('"necessityReason" is required when "diagnosticNecessity" is declared');
   }
   for (const field of ['blocksRelease', 'blocksLiveTrading']) {
     if (mod[field] !== undefined && typeof mod[field] !== 'boolean') errors.push(`invalid "${field}" (must be boolean)`);
@@ -102,6 +112,8 @@ function normalizeMetadata(mod = {}) {
     timeoutMs: Number.isFinite(mod.timeoutMs) ? Math.max(100, mod.timeoutMs) : null,
     executionProfile: mod.executionProfile || null,
     allowedEnv: Array.isArray(mod.allowedEnv) ? mod.allowedEnv : [],
+    diagnosticNecessity: normalizeNecessity(mod.diagnosticNecessity),
+    necessityReason: mod.necessityReason || (mod.diagnosticNecessity === undefined ? `Legacy diagnostic default (${DEFAULT_NECESSITY}/5)` : null),
   };
 }
 

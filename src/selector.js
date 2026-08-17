@@ -1,6 +1,7 @@
 const fs = require('fs');
 const path = require('path');
 const { parseAst, walk } = require('./assertions');
+const { normalizeNecessity } = require('./diagnostic-policy');
 
 function extractLiteral(source, key) {
   const match = source.match(new RegExp(`(?:^|[,{])\\s*${key}\\s*:\\s*['\"]([^'\"]+)['\"]`));
@@ -56,6 +57,8 @@ function inspectDiagnosticSource(filePath) {
   const declaredId = value('id');
   const declaredName = value('name');
   const declaredLayer = value('layer');
+  const declaredNecessity = object ? staticValue(object, 'diagnosticNecessity') : null;
+  const necessityReason = value('necessityReason') || null;
   const id = declaredId || path.basename(filePath, '.diag.js');
   const name = declaredName || path.basename(filePath);
   const layer = declaredLayer || 'UNKNOWN';
@@ -65,6 +68,8 @@ function inspectDiagnosticSource(filePath) {
   if (!['TASK', 'FUNCTION', 'SYSTEM'].includes(layer)) errors.push(`Invalid or missing layer: ${layer}`);
   if (astError) errors.push(`AST metadata inspection failed: ${astError.message}`);
   if (object ? !hasRunFunction(object) : !/(?:async\s+)?run\s*(?:\(|:)/.test(source)) errors.push('Static metadata inspection could not find run().');
+  if (declaredNecessity !== undefined && declaredNecessity !== null && (!Number.isInteger(declaredNecessity) || declaredNecessity < 1 || declaredNecessity > 5)) errors.push('diagnosticNecessity must be an integer from 1 to 5.');
+  if (declaredNecessity !== undefined && declaredNecessity !== null && !necessityReason) errors.push('necessityReason is required when diagnosticNecessity is declared.');
   return {
     filePath,
     id,
@@ -80,6 +85,10 @@ function inspectDiagnosticSource(filePath) {
     dependencies: array('dependencies'),
     files: array('files'),
     cache: object ? staticValue(object, 'cache') === true : /(?:^|[,{])\s*cache\s*:\s*true\b/.test(source),
+    blocksRelease: object ? staticValue(object, 'blocksRelease') === true : /(?:^|[,{])\s*blocksRelease\s*:\s*true\b/.test(source),
+    blocksLiveTrading: object ? staticValue(object, 'blocksLiveTrading') === true : /(?:^|[,{])\s*blocksLiveTrading\s*:\s*true\b/.test(source),
+    diagnosticNecessity: normalizeNecessity(declaredNecessity),
+    necessityReason: necessityReason || (declaredNecessity === undefined || declaredNecessity === null ? 'Legacy diagnostic default (4/5)' : null),
     valid: errors.length === 0,
     errors,
     source,

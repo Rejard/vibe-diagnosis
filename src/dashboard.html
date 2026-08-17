@@ -107,6 +107,9 @@ header{display:flex;align-items:center;justify-content:space-between;padding:20p
 .card.status-warning::before{background:var(--warn)}
 .card.status-error::before{background:var(--err)}
 .card.status-pending::before{background:var(--text3)}
+.card.card-disabled{opacity:.7;border-style:dashed}
+.card-necessity{color:#ffd166;font-size:15px;letter-spacing:1px;white-space:nowrap}
+.card-policy{font-size:11px;color:var(--text3);margin-top:6px}
 
 .card-header{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:12px}
 .card-name{font-size:15px;font-weight:600;line-height:1.3}
@@ -126,7 +129,10 @@ header{display:flex;align-items:center;justify-content:space-between;padding:20p
 .card-duration{font-size:12px;color:var(--text3)}
 .card-task{font-size:11px;color:var(--accent2);margin-top:4px}
 
-.card-actions{margin-top:12px;padding-top:12px;border-top:1px solid var(--border);display:flex;align-items:center;gap:8px}
+.card-actions{margin-top:12px;padding-top:12px;border-top:1px solid var(--border);display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.btn-policy{padding:6px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:7px;color:var(--text2);font-size:11px;font-weight:600;cursor:pointer;font-family:'Inter',sans-serif}
+.btn-policy:hover{border-color:var(--accent2);color:var(--text)}
+.btn-policy.danger:hover{border-color:var(--err);color:var(--err)}
 .btn-repair{
   display:flex;align-items:center;gap:6px;padding:6px 14px;
   background:var(--surface2);border:1px solid var(--border);border-radius:8px;
@@ -761,6 +767,7 @@ function apiFetch(url, options = {}) {
 
 let diagnosticsList = [];
 let lastResults = {};
+let lastSkipped = {};
 let byokConfigured = false;
 let repairStates = {};
 
@@ -768,6 +775,8 @@ let selectedCardId = null;
 let selectedCardName = null;
 
 function selectDiagnosticCard(cardId, cardName, event) {
+  cardId = decodeURIComponent(cardId);
+  cardName = decodeURIComponent(cardName);
   if (event && (event.target.closest('button') || event.target.closest('.card-actions'))) {
     return;
   }
@@ -780,6 +789,20 @@ function selectDiagnosticCard(cardId, cardName, event) {
   }
   loadTimelineHistory();
   updateCardsSelection();
+}
+
+function escapeHtml(value) {
+  return String(value == null ? '' : value)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function necessityStars(value) {
+  const count = Number.isInteger(value) ? Math.max(1, Math.min(5, value)) : 4;
+  return '&#9733;'.repeat(count) + '&#9734;'.repeat(5 - count);
 }
 
 function updateCardsSelection() {
@@ -825,12 +848,15 @@ function updateHealthRing(percent) {
 }
 
 function createCard(diag, result) {
-  const status = result ? result.status.toLowerCase() : 'pending';
-  const details = result ? result.details : 'Not yet tested';
-  const duration = result ? result.duration + 'ms' : '—';
+  const status = diag.removed || diag.diagnosticState !== 'ENABLED' ? 'pending' : result ? result.status.toLowerCase() : 'pending';
+  const skipped = lastSkipped[diag.id];
+  const details = diag.removed ? 'Recoverably removed' : diag.diagnosticState !== 'ENABLED' ? 'Excluded from automatic checks' : result ? result.details : skipped ? `Skipped: ${skipped.skipReason}` : 'Not yet tested';
+  const duration = result ? result.duration + 'ms' : '--';
   const layerClass = 'badge-' + (diag.layer || 'task').toLowerCase();
   const needsRepair = result && (result.status === 'ERROR' || result.status === 'WARNING');
   const repairState = repairStates[diag.id];
+  const encodedId = encodeURIComponent(diag.id);
+  const encodedName = encodeURIComponent(diag.name || diag.id);
 
   let repairHtml = '';
   if (needsRepair && byokConfigured) {
@@ -855,7 +881,7 @@ function createCard(diag, result) {
 
     repairHtml = `
       <div class="card-actions">
-        <button class="${btnClass}" ${disabled} onclick="repairDiagnostic('${diag.id}')">
+        <button class="${btnClass}" ${disabled} onclick="repairDiagnostic(decodeURIComponent('${encodedId}'))">
           ${btnContent}
         </button>
         ${summaryHtml}
@@ -863,23 +889,44 @@ function createCard(diag, result) {
     `;
   }
 
+  let policyActions;
+  if (diag.removed) {
+    policyActions = `<button class="btn-policy" onclick="restoreDiagnosticUi('${encodedId}')">Restore</button>`;
+  } else if (diag.diagnosticState === 'ENABLED') {
+    policyActions = `
+      <button class="btn-policy" onclick="runDiagnosticNow('${encodedId}')">Run now</button>
+      <button class="btn-policy" onclick="setDiagnosticStateUi('${encodedId}','SKIP_ONCE')">Skip once</button>
+      <button class="btn-policy" onclick="setDiagnosticStateUi('${encodedId}','SNOOZED')">Snooze</button>
+      <button class="btn-policy" onclick="setDiagnosticStateUi('${encodedId}','DISABLED')">Disable</button>
+      <button class="btn-policy danger" onclick="removeDiagnosticUi('${encodedId}')">Remove</button>`;
+  } else {
+    policyActions = `
+      <button class="btn-policy" onclick="setDiagnosticStateUi('${encodedId}','ENABLED')">Enable</button>
+      <button class="btn-policy" onclick="runDiagnosticNow('${encodedId}')">Run now</button>
+      <button class="btn-policy danger" onclick="removeDiagnosticUi('${encodedId}')">Remove</button>`;
+  }
+
   const isSelected = selectedCardId === diag.id ? 'selected' : '';
+  const disabledClass = diag.removed || diag.diagnosticState !== 'ENABLED' ? 'card-disabled' : '';
+  const stateDetails = diag.stateReason ? ` - ${escapeHtml(diag.stateReason)}` : '';
   return `
-    <div class="card status-${status} ${isSelected}" onclick="selectDiagnosticCard('${diag.id}', '${diag.name || diag.id}', event)">
+    <div class="card status-${status} ${isSelected} ${disabledClass}" onclick="selectDiagnosticCard('${encodedId}', '${encodedName}', event)">
       <div class="card-header">
         <div>
-          <div class="card-name">${diag.name || diag.id}</div>
-          <div class="card-id">${diag.id}</div>
+          <div class="card-name">${escapeHtml(diag.name || diag.id)}</div>
+          <div class="card-id">${escapeHtml(diag.id)}</div>
         </div>
-        <span class="card-badge ${layerClass}">${diag.layer || 'UNKNOWN'}</span>
+        <div><div class="card-necessity" title="Check necessity ${diag.diagnosticNecessity || 4}/5">${necessityStars(diag.diagnosticNecessity)}</div><span class="card-badge ${layerClass}">${escapeHtml(diag.layer || 'UNKNOWN')}</span></div>
       </div>
-      ${diag.linkedTask ? `<div class="card-task">🔗 ${diag.linkedTask}</div>` : ''}
-      <div class="card-task">${result ? `${result.classification || 'RESULT'} · ${result.severity || 'UNSPECIFIED'} · ${result.scope || 'GENERAL'}${result.cached ? ' · CACHED' : ''}` : ''}</div>
+      ${diag.linkedTask ? `<div class="card-task">${escapeHtml(diag.linkedTask)}</div>` : ''}
+      <div class="card-task">${result ? `${escapeHtml(result.classification || 'RESULT')} - ${escapeHtml(result.severity || 'UNSPECIFIED')} - ${escapeHtml(result.scope || 'GENERAL')}${result.cached ? ' - CACHED' : ''}` : ''}</div>
+      <div class="card-policy">Check necessity ${diag.diagnosticNecessity || 4}/5 - ${escapeHtml(diag.diagnosticState || 'ENABLED')}${stateDetails}${diag.stateUntil ? ` - until ${escapeHtml(diag.stateUntil)}` : ''}</div>
       <div class="card-status">
         <span class="status-dot ${status}"></span>
-        <span class="card-details">${details}</span>
+        <span class="card-details">${escapeHtml(details)}</span>
         <span class="card-duration">${duration}</span>
       </div>
+      <div class="card-actions">${policyActions}</div>
       ${repairHtml}
     </div>
   `;
@@ -933,6 +980,82 @@ function renderCards() {
   container.innerHTML = diagnosticsList.map(d => createCard(d, lastResults[d.id])).join('');
 }
 
+async function postDashboardJson(url, body) {
+  const res = await apiFetch(API + url, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || 'Request failed with HTTP ' + res.status);
+  return data;
+}
+
+async function setDiagnosticStateUi(encodedId, state) {
+  const diagnosticId = decodeURIComponent(encodedId);
+  const diag = diagnosticsList.find(item => item.id === diagnosticId);
+  let reason = null;
+  let until = null;
+  if (state !== 'ENABLED') {
+    if ((diag?.diagnosticNecessity || 4) === 5 && !window.confirm('This is a 5-star required check. Pausing it will block completion eligibility. Continue?')) return;
+    reason = window.prompt('Why should this diagnostic be excluded?');
+    if (!reason || !reason.trim()) return;
+  }
+  if (state === 'SNOOZED') {
+    const defaultUntil = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+    until = window.prompt('Snooze until this ISO date:', defaultUntil);
+    if (!until) return;
+  }
+  try {
+    await postDashboardJson('/api/diagnostics/state', { diagnosticId, state, reason, until });
+    await loadDiagnostics();
+    showToast(state === 'ENABLED' ? 'Diagnostic enabled.' : `Diagnostic state changed to ${state}.`, 'success');
+  } catch (error) {
+    showToast(error.message, 'error');
+  }
+}
+
+async function runDiagnosticNow(encodedId) {
+  const diagnosticId = decodeURIComponent(encodedId);
+  try {
+    const data = await postDashboardJson('/api/run', { ids: [diagnosticId], force: true });
+    if (!Array.isArray(data.results) || data.results.length === 0) throw new Error('Focused diagnostic response was invalid.');
+    data.results.forEach(result => { lastResults[result.id] = result; });
+    delete lastSkipped[diagnosticId];
+    const focused = data.results.find(result => result.id === diagnosticId) || data.results[0];
+    renderCards();
+    showToast(`${diagnosticId}: ${focused.status}`, focused.status === 'OK' ? 'success' : 'error');
+  } catch (error) {
+    showToast(error.message, 'error');
+  }
+}
+
+async function removeDiagnosticUi(encodedId) {
+  const diagnosticId = decodeURIComponent(encodedId);
+  if (!window.confirm(`Remove ${diagnosticId} from this project? The file will remain recoverable from Vibe Diagnosis trash.`)) return;
+  const reason = window.prompt('Why is this diagnostic being removed?');
+  if (!reason || !reason.trim()) return;
+  try {
+    await postDashboardJson('/api/diagnostics/remove', { diagnosticId, confirmed: true, reason });
+    delete lastResults[diagnosticId];
+    await loadDiagnostics();
+    showToast('Diagnostic removed and kept recoverable.', 'success');
+  } catch (error) {
+    showToast(error.message, 'error');
+  }
+}
+
+async function restoreDiagnosticUi(encodedId) {
+  const diagnosticId = decodeURIComponent(encodedId);
+  try {
+    await postDashboardJson('/api/diagnostics/restore', { diagnosticId });
+    await loadDiagnostics();
+    showToast('Diagnostic restored.', 'success');
+  } catch (error) {
+    showToast(error.message, 'error');
+  }
+}
+
 async function runDiagnostics() {
   const btn = document.getElementById('btnRun');
   btn.classList.add('running');
@@ -954,8 +1077,10 @@ async function runDiagnostics() {
 
     lastResults = {};
     data.results.forEach(r => { lastResults[r.id] = r; });
+    lastSkipped = {};
+    (data.skippedDiagnostics || []).forEach(item => { lastSkipped[item.id] = item; });
 
-    document.getElementById('statTotal').textContent = data.summary.total;
+    document.getElementById('statTotal').textContent = data.summary.total + ' / ' + data.discovered;
     document.getElementById('statOk').textContent = data.summary.ok;
     document.getElementById('statWarn').textContent = data.summary.warning;
     document.getElementById('statErr').textContent = data.summary.error;
@@ -970,7 +1095,7 @@ async function runDiagnostics() {
     await Promise.all([loadHeuristicMetrics(), loadTimelineHistory()]);
 
     if (data.overallStatus === 'OK') {
-      showToast('✅ All diagnostics passed! Health ' + data.healthPercent + '%', 'success');
+      showToast('✅ Routine diagnostics passed! Health ' + data.healthPercent + '%' + (data.skippedDiagnostics?.length ? ' · Skipped ' + data.skippedDiagnostics.length : ''), 'success');
     } else {
       showToast('⚠️ ' + data.overallStatus + ' — Health ' + data.healthPercent + '% · Live evidence ' + data.evidenceSummary.liveEvidenceStatus, 'error');
     }

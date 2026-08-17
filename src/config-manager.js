@@ -119,6 +119,8 @@ function ensureGitignore(projectDir) {
     '.vibe-diagnosis/cache.json',
     '.vibe-diagnosis/repair-plans/',
     '.vibe-diagnosis/repair-history.json',
+    '.vibe-diagnosis/diagnostic-policy.local.json',
+    '.vibe-diagnosis/trash/',
   ];
 
   let content = '';

@@ -4,7 +4,7 @@ Tell your coding AI to diagnose its own work before it says “done.”
 
 [한국어 사용법](./README.ko.md)
 
-Vibe Diagnosis 1.6.3 is an MCP for vibe coding with Codex, Claude Code, Cursor, Windsurf, Gemini CLI, Antigravity, and other MCP-capable coding agents. You do not need to memorize commands. Give the agent a clear instruction; it can initialize project diagnostics, run checks during development, open the optional dashboard, prove completion, and prepare a repair plan when something fails.
+Vibe Diagnosis 1.7.0 is an MCP for vibe coding with Codex, Claude Code, Cursor, Windsurf, Gemini CLI, Antigravity, and other MCP-capable coding agents. You do not need to memorize commands. Give the agent a clear instruction; it can initialize project diagnostics, run checks during development, open the optional dashboard, prove completion, and prepare a repair plan when something fails.
 
 The key contract is simple:
 
@@ -15,7 +15,7 @@ The key contract is simple:
 Open your project in an MCP-capable coding agent and paste this:
 
 ```text
-Set up Vibe Diagnosis 1.6.3 for this project as a local MCP server. Detect the MCP configuration format used by this coding tool, add vibe-diagnosis-mcp@1.6.3 with npx, and verify the connection by listing its tools. Do not add API keys to source files, Git, or command history. If you cannot safely edit the client configuration, show me the exact config entry and where it belongs, then wait for me to restart the client.
+Set up Vibe Diagnosis 1.7.0 for this project as a local MCP server. Detect the MCP configuration format used by this coding tool, add vibe-diagnosis-mcp@1.7.0 with npx, and verify the connection by listing its tools. Do not add API keys to source files, Git, or command history. If you cannot safely edit the client configuration, show me the exact config entry and where it belongs, then wait for me to restart the client.
 ```
 
 After the agent or client restarts, paste:
@@ -34,10 +34,10 @@ Use this at the beginning of feature, bug-fix, refactoring, or review work:
 Use Vibe Diagnosis throughout this task.
 
 1. Before editing, call list_diagnostics. If this project is not initialized, call init_diagnostics, then inspect the generated diagnostics.
-2. Translate my acceptance criteria into executable diagnostics. Prefer behavior, tests, AST, routes, APIs, state transitions, rendering, authority, provider, or read-only runtime evidence over exact source strings.
+2. Translate my acceptance criteria into executable diagnostics. Assign diagnosticNecessity from 1 to 5 based on how often the check is worth repeating: hidden AI regressions that can survive build or compilation are 5; checks already guaranteed by stable compiler/test coverage can be 1. Record a necessityReason. Prefer behavior, tests, AST, routes, APIs, state transitions, rendering, authority, provider, or read-only runtime evidence over exact source strings.
 3. Run focused diagnostics while working. Do not open the dashboard unless I ask.
 4. Do not treat static checks as live proof. Report evidence type, freshness, warnings, flaky results, and release or live blockers separately.
-5. Immediately before saying the task is complete, call complete_task_diagnostics with the full uncached suite. Require completion.eligible=true, then call verify_completion_receipt against the current workspace.
+5. Immediately before saying the task is complete, call complete_task_diagnostics. It must run the uncached priority-aware completion suite, disclose every skipped, paused, disabled, or removed check, and reject a skipped 5-star required check. Require completion.eligible=true, then call verify_completion_receipt against the current workspace and diagnostic policy.
 6. If anything fails, explain the root cause. You may create a repair plan and diff, but never apply it until I approve that exact plan and checksum. Ask separately before any high-risk repair.
 7. Do not publish, deploy, commit, push, or call external providers unless I explicitly authorize it.
 ```
@@ -61,7 +61,7 @@ Run only the Vibe diagnostics related to the files and acceptance criteria I am 
 ### Prove the task is complete
 
 ```text
-Run complete_task_diagnostics now. It must be the full uncached suite and must not require the dashboard. If completion.eligible is true, verify the completion receipt against the current workspace. If it is false or stale, do not call the task complete; report the exact blockers.
+Run complete_task_diagnostics now. It must run the uncached priority-aware completion suite and must not require the dashboard. Report all priority skips and user exclusions. If completion.eligible is true, verify the receipt against the current workspace and diagnostic policy. If it is false or stale, do not call the task complete; report the exact blockers.
 ```
 
 ### Open the project dashboard
@@ -79,7 +79,31 @@ Stop only the Vibe Diagnosis dashboard associated with this project and confirm 
 ### Add a useful diagnostic
 
 ```text
-Create or update a Vibe diagnostic for this requirement: <describe the behavior>. Link it to the relevant source and test files, give it accurate severity, scope, evidenceType, blockers, dependencies, and execution profile, and test actual behavior. Avoid checking labels, Korean wording, component names, or source.includes unless the exact text is itself the requirement. Run the focused diagnostic and show its evidence.
+Create or update a Vibe diagnostic for this requirement: <describe the behavior>. Link it to the relevant source and test files; give it accurate severity, scope, evidenceType, blockers, dependencies, and execution profile. Assign diagnosticNecessity 1-5 for repeat-check value and explain necessityReason. Use 5 when AI edits can silently remove or disconnect behavior while build still passes; use 1 when a stable compiler or existing test already guarantees detection. Test actual behavior instead of source wording, then run the focused diagnostic and show its evidence.
+```
+
+### Choose what runs automatically
+
+The stars mean **check necessity**, not product importance or failure severity:
+
+| Stars | Automatic policy |
+|---|---|
+| ★★★★★ | Run on every completion; pausing it blocks completion eligibility |
+| ★★★★☆ | Run in normal routine and completion checks |
+| ★★★☆☆ | Run automatically when its declared files changed |
+| ★★☆☆☆ | Run with an explicit full/optional request |
+| ★☆☆☆☆ | Keep for rare manual or scheduled inspection |
+
+Ask the agent to change a diagnostic state without deleting evidence:
+
+```text
+List diagnostics with their check-necessity stars and current state. For <diagnostic ID>, set SKIP_ONCE, SNOOZED, DISABLED, or ENABLED only as I direct. Require my reason for any exclusion, show its effect on completion eligibility, and verify that the completion receipt becomes stale after a policy change.
+```
+
+For permanent project cleanup:
+
+```text
+Recoverably remove <diagnostic ID> because <reason>. Show me its stars and current state first, ask for explicit confirmation, move it to Vibe Diagnosis trash instead of permanently deleting it, and verify that restore_diagnostic can restore the original file. Do not remove any other diagnostic.
 ```
 
 ### Audit a large diagnostic catalog
@@ -144,7 +168,7 @@ Save the current goal, last completed work, diagnostic status, remaining blocker
 4. Investigate: separate product failures from runner errors, timeouts, and flaky retries.
 5. Inspect visually only when useful: open the dashboard explicitly.
 6. Repair safely: review a plan and checksum before approval.
-7. Finish: require full completion diagnostics and a current receipt.
+7. Finish: require the priority-aware completion diagnostics, disclose exclusions, and verify the current receipt.
 8. Publish separately: diagnostics do not authorize deploy, package publication, commit, or push.
 
 ## What the agent can use
@@ -153,6 +177,7 @@ Save the current goal, last completed work, diagnostic status, remaining blocker
 |---|---|
 | Set up and inspect | `init_diagnostics`, `list_diagnostics`, `audit_diagnostics` |
 | Work-time feedback | `run_diagnostics` |
+| Check policy | `set_diagnostic_state`, `remove_diagnostic`, `restore_diagnostic` |
 | Completion proof | `complete_task_diagnostics`, `verify_completion_receipt` |
 | Review-only repair | `repair_diagnostic`, `plan_repair`, `heal_all`, `repair_omission` |
 | Approved repair | `apply_repair_plan` |
@@ -169,7 +194,7 @@ All project paths passed to MCP tools must be absolute. The same project can hav
 - Failure classes: `CONTRACT_ERROR`, `TEST_FAILURE`, `RUNNER_ERROR`, `TIMEOUT`, and `FLAKY`.
 - `STATIC` and `TEST` diagnostics default to a restricted environment. Use `allowedEnv` only for explicitly required names. Runtime evidence can declare `STANDARD` or `LIVE` deliberately.
 - Release and live-operation gates are separate. A high pass percentage never overrides a declared blocker.
-- Completion receipts bind the run to Git and workspace/environment fingerprints. A later edit can make a previously valid receipt stale.
+- Completion receipts bind the run to Git, workspace/environment fingerprints, and the local diagnostic policy. A later edit or state change can make a previously valid receipt stale.
 - Diagnostics are project-owned executable code. Review third-party `.diag.js` files before running them; environment restriction is not a complete filesystem or network sandbox.
 - Repair planning is non-mutating. Applying a plan requires its reviewed checksum, explicit approval, and separate approval for authentication, data, credentials, dependencies, runtime settings, trading, or similar high-risk areas.
 - BYOK is optional. Keys are supplied by the user, never bundled, and local configuration is stored in ignored `.vibe-diagnosis/byok.local.json`.
@@ -183,7 +208,7 @@ Ask it to show, not guess, the config for your client. The generic entry is:
   "mcpServers": {
     "vibe-diagnosis": {
       "command": "npx",
-      "args": ["-y", "vibe-diagnosis-mcp@1.6.3"]
+      "args": ["-y", "vibe-diagnosis-mcp@1.7.0"]
     }
   }
 }
@@ -192,13 +217,13 @@ Ask it to show, not guess, the config for your client. The generic entry is:
 Claude Code fallback:
 
 ```bash
-claude mcp add vibe-diagnosis --scope local -- npx -y vibe-diagnosis-mcp@1.6.3
+claude mcp add vibe-diagnosis --scope local -- npx -y vibe-diagnosis-mcp@1.7.0
 ```
 
 Native Windows Claude Code fallback:
 
 ```powershell
-claude mcp add vibe-diagnosis --scope local -- cmd /c npx -y vibe-diagnosis-mcp@1.6.3
+claude mcp add vibe-diagnosis --scope local -- cmd /c npx -y vibe-diagnosis-mcp@1.7.0
 ```
 
 Restart or reconnect the coding client after changing its MCP configuration, then ask: “List the Vibe Diagnosis tools and do not modify the project.”
@@ -208,14 +233,18 @@ Restart or reconnect the coding client after changing its MCP configuration, the
 The CLI is useful for CI, scripts, and clients without MCP. It is not the primary vibe-coding workflow.
 
 ```bash
-npx -y vibe-diagnosis@1.6.3 init
-npx -y vibe-diagnosis@1.6.3 run --json
-npx -y vibe-diagnosis@1.6.3 complete
-npx -y vibe-diagnosis@1.6.3 dashboard
-npx -y vibe-diagnosis@1.6.3 stop
+npx -y vibe-diagnosis@1.7.0 init
+npx -y vibe-diagnosis@1.7.0 run --json
+npx -y vibe-diagnosis@1.7.0 run --all --json
+npx -y vibe-diagnosis@1.7.0 complete
+npx -y vibe-diagnosis@1.7.0 diagnostic-state <id> disabled --reason "intentional hold"
+npx -y vibe-diagnosis@1.7.0 remove-diagnostic <id> --confirm --reason "not applicable"
+npx -y vibe-diagnosis@1.7.0 restore-diagnostic <id>
+npx -y vibe-diagnosis@1.7.0 dashboard
+npx -y vibe-diagnosis@1.7.0 stop
 ```
 
-Use `--cwd <absolute-project-path>` when the shell is not inside the target project.
+Use `--cwd <absolute-project-path>` when the shell is not inside the target project. Routine `run` follows necessity; `run --all` includes every enabled optional check. `snoozed` additionally requires `--until <future-ISO-date>`.
 
 ## Packages and requirements
 

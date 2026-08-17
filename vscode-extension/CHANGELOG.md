@@ -1,6 +1,12 @@
 # Change Log
 
-## 1.6.3 (Current)
+## 1.7.0 (Current)
+
+- Added 1-5 star diagnostic check necessity for priority-aware routine and completion runs.
+- Added dashboard controls for run-now, skip-once, snooze, disable, recoverable remove, and restore.
+- Bound completion receipts to the local diagnostic policy so exclusions cannot become invisible after completion.
+
+## 1.6.3
 
 - Added restricted STATIC/TEST diagnostic environments with explicit environment allowlists.
 - Replaced heuristic MCP stdout filtering with transport-owned protocol output.

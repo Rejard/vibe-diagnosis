@@ -3,6 +3,7 @@ const path = require('path');
 const crypto = require('crypto');
 const { inspectDiagnosticSource } = require('./selector');
 const { detectFragileStringChecks } = require('./assertions');
+const { describePolicy } = require('./diagnostic-policy');
 
 function normalizedHash(source) {
   return crypto.createHash('sha256').update(source.replace(/\s+/g, ' ').trim()).digest('hex');
@@ -26,6 +27,8 @@ function referencedFiles(projectDir, diagnosticFile, source) {
 
 function auditDiagnostics(projectDir, files) {
   const descriptors = files.map(inspectDiagnosticSource);
+  const policyInfo = describePolicy(descriptors, projectDir, { selectionMode: 'FULL' });
+  const policyById = new Map(policyInfo.decisions.map(item => [item.descriptor.id, item.entry]));
   const knownIds = new Set(descriptors.map(item => item.id));
   const ids = new Map();
   const hashes = new Map();
@@ -40,6 +43,9 @@ function auditDiagnostics(projectDir, files) {
     return {
       id: item.id,
       file: path.relative(projectDir, item.filePath),
+      diagnosticNecessity: item.diagnosticNecessity,
+      necessityReason: item.necessityReason,
+      diagnosticState: policyById.get(item.id)?.state || 'ENABLED',
       fragileStringChecks: detectFragileStringChecks(item.source),
       missingReferences: [...new Set([...refs.filter(ref => !ref.exists).map(ref => ref.file), ...declaredMissingFiles])],
       dependencies: item.dependencies,
@@ -48,6 +54,12 @@ function auditDiagnostics(projectDir, files) {
   });
   return {
     diagnostics,
+    removedDiagnostics: policyInfo.removed,
+    policyWarnings: diagnostics.flatMap(item => {
+      const warnings = [];
+      if (item.diagnosticNecessity === 5 && item.diagnosticState !== 'ENABLED') warnings.push({ id: item.id, code: 'REQUIRED_DIAGNOSTIC_INACTIVE', state: item.diagnosticState });
+      return warnings;
+    }),
     duplicateIds: [...ids].filter(([, values]) => values.length > 1).map(([id, values]) => ({ id, files: values.map(file => path.relative(projectDir, file)) })),
     duplicateSources: [...hashes].filter(([, values]) => values.length > 1).map(([hash, values]) => ({ hash, files: values.map(file => path.relative(projectDir, file)) })),
     totals: {
@@ -55,6 +67,9 @@ function auditDiagnostics(projectDir, files) {
       fragileStringChecks: diagnostics.reduce((sum, item) => sum + item.fragileStringChecks.length, 0),
       missingReferences: diagnostics.reduce((sum, item) => sum + item.missingReferences.length, 0),
       missingDependencies: diagnostics.reduce((sum, item) => sum + item.missingDependencies.length, 0),
+      inactive: diagnostics.filter(item => item.diagnosticState !== 'ENABLED').length,
+      removed: policyInfo.removed.length,
+      requiredInactive: diagnostics.filter(item => item.diagnosticNecessity === 5 && item.diagnosticState !== 'ENABLED').length,
     },
   };
 }

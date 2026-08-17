@@ -10,6 +10,12 @@ const { summarizeResults } = require('./run-summary');
 const { detectFragileStringChecks } = require('./assertions');
 const { createCompletionReceipt } = require('./completion-receipt');
 const { withDiagnosticsLock } = require('./diagnostics-lock');
+const {
+  describePolicy,
+  consumeSkipOnce,
+  diagnosticPolicyFingerprint,
+  normalizeNecessity,
+} = require('./diagnostic-policy');
 
 const DIAG_DIR = '.vibe-diagnosis/diagnostics';
 const DIAG_PATTERN = /\.diag\.js$/;
@@ -31,7 +37,39 @@ async function runDiagnosticsReportUnlocked(projectDir, options = {}) {
   const resolvedProjectDir = path.resolve(projectDir);
   const allFiles = discoverDiagnostics(resolvedProjectDir);
   const environment = captureEnvironment(resolvedProjectDir);
-  const selected = selectDiagnostics(allFiles, options.filters || {});
+  const candidates = selectDiagnostics(allFiles, options.filters || {});
+  const policyInfo = describePolicy(candidates, resolvedProjectDir, {
+    selectionMode: options.selectionMode || 'FULL',
+    changedFiles: environment.git.changedFiles,
+    force: options.force === true,
+  });
+  const decisions = new Map(policyInfo.decisions.map(item => [item.descriptor.id, item]));
+  const runnableIds = new Set(policyInfo.decisions.filter(item => item.decision.run).map(item => item.descriptor.id));
+  const byId = new Map(candidates.map(item => [item.id, item]));
+  const dependencyQueue = [...runnableIds];
+  while (dependencyQueue.length) {
+    const current = byId.get(dependencyQueue.shift());
+    for (const dependency of current?.dependencies || []) {
+      const item = decisions.get(dependency);
+      if (item?.entry.state === 'ENABLED' && !runnableIds.has(dependency)) {
+        runnableIds.add(dependency);
+        dependencyQueue.push(dependency);
+        item.decision = { ...item.decision, run: true, reason: 'SELECTED_DEPENDENCY' };
+      }
+    }
+  }
+  const selected = candidates.filter(item => runnableIds.has(item.id));
+  const skippedDiagnostics = policyInfo.decisions.filter(item => !runnableIds.has(item.descriptor.id)).map(item => ({
+    id: item.descriptor.id,
+    name: item.descriptor.name,
+    diagnosticNecessity: normalizeNecessity(item.descriptor.diagnosticNecessity),
+    necessityReason: item.descriptor.necessityReason || null,
+    state: item.entry.state,
+    reason: item.entry.reason,
+    until: item.entry.until,
+    skipReason: item.decision.reason,
+  }));
+  consumeSkipOnce(resolvedProjectDir, skippedDiagnostics.filter(item => item.state === 'SKIP_ONCE').map(item => item.id), policyInfo.policy);
   const startedAt = new Date().toISOString();
   const runId = options.runId || `${startedAt.replace(/[:.]/g, '-')}-${crypto.randomBytes(3).toString('hex')}`;
   let results = [];
@@ -66,7 +104,34 @@ async function runDiagnosticsReportUnlocked(projectDir, options = {}) {
   const baseline = options.compareBaseline === false ? null : loadBaseline(resolvedProjectDir, options.baselineId);
   results = linkChangedFiles(compareToBaseline(results, baseline), environment.git.changedFiles);
   const summary = summarizeResults(results);
-  const report = { schemaVersion: 2, runId, startedAt, finishedAt: new Date().toISOString(), projectDir: resolvedProjectDir, selected: selected.length, discovered: allFiles.length, filters: options.filters || {}, environment, results, ...summary };
+  const policyStates = skippedDiagnostics.reduce((counts, item) => {
+    counts[item.skipReason] = (counts[item.skipReason] || 0) + 1;
+    return counts;
+  }, {});
+  const report = {
+    schemaVersion: 3,
+    runId,
+    startedAt,
+    finishedAt: new Date().toISOString(),
+    projectDir: resolvedProjectDir,
+    selected: selected.length,
+    discovered: allFiles.length,
+    filteredOut: Math.max(0, allFiles.length - candidates.length),
+    selectionMode: options.selectionMode || 'FULL',
+    filters: options.filters || {},
+    environment,
+    policy: {
+      fingerprint: diagnosticPolicyFingerprint(resolvedProjectDir),
+      defaultNecessity: 4,
+      skipped: skippedDiagnostics.length,
+      removed: policyInfo.removed.length,
+      skipReasons: policyStates,
+    },
+    skippedDiagnostics,
+    removedDiagnostics: policyInfo.removed,
+    results,
+    ...summary,
+  };
   if (options.persist === true) report.runFile = saveRunReport(resolvedProjectDir, report);
   return report;
 }
@@ -89,11 +154,13 @@ async function runCompletionDiagnostics(projectDir, options = {}) {
       persist: false,
       useCache: false,
       filters: {},
+      selectionMode: 'AUTO',
     });
     const reasons = [];
     report.completionEnvironment = captureEnvironment(path.resolve(projectDir));
     if (report.discovered === 0) reasons.push('NO_DIAGNOSTICS');
-    if (report.selected !== report.discovered) reasons.push('INCOMPLETE_SELECTION');
+    const requiredSkipped = report.skippedDiagnostics.filter(item => item.diagnosticNecessity === 5 && item.skipReason !== 'PRIORITY_NOT_DUE');
+    if (requiredSkipped.length) reasons.push('REQUIRED_DIAGNOSTICS_SKIPPED');
     if (report.summary.error > 0) reasons.push('DIAGNOSTIC_FAILURES');
     if (report.gates.releaseStatus === 'RELEASE_BLOCKED') reasons.push('RELEASE_BLOCKED');
     if (report.environment.fingerprint !== report.completionEnvironment.fingerprint) reasons.push('WORKSPACE_CHANGED_DURING_DIAGNOSTICS');
@@ -101,13 +168,16 @@ async function runCompletionDiagnostics(projectDir, options = {}) {
       eligible: reasons.length === 0,
       reasons,
       fullSuite: report.selected === report.discovered,
+      scheduledSuiteComplete: report.selected + report.skippedDiagnostics.length === report.discovered,
+      requiredSkipped: requiredSkipped.map(item => item.id),
+      exceptions: report.skippedDiagnostics.filter(item => item.skipReason !== 'PRIORITY_NOT_DUE').map(item => ({ id: item.id, state: item.state, reason: item.reason, until: item.until })),
       cacheUsed: false,
       dashboardRequired: false,
       warnings: report.summary.warning,
       verifiedFingerprint: report.completionEnvironment.fingerprint,
       instruction: reasons.length
-        ? 'Do not report the development task complete. Resolve or accurately report the blocking diagnostics.'
-        : 'The full uncached diagnostic suite completed. Report any warnings and evidence limitations with the result.',
+        ? 'Do not report the development task complete. Resolve or accurately report failed or skipped required diagnostics.'
+        : 'The uncached priority-aware completion suite completed. Report warnings, policy exceptions, and evidence limitations.',
     };
     report.completion.receipt = createCompletionReceipt(report);
     if (options.persist !== false) report.runFile = saveRunReport(path.resolve(projectDir), report);

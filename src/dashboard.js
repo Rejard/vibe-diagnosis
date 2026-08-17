@@ -10,6 +10,12 @@ const { runHeuristicMetrics } = require('./analyzer');
 const { resolveWithin } = require('./path-policy');
 const { inspectDiagnosticSource } = require('./selector');
 const { conflictPayload, projectKey } = require('./diagnostics-lock');
+const {
+  describePolicy,
+  setDiagnosticState,
+  removeDiagnostic,
+  restoreDiagnostic,
+} = require('./diagnostic-policy');
 
 const HTML_PATH = path.join(__dirname, 'dashboard.html');
 
@@ -42,13 +48,28 @@ function logSessionHistory(projectDir, passRate, status, cardResults) {
 
 function listDiagnosticMeta(projectDir) {
   const files = discoverDiagnostics(projectDir);
-  const result = [];
+  const descriptors = [];
 
   for (const filePath of files) {
     try {
       const mod = inspectDiagnosticSource(filePath);
-      result.push({
-        file: path.basename(filePath),
+      descriptors.push(mod);
+    } catch (err) {
+      descriptors.push({
+        filePath,
+        id: path.basename(filePath, '.diag.js'),
+        name: 'Failed to load',
+        layer: 'UNKNOWN',
+        diagnosticNecessity: 4,
+        necessityReason: 'Metadata could not be inspected.',
+        valid: false,
+        errors: [err.message],
+      });
+    }
+  }
+  const policy = describePolicy(descriptors, projectDir, { selectionMode: 'FULL' });
+  const active = policy.decisions.map(({ descriptor: mod, entry }) => ({
+        file: path.basename(mod.filePath),
         id: mod.id,
         name: mod.name,
         layer: mod.layer,
@@ -60,21 +81,30 @@ function listDiagnosticMeta(projectDir) {
         dependencies: mod.dependencies,
         files: mod.files,
         cache: mod.cache,
+        diagnosticNecessity: mod.diagnosticNecessity,
+        necessityReason: mod.necessityReason,
+        diagnosticState: entry.state,
+        stateReason: entry.reason,
+        stateUntil: entry.until,
+        removed: false,
         valid: mod.valid,
         errors: mod.errors,
-      });
-    } catch (err) {
-      result.push({
-        file: path.basename(filePath),
-        id: path.basename(filePath, '.diag.js'),
-        name: 'Failed to load',
-        layer: 'UNKNOWN',
-        valid: false,
-      });
-    }
-  }
-
-  return result;
+  }));
+  const removed = policy.removed.map(item => ({
+    file: path.basename(item.originalFile || ''),
+    id: item.id,
+    name: item.name,
+    layer: 'REMOVED',
+    diagnosticNecessity: item.diagnosticNecessity,
+    necessityReason: item.necessityReason,
+    diagnosticState: 'REMOVED',
+    stateReason: item.reason,
+    removedAt: item.removedAt,
+    removed: true,
+    valid: true,
+    errors: [],
+  }));
+  return [...active, ...removed];
 }
 
 function listErrorPatterns(projectDir) {
@@ -112,7 +142,7 @@ function sendHtml(res, html) {
   res.end(html);
 }
 
-function readBody(req) {
+function readBody(req, options = {}) {
   return new Promise((resolve, reject) => {
     let data = '';
     req.on('data', chunk => {
@@ -123,11 +153,16 @@ function readBody(req) {
       }
     });
     req.on('end', () => {
-      try { resolve(JSON.parse(data)); }
+      try { resolve(!data.trim() && options.allowEmpty ? {} : JSON.parse(data)); }
       catch { reject(new Error('Invalid JSON body')); }
     });
     req.on('error', reject);
   });
+}
+
+async function readOptionalBody(req) {
+  if (!req.headers['content-length'] && !req.headers['transfer-encoding']) return {};
+  return readBody(req, { allowEmpty: true });
 }
 
 function startDashboard(projectDir, port = 7700, options = {}) {
@@ -184,7 +219,15 @@ function startDashboard(projectDir, port = 7700, options = {}) {
 
     if (req.method === 'POST' && url.pathname === '/api/run') {
       try {
-        const report = await runDiagnosticsReport(projectDir, { persist: true, executionKind: 'dashboard' });
+        const body = await readOptionalBody(req);
+        const ids = Array.isArray(body.ids) && body.ids.every(id => typeof id === 'string') ? body.ids : [];
+        const report = await runDiagnosticsReport(projectDir, {
+          persist: true,
+          executionKind: 'dashboard',
+          selectionMode: body.includeOptional === true ? 'FULL' : 'AUTO',
+          force: body.force === true,
+          filters: ids.length ? { ids } : {},
+        });
         const results = report.results;
         lastRunResults = results;
         lastRunReport = report;
@@ -199,6 +242,43 @@ function startDashboard(projectDir, port = 7700, options = {}) {
       } catch (err) {
         const conflict = conflictPayload(err);
         sendJson(res, conflict || { error: err.message }, conflict ? 409 : 500);
+      }
+      return;
+    }
+
+    if (req.method === 'POST' && url.pathname === '/api/diagnostics/state') {
+      try {
+        const body = await readBody(req);
+        const known = listDiagnosticMeta(projectDir).find(item => item.id === body.diagnosticId && !item.removed);
+        if (!known) { sendJson(res, { error: 'Diagnostic was not found.' }, 404); return; }
+        const result = setDiagnosticState(projectDir, body.diagnosticId, body.state, { reason: body.reason, until: body.until });
+        sendJson(res, { success: true, policy: result });
+      } catch (err) {
+        sendJson(res, { error: err.message }, 400);
+      }
+      return;
+    }
+
+    if (req.method === 'POST' && url.pathname === '/api/diagnostics/remove') {
+      try {
+        const body = await readBody(req);
+        const descriptor = discoverDiagnostics(projectDir).map(inspectDiagnosticSource).find(item => item.id === body.diagnosticId);
+        if (!descriptor) { sendJson(res, { error: 'Diagnostic was not found.' }, 404); return; }
+        const removed = removeDiagnostic(projectDir, descriptor, { confirmed: body.confirmed, reason: body.reason });
+        sendJson(res, { success: true, removed });
+      } catch (err) {
+        sendJson(res, { error: err.message }, 400);
+      }
+      return;
+    }
+
+    if (req.method === 'POST' && url.pathname === '/api/diagnostics/restore') {
+      try {
+        const body = await readBody(req);
+        const restored = restoreDiagnostic(projectDir, body.diagnosticId);
+        sendJson(res, { success: true, restored });
+      } catch (err) {
+        sendJson(res, { error: err.message }, 400);
       }
       return;
     }

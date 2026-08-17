@@ -24,6 +24,8 @@ module.exports = {
   name: 'Cartridge Component & Symbol Integrity Scanner',
   layer: 'FUNCTION',
   linkedTask: 'Omission Protection',
+  diagnosticNecessity: 5,
+  necessityReason: 'Required UI components and symbols can disappear without producing a compile-time error.',
 
   async run({ projectDir }) {
     const analyzer = loadAnalyzer(projectDir);

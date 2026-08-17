@@ -24,6 +24,8 @@ module.exports = {
   name: 'Monolithic UI File Omission Risk Scanner',
   layer: 'SYSTEM',
   linkedTask: 'Omission Protection',
+  diagnosticNecessity: 5,
+  necessityReason: 'AI edits can silently omit UI blocks while the application still builds successfully.',
 
   async run({ projectDir }) {
     const analyzer = loadAnalyzer(projectDir);

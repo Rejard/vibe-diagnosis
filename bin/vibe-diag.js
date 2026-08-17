@@ -19,6 +19,7 @@ const flags = {
   tags: [],
   scope: null,
   severity: null,
+  forceDisabled: args.includes('--force-disabled'),
 };
 
 function flagValue(name) {
@@ -130,6 +131,8 @@ async function main() {
         executionKind: 'cli-run',
         useCache: flags.useCache,
         baselineId: flags.baselineId,
+        selectionMode: flags.all ? 'FULL' : 'AUTO',
+        force: flags.forceDisabled,
         filters: { ids: flags.ids, tags: flags.tags, scope: flags.scope, severity: flags.severity },
       });
 
@@ -181,6 +184,35 @@ async function main() {
       process.stdout.write(JSON.stringify(auditDiagnostics(targetDir, discoverDiagnostics(targetDir)), null, 2) + '\n');
       break;
     }
+    case 'diagnostic-state': {
+      const { discoverDiagnostics } = require('../src/runner');
+      const { inspectDiagnosticSource } = require('../src/selector');
+      const { setDiagnosticState } = require('../src/diagnostic-policy');
+      const diagnosticId = args[1];
+      const state = String(args[2] || '').toUpperCase().replace(/-/g, '_');
+      const descriptor = discoverDiagnostics(targetDir).map(inspectDiagnosticSource).find(item => item.id === diagnosticId);
+      if (!descriptor) throw new Error(`Diagnostic "${diagnosticId}" was not found.`);
+      const result = setDiagnosticState(targetDir, diagnosticId, state, { reason: flagValue('--reason'), until: flagValue('--until') });
+      process.stdout.write(JSON.stringify({ success: true, diagnostic: { id: descriptor.id, diagnosticNecessity: descriptor.diagnosticNecessity }, policy: result }, null, 2) + '\n');
+      break;
+    }
+    case 'remove-diagnostic': {
+      const { discoverDiagnostics } = require('../src/runner');
+      const { inspectDiagnosticSource } = require('../src/selector');
+      const { removeDiagnostic } = require('../src/diagnostic-policy');
+      const diagnosticId = args[1];
+      const descriptor = discoverDiagnostics(targetDir).map(inspectDiagnosticSource).find(item => item.id === diagnosticId);
+      if (!descriptor) throw new Error(`Diagnostic "${diagnosticId}" was not found.`);
+      const result = removeDiagnostic(targetDir, descriptor, { confirmed: args.includes('--confirm'), reason: flagValue('--reason') });
+      process.stdout.write(JSON.stringify({ success: true, removed: result }, null, 2) + '\n');
+      break;
+    }
+    case 'restore-diagnostic': {
+      const { restoreDiagnostic } = require('../src/diagnostic-policy');
+      const result = restoreDiagnostic(targetDir, args[1]);
+      process.stdout.write(JSON.stringify({ success: true, restored: result }, null, 2) + '\n');
+      break;
+    }
     case 'stop': {
       await handleStop();
       break;
@@ -190,7 +222,8 @@ async function main() {
       console.log(`\n  Vibe Diagnosis v${pkg.version}\n`);
       console.log('  Usage:');
       console.log('    vibe-diag init                Initialize .vibe-diagnosis/ in current project');
-      console.log('    vibe-diag run                 Run all diagnostics');
+      console.log('    vibe-diag run                 Run the priority-aware routine diagnostics');
+      console.log('    vibe-diag run --all           Run all enabled diagnostics, including optional checks');
       console.log('    vibe-diag run --json           Output results as JSON');
       console.log('    vibe-diag run --ids a,b --tags security --scope AUTH  Select diagnostics');
       console.log('    vibe-diag run --cache          Use safe opt-in STATIC/TEST cache');
@@ -203,6 +236,9 @@ async function main() {
       console.log('    vibe-diag repair --all         Create plans for all failing diagnostics');
       console.log('    vibe-diag apply-repair <planId> --approve --checksum <sha256> [--approve-high-risk]');
       console.log('    vibe-diag audit                Audit duplicate and fragile diagnostics');
+      console.log('    vibe-diag diagnostic-state <id> <enabled|skip-once|snoozed|disabled> --reason <text> [--until <ISO>]');
+      console.log('    vibe-diag remove-diagnostic <id> --confirm --reason <text>');
+      console.log('    vibe-diag restore-diagnostic <id>');
       console.log('    vibe-diag stop                 Stop the running web dashboard');
       console.log('    vibe-diag --cwd <path>        Run in specified directory\n');
     }

@@ -45,6 +45,7 @@ function loadCore() {
       pathPolicy: require("vibe-diagnosis/src/path-policy"),
       completionReceipt: require("vibe-diagnosis/src/completion-receipt"),
       diagnosticsLock: require("vibe-diagnosis/src/diagnostics-lock"),
+      diagnosticPolicy: require("vibe-diagnosis/src/diagnostic-policy"),
       redaction: require("vibe-diagnosis/src/redaction"),
     };
   } catch {
@@ -65,6 +66,7 @@ function loadCore() {
       pathPolicy: require("../src/path-policy"),
       completionReceipt: require("../src/completion-receipt"),
       diagnosticsLock: require("../src/diagnostics-lock"),
+      diagnosticPolicy: require("../src/diagnostic-policy"),
       redaction: require("../src/redaction"),
     };
   }
@@ -78,11 +80,11 @@ const { conflictPayload } = core.diagnosticsLock;
 
 const server = new McpServer({
   name: "vibe-diagnosis",
-  version: "1.6.3",
+  version: "1.7.0",
 });
 
 const READ_ONLY_TOOLS = new Set(["list_repair_incidents", "audit_diagnostics", "list_diagnostics", "read_error_pattern", "check_symbol_diff", "recommend_cartridge_split", "verify_completion_receipt"]);
-const DESTRUCTIVE_TOOLS = new Set(["apply_repair_plan", "init_diagnostics", "write_error_pattern", "stop_dashboard", "sync_ai_context", "sync_agent_rules"]);
+const DESTRUCTIVE_TOOLS = new Set(["apply_repair_plan", "init_diagnostics", "write_error_pattern", "stop_dashboard", "sync_ai_context", "sync_agent_rules", "set_diagnostic_state", "remove_diagnostic", "restore_diagnostic"]);
 const OPEN_WORLD_TOOLS = new Set(["repair_diagnostic", "heal_all", "plan_repair"]);
 const projectDirSchema = z.string().refine(value => path.isAbsolute(value), "projectDir must be an absolute path").describe("Absolute path to the project root directory");
 const registerLegacyTool = server.tool.bind(server);
@@ -189,10 +191,12 @@ server.tool(
     severity: z.string().optional().describe("Run diagnostics at one severity"),
     useCache: z.boolean().optional().default(false).describe("Use opt-in cache only for STATIC/TEST diagnostics"),
     baselineId: z.string().optional().describe("Compare against a specific saved run ID"),
+    includeOptional: z.boolean().optional().default(false).describe("Run all enabled diagnostics including 1-3 star optional checks"),
+    forceDisabled: z.boolean().optional().default(false).describe("Explicitly run selected IDs even when paused or disabled"),
   },
-  async ({ projectDir, autoLaunchDashboard, ids, tags, scope, severity, useCache, baselineId }) => {
+  async ({ projectDir, autoLaunchDashboard, ids, tags, scope, severity, useCache, baselineId, includeOptional, forceDisabled }) => {
     try {
-      const report = await runDiagnosticsReport(projectDir, { persist: true, executionKind: "mcp-run", useCache, baselineId, filters: { ids, tags, scope, severity } });
+      const report = await runDiagnosticsReport(projectDir, { persist: true, executionKind: "mcp-run", useCache, baselineId, selectionMode: includeOptional ? "FULL" : "AUTO", force: forceDisabled === true, filters: { ids, tags, scope, severity } });
 
       if (autoLaunchDashboard) {
         autoStartDashboardIfNeeded(projectDir, 7700, false).catch(() => {});
@@ -448,7 +452,7 @@ server.tool(
 
 server.tool(
   "list_diagnostics",
-  "List all diagnostic files (.diag.js) in the project with their metadata. CRITICAL: Call this tool at the start of any development task to understand the existing validations and what needs to be checked.",
+  "List diagnostics with their 1-5 check necessity, active state, and recoverable removed records. CRITICAL: Call this tool at the start of any development task.",
   {
     projectDir: z.string().describe("Absolute path to the project root directory"),
   },
@@ -456,16 +460,13 @@ server.tool(
     try {
       const files = discoverDiagnostics(projectDir);
 
-      if (files.length === 0) {
-        return {
-          content: [{ type: "text", text: "No .diag.js files found in .vibe-diagnosis/diagnostics/" }],
-        };
-      }
-
-      const diagnostics = files.map(filePath => {
-        const descriptor = core.selector.inspectDiagnosticSource(filePath);
-        return { file: path.basename(filePath), id: descriptor.id, name: descriptor.name, layer: descriptor.layer, linkedTask: descriptor.linkedTask, valid: descriptor.valid, errors: descriptor.errors };
+      const descriptors = files.map(filePath => core.selector.inspectDiagnosticSource(filePath));
+      const policy = core.diagnosticPolicy.describePolicy(descriptors, projectDir, { selectionMode: "FULL" });
+      const diagnostics = policy.decisions.map(({ descriptor, entry }) => {
+        const filePath = descriptor.filePath;
+        return { file: path.basename(filePath), id: descriptor.id, name: descriptor.name, layer: descriptor.layer, linkedTask: descriptor.linkedTask, diagnosticNecessity: descriptor.diagnosticNecessity, necessityReason: descriptor.necessityReason, diagnosticState: entry.state, stateReason: entry.reason, stateUntil: entry.until, removed: false, valid: descriptor.valid, errors: descriptor.errors };
       });
+      diagnostics.push(...policy.removed.map(item => ({ file: path.basename(item.originalFile || ""), id: item.id, name: item.name, layer: "REMOVED", diagnosticNecessity: item.diagnosticNecessity, necessityReason: item.necessityReason, diagnosticState: "REMOVED", stateReason: item.reason, removedAt: item.removedAt, removed: true, valid: true, errors: [] })));
 
       return {
         content: [{ type: "text", text: JSON.stringify(diagnostics, null, 2) }],
@@ -602,6 +603,66 @@ server.tool(
       return { content: [{ type: "text", text: JSON.stringify(result, null, 2) }] };
     } catch (err) {
       return { content: [{ type: "text", text: `Error stopping dashboard: ${err.message}` }], isError: true };
+    }
+  }
+);
+
+server.tool(
+  "set_diagnostic_state",
+  "Enable, skip once, snooze, or disable a project diagnostic. Non-enabled states require an explicit reason; snoozing also requires a future ISO date.",
+  {
+    projectDir: z.string().describe("Absolute path to the project root directory"),
+    diagnosticId: z.string().min(1),
+    state: z.enum(["ENABLED", "SKIP_ONCE", "SNOOZED", "DISABLED"]),
+    reason: z.string().optional(),
+    until: z.string().optional(),
+  },
+  async ({ projectDir, diagnosticId, state, reason, until }) => {
+    try {
+      const descriptor = discoverDiagnostics(projectDir).map(filePath => core.selector.inspectDiagnosticSource(filePath)).find(item => item.id === diagnosticId);
+      if (!descriptor) throw new Error(`Diagnostic "${diagnosticId}" was not found.`);
+      const policy = core.diagnosticPolicy.setDiagnosticState(projectDir, diagnosticId, state, { reason, until });
+      return { content: [{ type: "text", text: JSON.stringify({ success: true, diagnostic: { id: descriptor.id, diagnosticNecessity: descriptor.diagnosticNecessity }, policy }, null, 2) }] };
+    } catch (err) {
+      return { content: [{ type: "text", text: err.message }], isError: true };
+    }
+  }
+);
+
+server.tool(
+  "remove_diagnostic",
+  "Recoverably remove a project .diag.js file. Requires explicit confirmation and a reason; the file is moved to the local Vibe Diagnosis trash.",
+  {
+    projectDir: z.string().describe("Absolute path to the project root directory"),
+    diagnosticId: z.string().min(1),
+    confirmed: z.boolean().describe("True only after the user explicitly approved removing this diagnostic"),
+    reason: z.string().min(1),
+  },
+  async ({ projectDir, diagnosticId, confirmed, reason }) => {
+    try {
+      const descriptor = discoverDiagnostics(projectDir).map(filePath => core.selector.inspectDiagnosticSource(filePath)).find(item => item.id === diagnosticId);
+      if (!descriptor) throw new Error(`Diagnostic "${diagnosticId}" was not found.`);
+      const removed = core.diagnosticPolicy.removeDiagnostic(projectDir, descriptor, { confirmed, reason });
+      return { content: [{ type: "text", text: JSON.stringify({ success: true, removed }, null, 2) }] };
+    } catch (err) {
+      return { content: [{ type: "text", text: err.message }], isError: true };
+    }
+  }
+);
+
+server.tool(
+  "restore_diagnostic",
+  "Restore a recoverably removed project diagnostic to its original path.",
+  {
+    projectDir: z.string().describe("Absolute path to the project root directory"),
+    diagnosticId: z.string().min(1),
+  },
+  async ({ projectDir, diagnosticId }) => {
+    try {
+      const restored = core.diagnosticPolicy.restoreDiagnostic(projectDir, diagnosticId);
+      return { content: [{ type: "text", text: JSON.stringify({ success: true, restored }, null, 2) }] };
+    } catch (err) {
+      return { content: [{ type: "text", text: err.message }], isError: true };
     }
   }
 );

@@ -3,9 +3,9 @@
 [![VS Code Marketplace](https://img.shields.io/visual-studio-marketplace/v/Rejard.vibe-diagnosis-vscode?style=flat-square&color=blue)](https://marketplace.visualstudio.com/items?itemName=Rejard.vibe-diagnosis-vscode)
 [![Open VSX](https://img.shields.io/open-vsx/v/Rejard/vibe-diagnosis-vscode?style=flat-square&color=purple)](https://open-vsx.org/extension/Rejard/vibe-diagnosis-vscode)
 
-VS Code integration for Vibe Diagnosis 1.6.3. Run project diagnostics, inspect failures in the Problems panel, open the optional authenticated local dashboard, and review a fully sealed repair plan before approving any file change.
+VS Code integration for Vibe Diagnosis 1.7.0. Run project diagnostics, inspect failures in the Problems panel, open the optional authenticated local dashboard, and review a fully sealed repair plan before approving any file change.
 
-Version 1.6.3 retains the 1.6 safety contracts and adds restricted STATIC/TEST environments, AST-based metadata inspection, stronger MCP stdio isolation, and neutral large-catalog validation.
+Version 1.7.0 adds one-to-five check necessity, priority-aware routine execution, explicit pause/disable policy, recoverable diagnostic removal, and policy-bound completion receipts while retaining the 1.6 safety contracts.
 
 ## Requirements
 
@@ -23,7 +23,7 @@ Open the Command Palette with `Ctrl+Shift+P` or `Cmd+Shift+P`:
 |---|---|
 | `Vibe Diagnosis: Init` | Creates `.vibe-diagnosis/`, a sample diagnostic, and supported agent rule blocks |
 | `Vibe Diagnosis: Run` | Runs diagnostics and shows health, gates, and failures |
-| `Vibe Diagnosis: Run (JSON)` | Runs diagnostics and prints the complete version 1.6 report |
+| `Vibe Diagnosis: Run (JSON)` | Runs diagnostics and prints the complete version 1.7 report |
 | `Vibe Diagnosis: Open Dashboard` | Starts the optional project dashboard on its allocated local port |
 | `Vibe Diagnosis: Plan Safe Repair` | Runs current diagnostics, shows a risk-rated plan and diff, then asks separately before application |
 
@@ -59,7 +59,7 @@ Install the MCP server separately:
   "mcpServers": {
     "vibe-diagnosis": {
       "command": "npx",
-      "args": ["-y", "vibe-diagnosis-mcp@1.6.3"]
+      "args": ["-y", "vibe-diagnosis-mcp@1.7.0"]
     }
   }
 }
@@ -67,13 +67,13 @@ Install the MCP server separately:
 
 ## 한국어 안내
 
-Vibe Diagnosis 1.6.3 확장은 기존 안전 계약에 더해 제한된 STATIC·TEST 환경, AST 기반 메타데이터 검사, 강화된 MCP stdio 분리, 중립적인 대규모 진단 검증을 제공합니다.
+Vibe Diagnosis 1.7.0 확장은 별 1~5개의 점검 필요도, 우선순위 자동 실행, 명시적인 보류·비활성 정책, 복구 가능한 진단 제거, 정책과 결합된 완료 영수증을 제공합니다.
 
 명령 팔레트에서 다음 명령을 사용할 수 있습니다.
 
 - `Vibe Diagnosis: Init`: 진단 폴더, 예제 진단, 지원되는 에이전트 규칙 블록 생성
 - `Vibe Diagnosis: Run`: 진단 실행 및 건강도·게이트·실패 표시
-- `Vibe Diagnosis: Run (JSON)`: 전체 1.6 JSON 보고서 출력
+- `Vibe Diagnosis: Run (JSON)`: 전체 1.7 JSON 보고서 출력
 - `Vibe Diagnosis: Open Dashboard`: 현재 프로젝트의 로컬 대시보드 실행
 - `Vibe Diagnosis: Plan Safe Repair`: 실패 진단의 수리 계획과 diff를 검토하고 별도 승인 후 적용
 
