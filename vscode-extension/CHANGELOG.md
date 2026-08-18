@@ -1,6 +1,12 @@
 # Change Log
 
-## 1.7.1 (Current)
+## 1.7.2 (Current)
+
+- Safely renders string, scalar, array, and structured-object diagnostic details without aborting dashboard restoration.
+- Isolates malformed card fields so one diagnostic cannot hide the rest of the latest persisted report.
+- Preserves policy exclusion and timing displays across initial load, refresh, and server restart.
+
+## 1.7.1
 
 - Restored the latest persisted diagnostic report after dashboard page and server restarts.
 - Added per-diagnostic and total elapsed time plus slowest-first dashboard inspection.

@@ -56,13 +56,14 @@ test('synthetic diagnostic catalog scales to 1000 entries without project coupli
 
 test('all three package READMEs lead with agent-directed vibe workflows', () => {
   const root = path.join(__dirname, '..');
+  const version = require(path.join(root, 'package.json')).version;
   const documents = [
     fs.readFileSync(path.join(root, 'README.md'), 'utf8'),
     fs.readFileSync(path.join(root, 'README.ko.md'), 'utf8'),
     fs.readFileSync(path.join(root, 'mcp-server', 'README.md'), 'utf8'),
   ];
   for (const document of documents) {
-    assert.match(document, /1\.7\.1/);
+    assert.match(document, new RegExp(version.replace(/\./g, '\\.')));
     assert.match(document, /complete_task_diagnostics/);
     assert.match(document, /verify_completion_receipt/);
     assert.match(document, /open_dashboard/);

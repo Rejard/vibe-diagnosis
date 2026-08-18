@@ -80,7 +80,7 @@ const { conflictPayload } = core.diagnosticsLock;
 
 const server = new McpServer({
   name: "vibe-diagnosis",
-  version: "1.7.1",
+  version: "1.7.2",
 });
 
 const READ_ONLY_TOOLS = new Set(["list_repair_incidents", "audit_diagnostics", "list_diagnostics", "read_error_pattern", "check_symbol_diff", "recommend_cartridge_split", "verify_completion_receipt"]);

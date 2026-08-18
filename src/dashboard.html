@@ -775,7 +775,7 @@ header{display:flex;align-items:center;justify-content:space-between;padding:20p
 <script>
 const API = '';
 const DASHBOARD_TOKEN = __VIBE_DASHBOARD_TOKEN__;
-const DASHBOARD_EXPECTED = { version: '1.7.1', apiVersion: 2 };
+const DASHBOARD_EXPECTED = { version: '1.7.2', apiVersion: 2 };
 function apiFetch(url, options = {}) {
   return fetch(url, { ...options, headers: { ...(options.headers || {}), 'X-Vibe-Dashboard-Token': DASHBOARD_TOKEN } });
 }
@@ -840,8 +840,41 @@ function selectDiagnosticCard(cardId, cardName, event) {
   updateCardsSelection();
 }
 
+function formatDashboardValue(value) {
+  if (value === null) return 'null';
+  if (value === undefined) return '';
+  if (typeof value === 'string') return value;
+  if (typeof value === 'number' || typeof value === 'boolean' || typeof value === 'bigint') return String(value);
+
+  const seen = new WeakSet();
+  const normalize = item => {
+    if (item === null) return null;
+    if (item === undefined) return '[undefined]';
+    if (typeof item === 'bigint') return String(item) + 'n';
+    if (typeof item === 'function') return `[Function${item.name ? ': ' + item.name : ''}]`;
+    if (typeof item === 'symbol') return String(item);
+    if (typeof item !== 'object') return item;
+    if (seen.has(item)) return '[Circular]';
+    seen.add(item);
+    if (Array.isArray(item)) return item.map(entry => normalize(entry));
+    const output = {};
+    Object.keys(item).sort().forEach(key => {
+      try { output[key] = normalize(item[key]); }
+      catch { output[key] = '[Unreadable value]'; }
+    });
+    return output;
+  };
+
+  try {
+    const json = JSON.stringify(normalize(value), null, 2);
+    if (json !== undefined) return json;
+  } catch {}
+  try { return String(value); }
+  catch { return '[Unserializable value]'; }
+}
+
 function escapeHtml(value) {
-  return String(value == null ? '' : value)
+  return formatDashboardValue(value)
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
@@ -921,12 +954,12 @@ function updateHealthRing(percent) {
 function createCard(diag, result) {
   const skipped = lastSkipped[diag.id];
   const excludedNow = diag.removed || diag.diagnosticState !== 'ENABLED';
-  const status = skipped || excludedNow ? 'pending' : result ? result.status.toLowerCase() : 'pending';
+  const status = skipped || excludedNow ? 'pending' : result ? String(result.status || 'UNKNOWN').toLowerCase() : 'pending';
   let details;
   if (skipped) details = `${skipped.state || skipped.skipReason}: 실행하지 않음 (${skipped.skipReason})${skipped.reason ? ' - ' + skipped.reason : ''}`;
   else if (diag.removed) details = 'Recoverably removed · 실행하지 않음';
   else if (diag.diagnosticState !== 'ENABLED') details = `${diag.diagnosticState}: 실행하지 않음${diag.stateReason ? ' - ' + diag.stateReason : ''}`;
-  else if (result) details = result.details;
+  else if (result) details = formatDashboardValue(result.details);
   else details = 'Not yet tested';
   const elapsed = resultDuration(result);
   let duration = skipped || excludedNow ? '실행 안 함' : result ? formatDuration(elapsed) : '--';
@@ -1017,6 +1050,44 @@ function createCard(diag, result) {
   `;
 }
 
+function safeField(value, key, fallback = null) {
+  try {
+    const field = value && value[key];
+    return field == null ? fallback : field;
+  } catch {
+    return fallback;
+  }
+}
+
+function createCardFallback(diag, result) {
+  const id = formatDashboardValue(safeField(diag, 'id', 'unknown-diagnostic'));
+  const name = formatDashboardValue(safeField(diag, 'name', id));
+  const state = formatDashboardValue(safeField(diag, 'diagnosticState', 'ENABLED'));
+  const skipped = lastSkipped[id];
+  const statusValue = formatDashboardValue(safeField(result, 'status', 'UNKNOWN'));
+  const hasResult = Boolean(result);
+  const excluded = Boolean(skipped) || state !== 'ENABLED';
+  let details;
+  if (skipped) details = `${formatDashboardValue(skipped.skipReason || skipped.state || 'POLICY_EXCLUDED')}: 실행하지 않음`;
+  else if (excluded) details = `${state}: 실행하지 않음`;
+  else if (hasResult) details = `${formatDashboardValue(safeField(result, 'details', 'Result recorded'))} · 일부 필드를 안전하게 표시하지 못했습니다.`;
+  else details = 'Not yet tested';
+  const elapsed = resultDuration(result);
+  const duration = excluded ? '실행 안 함' : hasResult ? formatDuration(elapsed) : '--';
+  const status = excluded ? 'pending' : hasResult ? statusValue.toLowerCase() : 'pending';
+  return `
+    <div class="card status-${escapeHtml(status)} card-render-fallback">
+      <div class="card-header"><div><div class="card-name">${escapeHtml(name)}</div><div class="card-id">${escapeHtml(id)}</div></div></div>
+      <div class="card-policy">${escapeHtml(state)}</div>
+      <div class="card-status"><span class="status-dot ${escapeHtml(status)}"></span><span class="card-details">${escapeHtml(details)}</span><span class="card-duration">${escapeHtml(duration)}</span></div>
+    </div>`;
+}
+
+function renderDiagnosticCard(diag, result) {
+  try { return createCard(diag, result); }
+  catch { return createCardFallback(diag, result); }
+}
+
 function showToast(message, type) {
   const toast = document.getElementById('toast');
   toast.textContent = message;
@@ -1066,7 +1137,11 @@ function renderCards() {
   if (diagnosticSort === 'slowest') {
     displayList.sort((a, b) => (resultDuration(lastResults[b.id]) ?? -1) - (resultDuration(lastResults[a.id]) ?? -1));
   }
-  container.innerHTML = displayList.map(d => createCard(d, lastResults[d.id])).join('');
+  container.innerHTML = displayList.map(d => {
+    let id;
+    try { id = d.id; } catch { id = null; }
+    return renderDiagnosticCard(d, id == null ? null : lastResults[id]);
+  }).join('');
 }
 
 function setDiagnosticSort(value) {
@@ -1719,15 +1794,6 @@ async function deleteMilestone(id) {
   } catch (err) {
     showToast('Delete failed', 'error');
   }
-}
-
-function escapeHtml(str) {
-  if (!str) return '';
-  return str.replace(/&/g, '&amp;')
-            .replace(/</g, '&lt;')
-            .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#039;');
 }
 
 async function init() {

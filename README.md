@@ -4,7 +4,7 @@ Tell your coding AI to diagnose its own work before it says “done.”
 
 [한국어 사용법](./README.ko.md)
 
-Vibe Diagnosis 1.7.1 is an MCP for vibe coding with Codex, Claude Code, Cursor, Windsurf, Gemini CLI, Antigravity, and other MCP-capable coding agents. You do not need to memorize commands. Give the agent a clear instruction; it can initialize project diagnostics, run checks during development, open the optional dashboard, prove completion, and prepare a repair plan when something fails.
+Vibe Diagnosis 1.7.2 is an MCP for vibe coding with Codex, Claude Code, Cursor, Windsurf, Gemini CLI, Antigravity, and other MCP-capable coding agents. You do not need to memorize commands. Give the agent a clear instruction; it can initialize project diagnostics, run checks during development, open the optional dashboard, prove completion, and prepare a repair plan when something fails.
 
 The key contract is simple:
 
@@ -15,7 +15,7 @@ The key contract is simple:
 Open your project in an MCP-capable coding agent and paste this:
 
 ```text
-Set up Vibe Diagnosis 1.7.1 for this project as a local MCP server. Detect the MCP configuration format used by this coding tool, add vibe-diagnosis-mcp@1.7.1 with npx, and verify the connection by listing its tools. Do not add API keys to source files, Git, or command history. If you cannot safely edit the client configuration, show me the exact config entry and where it belongs, then wait for me to restart the client.
+Set up Vibe Diagnosis 1.7.2 for this project as a local MCP server. Detect the MCP configuration format used by this coding tool, add vibe-diagnosis-mcp@1.7.2 with npx, and verify the connection by listing its tools. Do not add API keys to source files, Git, or command history. If you cannot safely edit the client configuration, show me the exact config entry and where it belongs, then wait for me to restart the client.
 ```
 
 After the agent or client restarts, paste:
@@ -76,7 +76,7 @@ To stop it:
 Stop only the Vibe Diagnosis dashboard associated with this project and confirm that its project lock was released. Do not terminate unrelated Node processes or dashboards.
 ```
 
-Version 1.7.1 restores the latest project-scoped report from `.vibe-diagnosis/runs/latest.json` whenever the page or server is restarted. It restores result and skip states, health, gates, completion eligibility, per-check wall-clock time, and total elapsed time. A legacy report without timing still opens safely. Policy exclusions show “not executed” instead of a misleading `0ms`, while only checks absent from the latest run remain `Not yet tested`. Use the optional “Slowest first” sort to find expensive checks without changing the default status/necessity order.
+Version 1.7.2 restores the latest project-scoped report from `.vibe-diagnosis/runs/latest.json` whenever the page or server is restarted. String, scalar, array, and structured-object `details` values are rendered as readable escaped text, including safe circular-value fallbacks. One malformed card cannot abort the remaining report. Result and skip states, health, gates, completion eligibility, per-check wall-clock time, and total elapsed time remain available. A legacy report without timing still opens safely. Policy exclusions show “not executed” instead of a misleading `0ms`, while only checks absent from the latest run remain `Not yet tested`. Use the optional “Slowest first” sort to find expensive checks without changing the default status/necessity order.
 
 The dashboard health and lock contracts include the package version, API version, PID, authenticated project identity, and capabilities. `open_dashboard`, the CLI, and the VS Code client detect an older authenticated server, verify that every project identity field matches, request its authenticated shutdown, wait for the port, and start the installed version. They refuse to stop an unrelated or unverifiable listener. If a stale browser tab receives a plain-text `Not found` from an old server, it now shows a readable update/restart message instead of a JSON parser exception.
 
@@ -212,7 +212,7 @@ Ask it to show, not guess, the config for your client. The generic entry is:
   "mcpServers": {
     "vibe-diagnosis": {
       "command": "npx",
-      "args": ["-y", "vibe-diagnosis-mcp@1.7.1"]
+      "args": ["-y", "vibe-diagnosis-mcp@1.7.2"]
     }
   }
 }
@@ -221,13 +221,13 @@ Ask it to show, not guess, the config for your client. The generic entry is:
 Claude Code fallback:
 
 ```bash
-claude mcp add vibe-diagnosis --scope local -- npx -y vibe-diagnosis-mcp@1.7.1
+claude mcp add vibe-diagnosis --scope local -- npx -y vibe-diagnosis-mcp@1.7.2
 ```
 
 Native Windows Claude Code fallback:
 
 ```powershell
-claude mcp add vibe-diagnosis --scope local -- cmd /c npx -y vibe-diagnosis-mcp@1.7.1
+claude mcp add vibe-diagnosis --scope local -- cmd /c npx -y vibe-diagnosis-mcp@1.7.2
 ```
 
 Restart or reconnect the coding client after changing its MCP configuration, then ask: “List the Vibe Diagnosis tools and do not modify the project.”
@@ -237,15 +237,15 @@ Restart or reconnect the coding client after changing its MCP configuration, the
 The CLI is useful for CI, scripts, and clients without MCP. It is not the primary vibe-coding workflow.
 
 ```bash
-npx -y vibe-diagnosis@1.7.1 init
-npx -y vibe-diagnosis@1.7.1 run --json
-npx -y vibe-diagnosis@1.7.1 run --all --json
-npx -y vibe-diagnosis@1.7.1 complete
-npx -y vibe-diagnosis@1.7.1 diagnostic-state <id> disabled --reason "intentional hold"
-npx -y vibe-diagnosis@1.7.1 remove-diagnostic <id> --confirm --reason "not applicable"
-npx -y vibe-diagnosis@1.7.1 restore-diagnostic <id>
-npx -y vibe-diagnosis@1.7.1 dashboard
-npx -y vibe-diagnosis@1.7.1 stop
+npx -y vibe-diagnosis@1.7.2 init
+npx -y vibe-diagnosis@1.7.2 run --json
+npx -y vibe-diagnosis@1.7.2 run --all --json
+npx -y vibe-diagnosis@1.7.2 complete
+npx -y vibe-diagnosis@1.7.2 diagnostic-state <id> disabled --reason "intentional hold"
+npx -y vibe-diagnosis@1.7.2 remove-diagnostic <id> --confirm --reason "not applicable"
+npx -y vibe-diagnosis@1.7.2 restore-diagnostic <id>
+npx -y vibe-diagnosis@1.7.2 dashboard
+npx -y vibe-diagnosis@1.7.2 stop
 ```
 
 Use `--cwd <absolute-project-path>` when the shell is not inside the target project. Routine `run` follows necessity; `run --all` includes every enabled optional check. `snoozed` additionally requires `--until <future-ISO-date>`.

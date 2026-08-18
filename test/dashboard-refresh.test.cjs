@@ -31,7 +31,7 @@ async function listenDashboard(root) {
 
 test('dashboard restores the latest persisted report after a server restart', async t => {
   const root = makeProject();
-  fs.writeFileSync(path.join(root, '.vibe-diagnosis', 'diagnostics', 'ok.diag.js'), "module.exports={id:'ok',name:'OK',layer:'TASK',async run(){return {status:'OK',details:'restored'}}};\n");
+  fs.writeFileSync(path.join(root, '.vibe-diagnosis', 'diagnostics', 'ok.diag.js'), "module.exports={id:'ok',name:'OK',layer:'TASK',async run(){return {status:'OK',details:{ready:true}}}};\n");
   t.after(() => fs.rmSync(root, { recursive: true, force: true }));
 
   let dashboard = await listenDashboard(root);
@@ -44,7 +44,7 @@ test('dashboard restores the latest persisted report after a server restart', as
   t.after(() => { if (dashboard.server.listening) dashboard.server.close(); });
   const restored = JSON.parse((await dashboard.request('/api/report')).body);
   assert.equal(restored.runId, original.runId);
-  assert.equal(restored.results[0].details, 'restored');
+  assert.deepEqual(restored.results[0].details, { ready: true });
   assert.ok(Number.isFinite(restored.results[0].durationMs));
   assert.ok(Number.isFinite(restored.durationMs));
 });

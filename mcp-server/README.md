@@ -1,13 +1,13 @@
 # vibe-diagnosis-mcp
 
-The primary Vibe Diagnosis 1.7.1 interface for AI coding agents.
+The primary Vibe Diagnosis 1.7.2 interface for AI coding agents.
 
 This package is designed to be operated through natural-language instructions in Codex, Claude Code, Cursor, Windsurf, Gemini CLI, Antigravity, and other MCP clients. The user describes the desired workflow; the agent maps that request to diagnosis, completion, dashboard, context, or approval-gated repair tools.
 
 ## Give this to your coding agent
 
 ```text
-Connect Vibe Diagnosis 1.7.1 to this coding tool as a project-local MCP server using npx and vibe-diagnosis-mcp@1.7.1. Detect and follow the client's actual MCP configuration format. Verify the server by initializing MCP and listing its tools. Do not initialize or modify the project yet. Do not store API keys in the MCP config. If a client restart is required, tell me exactly what was changed and wait.
+Connect Vibe Diagnosis 1.7.2 to this coding tool as a project-local MCP server using npx and vibe-diagnosis-mcp@1.7.2. Detect and follow the client's actual MCP configuration format. Verify the server by initializing MCP and listing its tools. Do not initialize or modify the project yet. Do not store API keys in the MCP config. If a client restart is required, tell me exactly what was changed and wait.
 ```
 
 After reconnecting:
@@ -72,7 +72,7 @@ Call list_diagnostics and show every diagnostic's stars, reason, and state. Chan
 Call open_dashboard for this absolute project path. Reuse only an authenticated dashboard whose project identity matches. Return the actual URL, then run diagnostics so the new dashboard process has current results.
 ```
 
-The 1.7.1 dashboard restores the newest project-local `runs/latest.json` after page or server restart, including skipped states, gates, completion, per-diagnostic wall-clock timing, and total duration. It labels policy exclusions as not executed, tolerates legacy reports without timing, and offers an opt-in slowest-first view. Dashboard health and lock records publish the server/package version and API contract. If an authenticated same-project server is older, `open_dashboard` validates service, project key, PID, port, and token before requesting graceful shutdown and starting the installed version; it never kills an unrelated listener.
+The 1.7.2 dashboard restores the newest project-local `runs/latest.json` after page or server restart, including skipped states, gates, completion, per-diagnostic wall-clock timing, and total duration. Structured object, array, scalar, and string `details` values render safely, and one malformed card cannot abort the remaining report. It labels policy exclusions as not executed, tolerates legacy reports without timing, and offers an opt-in slowest-first view. Dashboard health and lock records publish the server/package version and API contract. If an authenticated same-project server is older, `open_dashboard` validates service, project key, PID, port, and token before requesting graceful shutdown and starting the installed version; it never kills an unrelated listener.
 
 ```text
 Call stop_dashboard for this project only. Do not kill unrelated ports or processes.
@@ -136,7 +136,7 @@ Use this only when the coding agent cannot configure its own MCP client safely:
   "mcpServers": {
     "vibe-diagnosis": {
       "command": "npx",
-      "args": ["-y", "vibe-diagnosis-mcp@1.7.1"]
+      "args": ["-y", "vibe-diagnosis-mcp@1.7.2"]
     }
   }
 }
@@ -145,13 +145,13 @@ Use this only when the coding agent cannot configure its own MCP client safely:
 Claude Code:
 
 ```bash
-claude mcp add vibe-diagnosis --scope local -- npx -y vibe-diagnosis-mcp@1.7.1
+claude mcp add vibe-diagnosis --scope local -- npx -y vibe-diagnosis-mcp@1.7.2
 ```
 
 Native Windows Claude Code:
 
 ```powershell
-claude mcp add vibe-diagnosis --scope local -- cmd /c npx -y vibe-diagnosis-mcp@1.7.1
+claude mcp add vibe-diagnosis --scope local -- cmd /c npx -y vibe-diagnosis-mcp@1.7.2
 ```
 
 Requirements: Node.js 20 or newer, `npx`, and a project workspace writable by the MCP client. Restart or reconnect the client after changing configuration.
@@ -175,7 +175,7 @@ Configure Vibe Diagnosis BYOK locally for <provider and model>. Ask me for the k
 
 Local keys are stored in `.vibe-diagnosis/byok.local.json`, which is ignored. Supported providers are OpenAI, Anthropic, Google Gemini, and OpenRouter.
 
-## Release 1.7.1 contracts
+## Release 1.7.2 contracts
 
 - One-to-five check-necessity metadata with legacy four-star defaults
 - Priority-aware automatic selection: 5/4 routine, 3 change-scoped, 2/1 explicit

@@ -1,6 +1,6 @@
 {
   "name": "vibe-diagnosis-mcp",
-  "version": "1.7.1",
+  "version": "1.7.2",
   "description": "MCP server for vibe-diagnosis — AI agents run diagnostics automatically",
   "type": "module",
   "bin": {
@@ -34,7 +34,7 @@
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.30.0",
-    "vibe-diagnosis": "1.7.1",
+    "vibe-diagnosis": "1.7.2",
     "zod": "^3.24.0"
   }
 }
