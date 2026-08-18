@@ -1,23 +1,25 @@
 const fs = require('fs');
 const path = require('path');
+const { normalizeRunReport } = require('./report-store');
 
 function runsDir(projectDir) { return path.join(projectDir, '.vibe-diagnosis', 'runs'); }
 
 function saveRunReport(projectDir, report) {
   const dir = runsDir(projectDir);
   fs.mkdirSync(dir, { recursive: true });
+  const storedReport = normalizeRunReport(projectDir, report) || report;
   const target = path.join(dir, `${report.runId}.json`);
-  fs.writeFileSync(target, JSON.stringify(report, null, 2), 'utf8');
-  fs.writeFileSync(path.join(dir, 'latest.json'), JSON.stringify(report, null, 2), 'utf8');
-  if (report.completion?.receipt) {
-    fs.writeFileSync(path.join(dir, 'latest-completion.json'), JSON.stringify(report, null, 2), 'utf8');
+  fs.writeFileSync(target, JSON.stringify(storedReport, null, 2), 'utf8');
+  fs.writeFileSync(path.join(dir, 'latest.json'), JSON.stringify(storedReport, null, 2), 'utf8');
+  if (storedReport.completion?.receipt) {
+    fs.writeFileSync(path.join(dir, 'latest-completion.json'), JSON.stringify(storedReport, null, 2), 'utf8');
   }
   return target;
 }
 
 function loadBaseline(projectDir, baselineId) {
   const target = path.join(runsDir(projectDir), baselineId ? `${baselineId}.json` : 'latest.json');
-  try { return JSON.parse(fs.readFileSync(target, 'utf8')); } catch { return null; }
+  try { return normalizeRunReport(projectDir, JSON.parse(fs.readFileSync(target, 'utf8'))); } catch { return null; }
 }
 
 function stableResult(result) {

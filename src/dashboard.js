@@ -10,6 +10,8 @@ const { runHeuristicMetrics } = require('./analyzer');
 const { resolveWithin } = require('./path-policy');
 const { inspectDiagnosticSource } = require('./selector');
 const { conflictPayload, projectKey } = require('./diagnostics-lock');
+const { loadLatestRunReport, normalizeRunReport } = require('./report-store');
+const { dashboardIdentity } = require('./dashboard-contract');
 const {
   describePolicy,
   setDiagnosticState,
@@ -19,7 +21,7 @@ const {
 
 const HTML_PATH = path.join(__dirname, 'dashboard.html');
 
-function logSessionHistory(projectDir, passRate, status, cardResults) {
+function logSessionHistory(projectDir, passRate, status, cardResults, durationMs = null) {
   const historyDir = path.join(projectDir, '.vibe-diagnosis');
   if (!fs.existsSync(historyDir)) {
     fs.mkdirSync(historyDir, { recursive: true });
@@ -40,6 +42,7 @@ function logSessionHistory(projectDir, passRate, status, cardResults) {
     timestamp: new Date().toISOString(),
     passRate: Math.round(passRate * 100),
     status: status,
+    durationMs,
     cardResults: cardResults || []
   });
   fs.writeFileSync(historyFile, JSON.stringify(history, null, 2), 'utf-8');
@@ -166,15 +169,29 @@ async function readOptionalBody(req) {
 }
 
 function startDashboard(projectDir, port = 7700, options = {}) {
-  let lastRunResults = [];
-  let lastRunReport = null;
+  const resolvedProjectDir = path.resolve(projectDir);
+  const identity = dashboardIdentity(resolvedProjectDir);
+  let lastRunReport = loadLatestRunReport(resolvedProjectDir);
+  let lastRunResults = lastRunReport?.results || [];
   const shutdownToken = crypto.randomBytes(24).toString('hex');
+
+  function restoreLatestReport() {
+    const persisted = loadLatestRunReport(resolvedProjectDir);
+    if (persisted) {
+      const memoryTime = Date.parse(lastRunReport?.finishedAt || '') || 0;
+      const persistedTime = Date.parse(persisted.finishedAt || '') || 0;
+      if (!lastRunReport || persistedTime >= memoryTime) lastRunReport = persisted;
+    }
+    lastRunResults = lastRunReport?.results || [];
+    return lastRunReport;
+  }
 
   const server = http.createServer(async (req, res) => {
     const url = new URL(req.url, `http://${req.headers.host}`);
 
     if (req.method === 'GET' && url.pathname === '/') {
-      const html = fs.readFileSync(HTML_PATH, 'utf-8').replace('__VIBE_DASHBOARD_TOKEN__', JSON.stringify(shutdownToken));
+      const html = fs.readFileSync(HTML_PATH, 'utf-8')
+        .replace('__VIBE_DASHBOARD_TOKEN__', JSON.stringify(shutdownToken));
       sendHtml(res, html);
       return;
     }
@@ -195,7 +212,7 @@ function startDashboard(projectDir, port = 7700, options = {}) {
     }
 
     if (req.method === 'GET' && url.pathname === '/api/health') {
-      sendJson(res, { service: 'vibe-diagnosis-dashboard', projectKey: projectKey(projectDir), pid: process.pid });
+      sendJson(res, { ...identity, projectDir: undefined, projectKey: projectKey(resolvedProjectDir), pid: process.pid });
       return;
     }
 
@@ -209,7 +226,7 @@ function startDashboard(projectDir, port = 7700, options = {}) {
       try {
         const filename = decodeURIComponent(url.pathname.slice('/api/errors/'.length));
         const content = readErrorPattern(projectDir, filename);
-        if (content === null) sendText(res, 'Not found', 404);
+        if (content === null) sendJson(res, { error: 'Error pattern was not found.', code: 'ERROR_PATTERN_NOT_FOUND' }, 404);
         else sendText(res, content);
       } catch (error) {
         sendJson(res, { error: error.message }, 400);
@@ -229,16 +246,16 @@ function startDashboard(projectDir, port = 7700, options = {}) {
           filters: ids.length ? { ids } : {},
         });
         const results = report.results;
-        lastRunResults = results;
-        lastRunReport = report;
+        lastRunReport = normalizeRunReport(resolvedProjectDir, report) || report;
+        lastRunResults = lastRunReport.results;
         const { summary, overallStatus, healthPercent } = report;
         
         // Log to session history
         const passRate = summary.total > 0 ? summary.ok / summary.total : 1.0;
-        const cardResults = results.map(r => ({ id: r.id, status: r.status }));
-        logSessionHistory(projectDir, passRate, overallStatus, cardResults);
+        const cardResults = results.map(r => ({ id: r.id, status: r.status, durationMs: r.durationMs ?? r.duration ?? null }));
+        logSessionHistory(projectDir, passRate, overallStatus, cardResults, report.durationMs ?? report.totalDurationMs ?? null);
 
-        sendJson(res, report);
+        sendJson(res, lastRunReport);
       } catch (err) {
         const conflict = conflictPayload(err);
         sendJson(res, conflict || { error: err.message }, conflict ? 409 : 500);
@@ -372,6 +389,7 @@ function startDashboard(projectDir, port = 7700, options = {}) {
 
     if (req.method === 'GET' && url.pathname === '/api/metrics') {
       try {
+        restoreLatestReport();
         const list = listDiagnosticMeta(projectDir);
         const total = list.length;
         const diagnosticsEvaluated = lastRunResults.length > 0;
@@ -409,6 +427,7 @@ function startDashboard(projectDir, port = 7700, options = {}) {
 
     if (req.method === 'POST' && url.pathname === '/api/repair') {
       try {
+        restoreLatestReport();
         const body = await readBody(req);
         const { diagId } = body;
         if (!diagId) {
@@ -437,6 +456,7 @@ function startDashboard(projectDir, port = 7700, options = {}) {
 
     if (req.method === 'POST' && url.pathname === '/api/repair/plan') {
       try {
+        restoreLatestReport();
         const body = await readBody(req);
         const target = lastRunResults.find(result => result.id === body.diagId);
         if (!target || target.status === 'OK') { sendJson(res, { error: 'A recent failing diagnostic result is required.' }, 400); return; }
@@ -454,7 +474,10 @@ function startDashboard(projectDir, port = 7700, options = {}) {
           approvedChecksum: body.approvedChecksum,
           approvedHighRisk: body.approvedHighRisk === true,
         });
-        if (repair.result?.report) { lastRunReport = repair.result.report; lastRunResults = repair.result.report.results; }
+        if (repair.result?.report) {
+          lastRunReport = normalizeRunReport(resolvedProjectDir, repair.result.report) || repair.result.report;
+          lastRunResults = lastRunReport.results;
+        }
         sendJson(res, { success: repair.result?.success === true, repair });
       } catch (err) { sendJson(res, { error: err.message }, 400); }
       return;
@@ -466,7 +489,7 @@ function startDashboard(projectDir, port = 7700, options = {}) {
     }
 
     if (req.method === 'GET' && url.pathname === '/api/report') {
-      sendJson(res, lastRunReport || { results: [], message: 'Run diagnostics to create a report.' });
+      sendJson(res, restoreLatestReport() || { schemaVersion: 4, projectDir: resolvedProjectDir, results: [], skippedDiagnostics: [], message: 'Run diagnostics to create a report.' });
       return;
     }
 
@@ -479,7 +502,7 @@ function startDashboard(projectDir, port = 7700, options = {}) {
         }
         sendJson(res, { success: true, message: 'Dashboard is shutting down...' });
 
-        const lockFile = path.join(projectDir, '.vibe-diagnosis', 'active_port.json');
+        const lockFile = path.join(resolvedProjectDir, '.vibe-diagnosis', 'active_port.json');
         if (fs.existsSync(lockFile)) {
           try {
             fs.unlinkSync(lockFile);
@@ -495,8 +518,8 @@ function startDashboard(projectDir, port = 7700, options = {}) {
       return;
     }
 
-    res.writeHead(404);
-    res.end('Not found');
+    if (url.pathname.startsWith('/api/')) sendJson(res, { error: 'Dashboard API route was not found.', code: 'DASHBOARD_API_NOT_FOUND' }, 404);
+    else sendText(res, 'Not found', 404);
   });
 
   server.listen(port, '127.0.0.1', () => {
@@ -504,13 +527,18 @@ function startDashboard(projectDir, port = 7700, options = {}) {
     // 기동 시 포트 락 파일(.vibe-diagnosis/active_port.json) 생성 및 저장
     try {
       const fs = require('fs');
-      const lockDir = path.join(projectDir, '.vibe-diagnosis');
+      const lockDir = path.join(resolvedProjectDir, '.vibe-diagnosis');
       if (fs.existsSync(lockDir)) {
         fs.writeFileSync(path.join(lockDir, 'active_port.json'), JSON.stringify({
           port: actualPort,
           pid: process.pid,
-          projectDir: path.resolve(projectDir),
-          projectKey: projectKey(projectDir),
+          projectDir: resolvedProjectDir,
+          projectKey: projectKey(resolvedProjectDir),
+          service: identity.service,
+          version: identity.version,
+          apiVersion: identity.apiVersion,
+          compatibleApiVersions: identity.compatibleApiVersions,
+          capabilities: identity.capabilities,
           token: shutdownToken,
           timestamp: new Date().toISOString()
         }, null, 2), { encoding: 'utf8', mode: 0o600 });
@@ -523,7 +551,7 @@ function startDashboard(projectDir, port = 7700, options = {}) {
     console.log(`\n  \x1b[36m🩺 Vibe Diagnosis Dashboard\x1b[0m`);
     console.log(`  \x1b[90m${'─'.repeat(40)}\x1b[0m`);
     console.log(`  Running at: \x1b[32m${url}\x1b[0m`);
-    console.log(`  Project:    ${projectDir}`);
+    console.log(`  Project:    ${resolvedProjectDir}`);
     console.log(`  \x1b[90m${'─'.repeat(40)}\x1b[0m`);
     console.log(`  Press \x1b[33mCtrl+C\x1b[0m to stop\n`);
 

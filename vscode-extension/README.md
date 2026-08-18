@@ -3,9 +3,9 @@
 [![VS Code Marketplace](https://img.shields.io/visual-studio-marketplace/v/Rejard.vibe-diagnosis-vscode?style=flat-square&color=blue)](https://marketplace.visualstudio.com/items?itemName=Rejard.vibe-diagnosis-vscode)
 [![Open VSX](https://img.shields.io/open-vsx/v/Rejard/vibe-diagnosis-vscode?style=flat-square&color=purple)](https://open-vsx.org/extension/Rejard/vibe-diagnosis-vscode)
 
-VS Code integration for Vibe Diagnosis 1.7.0. Run project diagnostics, inspect failures in the Problems panel, open the optional authenticated local dashboard, and review a fully sealed repair plan before approving any file change.
+VS Code integration for Vibe Diagnosis 1.7.1. Run project diagnostics, inspect failures in the Problems panel, open the optional authenticated local dashboard, and review a fully sealed repair plan before approving any file change.
 
-Version 1.7.0 adds one-to-five check necessity, priority-aware routine execution, explicit pause/disable policy, recoverable diagnostic removal, and policy-bound completion receipts while retaining the 1.6 safety contracts.
+Version 1.7.1 keeps the 1.7 priority and policy controls and adds persistent dashboard result restoration, per-diagnostic timing, structured API errors, and identity-verified replacement of an older same-project dashboard server.
 
 ## Requirements
 
@@ -59,7 +59,7 @@ Install the MCP server separately:
   "mcpServers": {
     "vibe-diagnosis": {
       "command": "npx",
-      "args": ["-y", "vibe-diagnosis-mcp@1.7.0"]
+      "args": ["-y", "vibe-diagnosis-mcp@1.7.1"]
     }
   }
 }
@@ -67,7 +67,7 @@ Install the MCP server separately:
 
 ## 한국어 안내
 
-Vibe Diagnosis 1.7.0 확장은 별 1~5개의 점검 필요도, 우선순위 자동 실행, 명시적인 보류·비활성 정책, 복구 가능한 진단 제거, 정책과 결합된 완료 영수증을 제공합니다.
+Vibe Diagnosis 1.7.1 확장은 별 1~5개의 점검 필요도와 정책 기능에 더해 대시보드 최신 결과 복원, 항목별 소요 시간, 구조화된 API 오류, 같은 프로젝트의 구버전 서버 안전 갱신을 제공합니다.
 
 명령 팔레트에서 다음 명령을 사용할 수 있습니다.
 

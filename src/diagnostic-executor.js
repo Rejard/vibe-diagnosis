@@ -75,7 +75,8 @@ function runAttempt(projectDir, filePath, options = {}) {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
-      resolve({ packet, metadata, execution: { exitCode, signal, timedOut, timeoutMs, stdout, stderr, startedAt, finishedAt: new Date().toISOString(), duration: Date.now() - started } });
+      const durationMs = Date.now() - started;
+      resolve({ packet, metadata, execution: { exitCode, signal, timedOut, timeoutMs, stdout, stderr, startedAt, finishedAt: new Date().toISOString(), durationMs, duration: durationMs } });
     });
   });
 }
@@ -88,7 +89,16 @@ function fallbackModule(filePath, packet) {
 function attemptToResult(filePath, attempt) {
   const mod = attempt.metadata || fallbackModule(filePath, attempt.packet);
   const execution = attempt.execution;
-  const base = { ...mod, file: filePath, duration: execution.duration, execution };
+  const base = {
+    ...mod,
+    file: filePath,
+    executionState: 'EXECUTED',
+    startedAt: execution.startedAt,
+    finishedAt: execution.finishedAt,
+    durationMs: execution.durationMs,
+    duration: execution.durationMs,
+    execution,
+  };
   if (execution.timedOut) return { ...base, status: 'ERROR', classification: 'TIMEOUT', details: `Diagnostic timed out after ${execution.timeoutMs}ms`, evidence: [] };
   if (!attempt.packet) return { ...base, status: 'ERROR', classification: 'RUNNER_ERROR', details: `Diagnostic worker exited without a result${execution.exitCode === null ? '' : ` (exit ${execution.exitCode})`}`, evidence: [] };
   if (attempt.packet.kind === 'contract_error') return { ...base, status: 'ERROR', classification: 'CONTRACT_ERROR', details: attempt.packet.error.message, evidence: [] };
@@ -102,19 +112,33 @@ function attemptToResult(filePath, attempt) {
 }
 
 async function executeDiagnostic(projectDir, filePath, options = {}) {
+  const diagnosticStarted = Date.now();
+  const startedAt = new Date().toISOString();
+  const finish = result => {
+    const durationMs = Date.now() - diagnosticStarted;
+    const finishedAt = new Date().toISOString();
+    return redactValue({
+      ...result,
+      executionState: 'EXECUTED',
+      startedAt,
+      finishedAt,
+      durationMs,
+      duration: durationMs,
+    });
+  };
   const first = await runAttempt(projectDir, filePath, options);
   const firstResult = attemptToResult(filePath, first);
   const attempts = [{ ...first.execution, classification: firstResult.classification, status: firstResult.status }];
   if (!['RUNNER_ERROR', 'TIMEOUT'].includes(firstResult.classification) || options.retryInfrastructure === false) {
-    return redactValue({ ...firstResult, attempts });
+    return finish({ ...firstResult, attempts });
   }
   const second = await runAttempt(projectDir, filePath, options);
   const secondResult = attemptToResult(filePath, second);
   attempts.push({ ...second.execution, classification: secondResult.classification, status: secondResult.status });
   if (secondResult.status === 'OK') {
-    return redactValue({ ...secondResult, status: 'WARNING', classification: 'FLAKY', details: `Passed on isolated retry after ${firstResult.classification}: ${firstResult.details}`, attempts, firstFailure: firstResult });
+    return finish({ ...secondResult, status: 'WARNING', classification: 'FLAKY', details: `Passed on isolated retry after ${firstResult.classification}: ${firstResult.details}`, attempts, firstFailure: firstResult });
   }
-  return redactValue({ ...secondResult, attempts, firstFailure: firstResult });
+  return finish({ ...secondResult, attempts, firstFailure: firstResult });
 }
 
 module.exports = { executeDiagnostic, runAttempt, workerEnvironment, resolveExecutionProfile, DEFAULT_TIMEOUT_MS };

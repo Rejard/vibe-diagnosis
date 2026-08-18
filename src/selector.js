@@ -85,6 +85,7 @@ function inspectDiagnosticSource(filePath) {
     dependencies: array('dependencies'),
     files: array('files'),
     cache: object ? staticValue(object, 'cache') === true : /(?:^|[,{])\s*cache\s*:\s*true\b/.test(source),
+    timeoutMs: object && Number.isFinite(staticValue(object, 'timeoutMs')) ? Math.max(100, staticValue(object, 'timeoutMs')) : null,
     blocksRelease: object ? staticValue(object, 'blocksRelease') === true : /(?:^|[,{])\s*blocksRelease\s*:\s*true\b/.test(source),
     blocksLiveTrading: object ? staticValue(object, 'blocksLiveTrading') === true : /(?:^|[,{])\s*blocksLiveTrading\s*:\s*true\b/.test(source),
     diagnosticNecessity: normalizeNecessity(declaredNecessity),

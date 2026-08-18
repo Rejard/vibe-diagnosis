@@ -24,7 +24,9 @@ test('dashboard API returns the centralized V1.7 report', async t => {
   assert.equal((await metricsBeforeRun.json()).diagnosticsEvaluated, false);
   const response = await fetch(`http://127.0.0.1:${port}/api/run`, { method: 'POST', headers: { 'X-Vibe-Dashboard-Token': lock.token } });
   const report = await response.json();
-  assert.equal(report.schemaVersion, 3);
+  assert.equal(report.schemaVersion, 4);
+  assert.ok(Number.isFinite(report.durationMs));
+  assert.ok(Number.isFinite(report.results[0].durationMs));
   assert.equal(report.summary.ok, 1);
   assert.equal(report.gates.releaseStatus, 'NOT_EVALUATED');
   assert.equal(report.evidenceSummary.liveEvidenceStatus, 'UNVERIFIED');
@@ -32,7 +34,11 @@ test('dashboard API returns the centralized V1.7 report', async t => {
   assert.equal((await metricsAfterRun.json()).diagnosticsEvaluated, true);
   const health = await fetch(`http://127.0.0.1:${port}/api/health`, { headers: { 'X-Vibe-Dashboard-Token': lock.token } });
   assert.equal(health.status, 200);
-  assert.equal((await health.json()).service, 'vibe-diagnosis-dashboard');
+  const healthBody = await health.json();
+  assert.equal(healthBody.service, 'vibe-diagnosis-dashboard');
+  assert.equal(healthBody.version, '1.7.1');
+  assert.equal(healthBody.apiVersion, 2);
+  assert.ok(healthBody.capabilities.includes('persistent-report-v1'));
 });
 
 test('dashboard returns HTTP 409 and CLI conflict while one project run is active', async t => {
@@ -70,11 +76,18 @@ test('dashboard returns HTTP 409 and CLI conflict while one project run is activ
 
 test('dashboard client handles conflict responses before reading results and always clears running state', () => {
   const html = fs.readFileSync(path.join(__dirname, '..', 'src', 'dashboard.html'), 'utf8');
-  assert.match(html, /if \(!res\.ok\)/);
-  assert.match(html, /res\.status === 409/);
+  const packageVersion = require('../package.json').version;
+  assert.match(html, /if \(!response\.ok\)/);
+  assert.match(html, /content-type/);
+  assert.match(html, /error\.status === 409/);
   assert.match(html, /DIAGNOSTICS_ALREADY_RUNNING/);
   assert.match(html, /Array\.isArray\(data\.results\)/);
   assert.match(html, /finally\s*\{\s*btn\.classList\.remove\('running'\)/);
+  assert.match(html, /getDashboardJson\('\/api\/report'\)/);
+  assert.match(html, /Promise\.all\(\[\s*fetchList\(\),\s*getDashboardJson\('\/api\/report'\)/);
+  assert.match(html, /formatDuration/);
+  assert.match(html, /slowest/);
+  assert.match(html, new RegExp(`DASHBOARD_EXPECTED = \\{ version: '${packageVersion.replace(/\./g, '\\.')}'`));
   assert.match(html, /necessityStars/);
   assert.match(html, /setDiagnosticStateUi/);
   assert.match(html, /removeDiagnosticUi/);
@@ -129,6 +142,23 @@ test('VS Code repair approval carries the reviewed plan checksum', () => {
     approvedHighRisk: true,
   });
   assert.throws(() => buildRepairApproval({ id: 'repair-1' }), /integrity checksum/);
+});
+
+test('VS Code dashboard client rejects a legacy server lock before sending API requests', () => {
+  const root = fs.mkdtempSync(path.join(os.tmpdir(), 'vibe-dashboard-client-legacy-'));
+  try {
+    fs.mkdirSync(path.join(root, '.vibe-diagnosis'), { recursive: true });
+    fs.writeFileSync(path.join(root, '.vibe-diagnosis', 'active_port.json'), JSON.stringify({
+      port: 7700,
+      pid: process.pid,
+      projectDir: root,
+      token: 'legacy-token',
+      version: '1.6.3',
+    }));
+    assert.throws(() => readDashboardConnection(root), /Dashboard update required.*1\.6\.3/);
+  } finally {
+    fs.rmSync(root, { recursive: true, force: true });
+  }
 });
 
 test('dashboard rejects cross-origin and traversal requests', async t => {

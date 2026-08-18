@@ -3,6 +3,7 @@ const assert = require('node:assert/strict');
 const path = require('path');
 const { spawn, spawnSync } = require('child_process');
 const fs = require('fs');
+const rootPackage = require('../package.json');
 
 async function handshake(clientName) {
   const child = spawn(process.execPath, ['index.js'], { cwd: path.join(__dirname, '..', 'mcp-server'), stdio: ['pipe', 'pipe', 'pipe'], windowsHide: true });
@@ -30,7 +31,7 @@ async function handshake(clientName) {
   });
   try {
     const initialized = await request('initialize', { protocolVersion: '2024-11-05', capabilities: {}, clientInfo: { name: clientName, version: 'test' } });
-    assert.equal(initialized.result.serverInfo.version, '1.7.0');
+    assert.equal(initialized.result.serverInfo.version, rootPackage.version);
     child.stdin.write(JSON.stringify({ jsonrpc: '2.0', method: 'notifications/initialized' }) + '\n');
     const tools = await request('tools/list', {});
     assert.ok(tools.result.tools.some(tool => tool.name === 'complete_task_diagnostics'));
@@ -61,7 +62,7 @@ test('all three package READMEs lead with agent-directed vibe workflows', () => 
     fs.readFileSync(path.join(root, 'mcp-server', 'README.md'), 'utf8'),
   ];
   for (const document of documents) {
-    assert.match(document, /1\.7\.0/);
+    assert.match(document, /1\.7\.1/);
     assert.match(document, /complete_task_diagnostics/);
     assert.match(document, /verify_completion_receipt/);
     assert.match(document, /open_dashboard/);

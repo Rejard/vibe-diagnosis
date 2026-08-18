@@ -68,6 +68,10 @@ async function runDiagnosticsReportUnlocked(projectDir, options = {}) {
     reason: item.entry.reason,
     until: item.entry.until,
     skipReason: item.decision.reason,
+    executionState: 'NOT_EXECUTED',
+    startedAt: null,
+    finishedAt: null,
+    durationMs: null,
   }));
   consumeSkipOnce(resolvedProjectDir, skippedDiagnostics.filter(item => item.state === 'SKIP_ONCE').map(item => item.id), policyInfo.policy);
   const startedAt = new Date().toISOString();
@@ -77,16 +81,17 @@ async function runDiagnosticsReportUnlocked(projectDir, options = {}) {
   let cacheChanged = false;
 
   if (allFiles.length === 0) {
-    results = [{ id: '_no_diagnostics', name: 'No Diagnostics Found', layer: 'SYSTEM', status: 'WARNING', classification: null, details: `No .diag.js files found in ${DIAG_DIR}/`, duration: 0, severity: 'LOW', scope: 'GENERAL', evidenceType: 'STATIC', blocksRelease: false, blocksLiveTrading: false, confidence: 1, tags: [], dependencies: [], files: [], evidence: [] }];
+    results = [{ id: '_no_diagnostics', name: 'No Diagnostics Found', layer: 'SYSTEM', status: 'WARNING', classification: null, details: `No .diag.js files found in ${DIAG_DIR}/`, executionState: 'NOT_EXECUTED', startedAt: null, finishedAt: null, durationMs: null, duration: null, severity: 'LOW', scope: 'GENERAL', evidenceType: 'STATIC', blocksRelease: false, blocksLiveTrading: false, confidence: 1, tags: [], dependencies: [], files: [], evidence: [] }];
   } else {
     for (const descriptor of selected) {
       const key = cacheKey(resolvedProjectDir, descriptor, environment.fingerprint);
       if (options.useCache && isCacheEligible(descriptor) && cache[key]) {
-        results.push({ ...cache[key], cached: true });
+        results.push({ ...cache[key], cached: true, executionState: 'CACHED', startedAt: null, finishedAt: null, durationMs: null, duration: null });
         continue;
       }
       const result = await executeDiagnostic(resolvedProjectDir, descriptor.filePath, {
         ...options,
+        timeoutMs: Number.isFinite(descriptor.timeoutMs) ? descriptor.timeoutMs : options.timeoutMs,
         evidenceType: descriptor.evidenceType,
         executionProfile: descriptor.executionProfile,
         allowedEnv: descriptor.allowedEnv,
@@ -108,11 +113,15 @@ async function runDiagnosticsReportUnlocked(projectDir, options = {}) {
     counts[item.skipReason] = (counts[item.skipReason] || 0) + 1;
     return counts;
   }, {});
+  const finishedAt = new Date().toISOString();
+  const durationMs = Math.max(0, Date.parse(finishedAt) - Date.parse(startedAt));
   const report = {
-    schemaVersion: 3,
+    schemaVersion: 4,
     runId,
     startedAt,
-    finishedAt: new Date().toISOString(),
+    finishedAt,
+    durationMs,
+    totalDurationMs: durationMs,
     projectDir: resolvedProjectDir,
     selected: selected.length,
     discovered: allFiles.length,

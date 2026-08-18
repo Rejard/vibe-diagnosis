@@ -1,6 +1,13 @@
 # Change Log
 
-## 1.7.0 (Current)
+## 1.7.1 (Current)
+
+- Restored the latest persisted diagnostic report after dashboard page and server restarts.
+- Added per-diagnostic and total elapsed time plus slowest-first dashboard inspection.
+- Added structured response handling and server/API version mismatch detection.
+- Replaced only identity-verified older same-project dashboard servers through authenticated graceful shutdown.
+
+## 1.7.0
 
 - Added 1-5 star diagnostic check necessity for priority-aware routine and completion runs.
 - Added dashboard controls for run-now, skip-once, snooze, disable, recoverable remove, and restore.

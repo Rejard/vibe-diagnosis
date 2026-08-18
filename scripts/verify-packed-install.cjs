@@ -5,6 +5,7 @@ const path = require('path');
 const { execFileSync, spawn } = require('child_process');
 
 const root = path.resolve(__dirname, '..');
+const expectedVersion = require(path.join(root, 'package.json')).version;
 const npmCli = process.platform === 'win32'
   ? path.join(path.dirname(process.execPath), 'node_modules', 'npm', 'bin', 'npm-cli.js')
   : null;
@@ -67,6 +68,8 @@ async function main() {
   assert.ok(rootFiles.includes('src/dashboard-control.js'));
   assert.ok(rootFiles.includes('src/completion-receipt.js'));
   assert.ok(rootFiles.includes('src/diagnostics-lock.js'));
+  assert.ok(rootFiles.includes('src/dashboard-contract.js'));
+  assert.ok(rootFiles.includes('src/report-store.js'));
   assert.deepEqual(mcpPack.files.map(file => file.path).sort(), ['LICENSE', 'README.md', 'index.js', 'package.json']);
   runNpm(['init', '-y'], consumerDir);
   runNpm(['install', '--ignore-scripts', rootTarball], consumerDir);
@@ -74,8 +77,8 @@ async function main() {
 
   const installedPackage = require(path.join(consumerDir, 'node_modules', 'vibe-diagnosis', 'package.json'));
   const installedMcpPackage = require(path.join(consumerDir, 'node_modules', 'vibe-diagnosis-mcp', 'package.json'));
-  assert.equal(installedPackage.version, '1.7.0');
-  assert.equal(installedMcpPackage.version, '1.7.0');
+  assert.equal(installedPackage.version, expectedVersion);
+  assert.equal(installedMcpPackage.version, expectedVersion);
   assert.ok(fs.existsSync(path.join(consumerDir, 'node_modules', 'vibe-diagnosis', 'src', 'dashboard-control.js')));
 
   const entry = path.join(consumerDir, 'node_modules', 'vibe-diagnosis-mcp', 'index.js');

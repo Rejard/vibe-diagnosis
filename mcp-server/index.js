@@ -80,7 +80,7 @@ const { conflictPayload } = core.diagnosticsLock;
 
 const server = new McpServer({
   name: "vibe-diagnosis",
-  version: "1.7.0",
+  version: "1.7.1",
 });
 
 const READ_ONLY_TOOLS = new Set(["list_repair_incidents", "audit_diagnostics", "list_diagnostics", "read_error_pattern", "check_symbol_diff", "recommend_cartridge_split", "verify_completion_receipt"]);
@@ -120,6 +120,15 @@ async function findFreePort(startPort) {
   return port;
 }
 
+async function waitForPortFree(port, timeoutMs = 3000) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (!(await isPortInUse(port))) return true;
+    await new Promise(resolve => setTimeout(resolve, 50));
+  }
+  return !(await isPortInUse(port));
+}
+
 function openBrowser(url) {
   const cmd = process.platform === "win32" ? `start "" "${url}"`
     : process.platform === "darwin" ? `open "${url}"`
@@ -131,19 +140,19 @@ async function autoStartDashboardIfNeeded(projectDir, defaultPort = 7700, isExpl
   let port = defaultPort;
   let shouldSpawn = true;
 
-  if (!isExplicitPort) {
-    const existing = await core.dashboardControl.probeDashboard(projectDir);
-    if (existing.running) {
-      port = existing.lock.port;
-      shouldSpawn = false;
-    }
+  const refresh = await core.dashboardControl.refreshIncompatibleDashboard(projectDir);
+  if (refresh.action === "REUSE") {
+    port = refresh.probe.lock.port;
+    shouldSpawn = false;
+  } else if (refresh.action === "RESTART") {
+    port = isExplicitPort ? defaultPort : refresh.probe.lock.port;
+    if (!(await waitForPortFree(refresh.probe.lock.port))) throw new Error(`Dashboard port ${refresh.probe.lock.port} did not become available after authenticated shutdown.`);
   }
 
   if (shouldSpawn) {
-    const baseInUse = await isPortInUse(defaultPort);
-    port = defaultPort;
+    const baseInUse = await isPortInUse(port);
     if (baseInUse) {
-      port = isExplicitPort ? defaultPort : await findFreePort(defaultPort);
+      port = isExplicitPort ? port : await findFreePort(port);
     }
 
     try {
@@ -168,10 +177,13 @@ async function autoStartDashboardIfNeeded(projectDir, defaultPort = 7700, isExpl
     } catch (e) {
       // Safe skip if background spawn fails
     }
-    for (let attempt = 0; attempt < 20; attempt += 1) {
+    let ready = false;
+    for (let attempt = 0; attempt < 30; attempt += 1) {
       await new Promise((resolve) => setTimeout(resolve, 100));
-      if ((await core.dashboardControl.probeDashboard(projectDir)).running) break;
+      const probe = await core.dashboardControl.probeDashboard(projectDir);
+      if (probe.running && probe.compatible) { ready = true; break; }
     }
+    if (!ready) throw new Error("The compatible dashboard server did not start. Check whether the requested port belongs to another process.");
   }
 
   const url = `http://localhost:${port}`;

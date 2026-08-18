@@ -1,6 +1,9 @@
 const fs = require('fs');
 const path = require('path');
 const http = require('http');
+const extensionPackage = require('../package.json');
+
+const DASHBOARD_API_VERSION = 2;
 
 function readDashboardConnection(workspaceRoot) {
   const projectDir = path.resolve(workspaceRoot);
@@ -13,8 +16,11 @@ function readDashboardConnection(workspaceRoot) {
   if (!Number.isInteger(lock.port) || lock.port < 1 || lock.port > 65535 || typeof lock.token !== 'string' || !lock.token) {
     throw new Error('Dashboard lock is missing a valid port or token.');
   }
+  if (lock.version !== extensionPackage.version || lock.apiVersion !== DASHBOARD_API_VERSION) {
+    throw new Error(`Dashboard update required: extension ${extensionPackage.version}/API ${DASHBOARD_API_VERSION}, server ${lock.version || 'legacy'}/API ${lock.apiVersion || 'legacy'}.`);
+  }
 
-  return { host: '127.0.0.1', port: lock.port, token: lock.token };
+  return { host: '127.0.0.1', port: lock.port, token: lock.token, version: lock.version, apiVersion: lock.apiVersion };
 }
 
 function postJson(workspaceRoot, pathname, bodyValue = {}) {
@@ -36,15 +42,17 @@ function postJson(workspaceRoot, pathname, bodyValue = {}) {
       let data = '';
       res.on('data', (chunk) => { data += chunk; });
       res.on('end', () => {
+        const contentType = String(res.headers['content-type'] || '').toLowerCase();
+        let parsed = null;
+        if (contentType.includes('application/json')) {
+          try { parsed = JSON.parse(data); } catch {}
+        }
         if (res.statusCode >= 200 && res.statusCode < 300) {
-          try {
-            resolve(JSON.parse(data));
-          } catch {
-            resolve({ message: data });
-          }
+          resolve(parsed || { message: data });
           return;
         }
-        reject(new Error(`Dashboard API returned ${res.statusCode}: ${data}`));
+        const message = parsed?.error || data.trim() || 'Empty response';
+        reject(new Error(`Dashboard API returned ${res.statusCode}: ${message}`));
       });
     });
 

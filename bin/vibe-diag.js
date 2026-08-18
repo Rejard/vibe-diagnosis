@@ -71,6 +71,15 @@ async function findFreePort(startPort) {
   return port;
 }
 
+async function waitForPortFree(port, timeoutMs = 3000) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    if (!(await isPortInUse(port))) return true;
+    await new Promise(resolve => setTimeout(resolve, 50));
+  }
+  return !(await isPortInUse(port));
+}
+
 function startDashboardBackground(targetDir, port) {
   const binPath = path.join(__dirname, 'vibe-diag.js');
   const child = spawn(process.execPath, [binPath, 'dashboard', '--port', port.toString(), '--cwd', targetDir], {
@@ -89,26 +98,30 @@ function openBrowser(url) {
 }
 
 async function autoStartDashboardIfNeeded() {
-  const { probeDashboard } = require('../src/dashboard-control');
+  const { probeDashboard, refreshIncompatibleDashboard } = require('../src/dashboard-control');
   let port = flags.port;
   let shouldSpawn = true;
 
-  if (!args.includes('--port')) {
-    const existing = await probeDashboard(targetDir);
-    if (existing.running) {
-      port = existing.lock.port;
-      shouldSpawn = false;
-    }
+  const refresh = await refreshIncompatibleDashboard(targetDir);
+  if (refresh.action === 'REUSE') {
+    port = refresh.probe.lock.port;
+    shouldSpawn = false;
+  } else if (refresh.action === 'RESTART') {
+    port = args.includes('--port') ? flags.port : refresh.probe.lock.port;
+    if (!(await waitForPortFree(refresh.probe.lock.port))) throw new Error(`Dashboard port ${refresh.probe.lock.port} did not become available after authenticated shutdown.`);
   }
 
   if (shouldSpawn) {
     const hasExplicitPort = args.includes('--port');
-    port = hasExplicitPort ? flags.port : await findFreePort(flags.port);
+    port = hasExplicitPort ? flags.port : await findFreePort(port);
     startDashboardBackground(targetDir, port);
-    for (let attempt = 0; attempt < 20; attempt += 1) {
+    let ready = false;
+    for (let attempt = 0; attempt < 30; attempt += 1) {
       await new Promise((resolve) => setTimeout(resolve, 100));
-      if ((await probeDashboard(targetDir)).running) break;
+      const probe = await probeDashboard(targetDir);
+      if (probe.running && probe.compatible) { ready = true; break; }
     }
+    if (!ready) throw new Error('The compatible dashboard server did not start. Check whether the requested port belongs to another process.');
   }
 
   const url = `http://localhost:${port}`;
@@ -147,8 +160,18 @@ async function main() {
     }
     case 'dashboard': {
       const { startDashboard } = require('../src/dashboard');
+      const { refreshIncompatibleDashboard } = require('../src/dashboard-control');
       const hasExplicitPort = args.includes('--port');
-      const port = hasExplicitPort ? flags.port : await findFreePort(flags.port);
+      const refresh = await refreshIncompatibleDashboard(targetDir);
+      if (refresh.action === 'REUSE') {
+        console.log(`Dashboard ${refresh.probe.health.version} is already running at http://localhost:${refresh.probe.lock.port}`);
+        openBrowser(`http://localhost:${refresh.probe.lock.port}`);
+        break;
+      }
+      if (refresh.action === 'RESTART' && !(await waitForPortFree(refresh.probe.lock.port))) throw new Error(`Dashboard port ${refresh.probe.lock.port} did not become available after authenticated shutdown.`);
+      const preferredPort = hasExplicitPort ? flags.port : (refresh.probe?.lock?.port || flags.port);
+      if (hasExplicitPort && await isPortInUse(preferredPort)) throw new Error(`Port ${preferredPort} is already in use by another process.`);
+      const port = hasExplicitPort ? preferredPort : await findFreePort(preferredPort);
       startDashboard(targetDir, port);
       break;
     }
