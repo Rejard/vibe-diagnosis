@@ -42,6 +42,20 @@ Call run_diagnostics for the IDs, tags, scope, or severity related to this chang
 
 `run_diagnostics` defaults to `autoLaunchDashboard=false`. MCP connection itself also does not start a dashboard.
 
+### Response size
+
+`run_diagnostics` and `complete_task_diagnostics` accept `verbosity`.
+
+| Value | Response |
+|---|---|
+| `summary` (default) | Counts, gates, evidence and domain summaries, root-cause groups, `runFile`, and every failing diagnostic in full. Its size does not grow with the number of passing diagnostics |
+| `list` | Adds `id`, `name`, `executionState`, and `durationMs` for passing and skipped diagnostics |
+| `full` | The complete report, identical to the pre-1.8.0 response |
+
+A passing diagnostic contributes nothing to a decision, so the default omits it. Failures are never
+reduced, sampled, or paged at any verbosity. The complete report is always saved locally, and
+`runFile` in every response points at it. Use `list` when a person asks for a report of what ran.
+
 ### Final completion gate
 
 ```text

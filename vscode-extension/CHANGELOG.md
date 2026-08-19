@@ -1,6 +1,12 @@
 # Change Log
 
-## 1.7.3 (Current)
+## 1.8.0 (Current)
+
+- `run_diagnostics` and `complete_task_diagnostics` answer with a summary, gates, and every failing diagnostic by default, so the response no longer grows with the number of passing diagnostics.
+- Added `verbosity` with `summary`, `list`, and `full`. The previous response is `verbosity: "full"`.
+- The dashboard is unchanged. It still shows every diagnostic, and the complete report is still saved to the run file.
+
+## 1.7.3
 
 - Reads the version from the packaged manifest instead of hardcoding it, so a release cannot bump one file and miss another.
 - Filters the diagnostic list by status. The total, OK, WARN, and ERR cards are buttons, and keys 1 to 4 switch between them.

@@ -6,7 +6,6 @@ import { z } from "zod";
 import { createRequire } from "module";
 import fs from "fs";
 import path from "path";
-import net from "net";
 import { exec, spawn } from "child_process";
 const require = createRequire(import.meta.url);
 
@@ -47,6 +46,8 @@ function loadCore() {
       diagnosticsLock: require("vibe-diagnosis/src/diagnostics-lock"),
       diagnosticPolicy: require("vibe-diagnosis/src/diagnostic-policy"),
       redaction: require("vibe-diagnosis/src/redaction"),
+      reportView: require("vibe-diagnosis/src/report-view"),
+      portProbe: require("vibe-diagnosis/src/port-probe"),
     };
   } catch {
     return {
@@ -68,6 +69,8 @@ function loadCore() {
       diagnosticsLock: require("../src/diagnostics-lock"),
       diagnosticPolicy: require("../src/diagnostic-policy"),
       redaction: require("../src/redaction"),
+      reportView: require("../src/report-view"),
+      portProbe: require("../src/port-probe"),
     };
   }
 }
@@ -77,6 +80,7 @@ const { runDiagnostics, runDiagnosticsReport, runCompletionDiagnostics, discover
 const { initialize } = core.init;
 const { repairDiagnostic, createRepairPlan, applyRepairPlan, readAudit, autoRevertOrRepairOmission } = core.repairer;
 const { conflictPayload } = core.diagnosticsLock;
+const { isPortInUse, findFreePort, waitForPortFree } = core.portProbe;
 
 const server = new McpServer({
   name: "vibe-diagnosis",
@@ -97,37 +101,6 @@ server.tool = (name, description, schema, handler) => {
     openWorldHint: OPEN_WORLD_TOOLS.has(name),
   }, async args => core.redaction.redactValue(await handler(args)));
 };
-
-function isPortInUse(port) {
-  return new Promise((resolve) => {
-    const srv = net.createServer();
-    srv.once("error", (err) => {
-      resolve(err.code === "EADDRINUSE");
-    });
-    srv.once("listening", () => {
-      srv.close();
-      resolve(false);
-    });
-    srv.listen(port);
-  });
-}
-
-async function findFreePort(startPort) {
-  let port = startPort;
-  while (await isPortInUse(port)) {
-    port++;
-  }
-  return port;
-}
-
-async function waitForPortFree(port, timeoutMs = 3000) {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    if (!(await isPortInUse(port))) return true;
-    await new Promise(resolve => setTimeout(resolve, 50));
-  }
-  return !(await isPortInUse(port));
-}
 
 function openBrowser(url) {
   const cmd = process.platform === "win32" ? `start "" "${url}"`
@@ -193,7 +166,7 @@ async function autoStartDashboardIfNeeded(projectDir, defaultPort = 7700, isExpl
 
 server.tool(
   "run_diagnostics",
-  "Run project .diag.js diagnostics. The dashboard is optional and disabled by default. Use complete_task_diagnostics for the mandatory final full-suite check.",
+  "Run project .diag.js diagnostics. The response carries counts, gates, and every failing diagnostic; raise verbosity for passing ones. The dashboard is optional and disabled by default. Use complete_task_diagnostics for the mandatory final full-suite check.",
   {
     projectDir: z.string().describe("Absolute path to the project root directory containing .vibe-diagnosis/"),
     autoLaunchDashboard: z.boolean().optional().default(false).describe("Explicitly start and open the optional dashboard"),
@@ -205,8 +178,9 @@ server.tool(
     baselineId: z.string().optional().describe("Compare against a specific saved run ID"),
     includeOptional: z.boolean().optional().default(false).describe("Run all enabled diagnostics including 1-3 star optional checks"),
     forceDisabled: z.boolean().optional().default(false).describe("Explicitly run selected IDs even when paused or disabled"),
+    verbosity: z.enum(["summary", "list", "full"]).optional().default("summary").describe("summary: counts, gates, and every failing diagnostic in full (default, constant size). list: adds id, name, and duration for passing and skipped diagnostics. full: the complete report, the pre-1.8.0 response"),
   },
-  async ({ projectDir, autoLaunchDashboard, ids, tags, scope, severity, useCache, baselineId, includeOptional, forceDisabled }) => {
+  async ({ projectDir, autoLaunchDashboard, ids, tags, scope, severity, useCache, baselineId, includeOptional, forceDisabled, verbosity }) => {
     try {
       const report = await runDiagnosticsReport(projectDir, { persist: true, executionKind: "mcp-run", useCache, baselineId, selectionMode: includeOptional ? "FULL" : "AUTO", force: forceDisabled === true, filters: { ids, tags, scope, severity } });
 
@@ -219,7 +193,7 @@ server.tool(
           {
             type: "text",
             text: JSON.stringify(
-              report,
+              core.reportView.shapeReport(report, verbosity),
               null,
               2
             ),
@@ -331,13 +305,14 @@ server.tool(
   "MANDATORY final step for development tasks. Run the complete diagnostic suite without cache or dashboard and return a completion eligibility decision.",
   {
     projectDir: z.string().describe("Absolute path to the project root directory containing .vibe-diagnosis/"),
+    verbosity: z.enum(["summary", "list", "full"]).optional().default("summary").describe("summary: the completion decision, gates, and every failing diagnostic in full (default, constant size). list: adds id, name, and duration for passing and skipped diagnostics. full: the complete report, the pre-1.8.0 response"),
   },
-  async ({ projectDir }) => {
+  async ({ projectDir, verbosity }) => {
     try {
       const report = await runCompletionDiagnostics(projectDir, { persist: true, executionKind: "mcp-complete" });
       report.agentIntegration = { modified: false, instruction: "Use init_diagnostics or sync_agent_rules to update agent rule files explicitly." };
       return {
-        content: [{ type: "text", text: JSON.stringify(report, null, 2) }],
+        content: [{ type: "text", text: JSON.stringify(core.reportView.shapeReport(report, verbosity), null, 2) }],
         isError: !report.completion.eligible,
       };
     } catch (err) {

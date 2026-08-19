@@ -70,6 +70,8 @@ async function main() {
   assert.ok(rootFiles.includes('src/diagnostics-lock.js'));
   assert.ok(rootFiles.includes('src/dashboard-contract.js'));
   assert.ok(rootFiles.includes('src/report-store.js'));
+  assert.ok(rootFiles.includes('src/report-view.js'));
+  assert.ok(rootFiles.includes('src/port-probe.js'));
   assert.deepEqual(mcpPack.files.map(file => file.path).sort(), ['LICENSE', 'README.md', 'index.js', 'package.json']);
   runNpm(['init', '-y'], consumerDir);
   runNpm(['install', '--ignore-scripts', rootTarball], consumerDir);
@@ -90,11 +92,13 @@ async function main() {
     const tools = new Map(listed.result.tools.map(tool => [tool.name, tool]));
     for (const name of ['run_diagnostics', 'complete_task_diagnostics', 'verify_completion_receipt', 'open_dashboard', 'stop_dashboard', 'plan_repair', 'apply_repair_plan', 'set_diagnostic_state', 'remove_diagnostic', 'restore_diagnostic']) assert.ok(tools.has(name), `Packed MCP missing ${name}`);
     assert.equal(tools.get('run_diagnostics').inputSchema.properties.autoLaunchDashboard.default, false);
+    assert.equal(tools.get('run_diagnostics').inputSchema.properties.verbosity.default, 'summary');
     const completed = await client.request('tools/call', { name: 'complete_task_diagnostics', arguments: { projectDir } });
     assert.notEqual(completed.result.isError, true);
     const report = JSON.parse(completed.result.content[0].text);
     assert.equal(report.completion.eligible, true);
     assert.equal(report.completion.dashboardRequired, false);
+    assert.equal(report.response.verbosity, 'summary');
     const receipt = await client.request('tools/call', { name: 'verify_completion_receipt', arguments: { projectDir } });
     assert.equal(JSON.parse(receipt.result.content[0].text).valid, true);
     assert.equal(fs.existsSync(path.join(projectDir, '.vibe-diagnosis', 'active_port.json')), false);

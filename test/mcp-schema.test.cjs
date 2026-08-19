@@ -39,8 +39,11 @@ test('MCP exposes V1.7 priority policy, report filters, and approval-first repai
     const tools = new Map(listed.result.tools.map(tool => [tool.name, tool]));
     for (const name of ['run_diagnostics', 'complete_task_diagnostics', 'verify_completion_receipt', 'open_dashboard', 'stop_dashboard', 'plan_repair', 'apply_repair_plan', 'list_repair_incidents', 'audit_diagnostics', 'set_diagnostic_state', 'remove_diagnostic', 'restore_diagnostic']) assert.ok(tools.has(name), `missing ${name}`);
     const runProperties = tools.get('run_diagnostics').inputSchema.properties;
-    for (const name of ['ids', 'tags', 'scope', 'severity', 'useCache', 'baselineId', 'includeOptional', 'forceDisabled']) assert.ok(runProperties[name], `run_diagnostics missing ${name}`);
+    for (const name of ['ids', 'tags', 'scope', 'severity', 'useCache', 'baselineId', 'includeOptional', 'forceDisabled', 'verbosity']) assert.ok(runProperties[name], `run_diagnostics missing ${name}`);
     assert.equal(runProperties.autoLaunchDashboard.default, false);
+    assert.equal(runProperties.verbosity.default, 'summary');
+    assert.deepEqual(runProperties.verbosity.enum, ['summary', 'list', 'full']);
+    assert.equal(tools.get('complete_task_diagnostics').inputSchema.properties.verbosity.default, 'summary');
     const applyProperties = tools.get('apply_repair_plan').inputSchema.properties;
     assert.ok(applyProperties.approved);
     assert.ok(applyProperties.approvedChecksum);

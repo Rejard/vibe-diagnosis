@@ -194,6 +194,12 @@ Save the current goal, last completed work, diagnostic status, remaining blocker
 
 All project paths passed to MCP tools must be absolute. The same project can have only one active diagnostic run across MCP, CLI, dashboard, and separate Node processes. A duplicate request fails immediately with `DIAGNOSTICS_ALREADY_RUNNING`; different projects can run concurrently.
 
+`run_diagnostics` and `complete_task_diagnostics` answer with `verbosity: "summary"` by default: counts,
+gates, `runFile`, and every failing diagnostic in full. The response does not grow as the project
+adds passing diagnostics. Pass `verbosity: "list"` for passing diagnostic names and durations, or
+`verbosity: "full"` for the complete pre-1.8.0 response. The full report is always saved locally at
+`runFile`.
+
 ## Evidence and safety model
 
 - Evidence types: `STATIC`, `TEST`, `RUNTIME`, `DATA`, `PROVIDER`, `AUTHORITY`, `UI`, and `LIVE_EVIDENCE`.

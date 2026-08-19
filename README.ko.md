@@ -194,6 +194,12 @@ Vibe Diagnosis로 이 프로젝트의 빌드 안전성을 확인해. PASSED, FAI
 
 MCP에 전달하는 프로젝트 경로는 절대경로여야 합니다. 같은 프로젝트는 MCP·CLI·대시보드·별도 Node 프로세스를 합쳐 동시에 한 번만 진단합니다. 중복 요청은 기다리지 않고 `DIAGNOSTICS_ALREADY_RUNNING`으로 즉시 종료되며, 서로 다른 프로젝트는 동시에 진단할 수 있습니다.
 
+`run_diagnostics` 와 `complete_task_diagnostics` 는 기본값 `verbosity: "summary"` 로 응답합니다.
+집계, 게이트, `runFile`, 그리고 **실패한 진단 전부** 를 그대로 담습니다. 통과 진단이 늘어도
+응답 크기는 커지지 않습니다. 통과 항목의 이름과 소요 시간이 필요하면 `verbosity: "list"`,
+1.8.0 이전과 같은 전체 응답이 필요하면 `verbosity: "full"` 을 넘깁니다. 전체 보고서는 항상
+로컬 `runFile` 에 저장됩니다.
+
 ## 증거와 안전 원칙
 
 - 증거 유형: `STATIC`, `TEST`, `RUNTIME`, `DATA`, `PROVIDER`, `AUTHORITY`, `UI`, `LIVE_EVIDENCE`

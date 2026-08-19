@@ -36,7 +36,7 @@ test('dashboard API returns the centralized V1.7 report', async t => {
   assert.equal(health.status, 200);
   const healthBody = await health.json();
   assert.equal(healthBody.service, 'vibe-diagnosis-dashboard');
-  assert.equal(healthBody.version, '1.7.3');
+  assert.equal(healthBody.version, require('../package.json').version);
   assert.equal(healthBody.apiVersion, 2);
   assert.ok(healthBody.capabilities.includes('persistent-report-v1'));
 });
