@@ -61,6 +61,10 @@ header{display:flex;align-items:center;justify-content:space-between;padding:20p
 
 .stats{display:flex;gap:12px;margin-left:auto}
 .stat{padding:8px 16px;background:var(--surface);border:1px solid var(--border);border-radius:var(--radius-sm);font-size:13px;color:var(--text2)}
+.stat-filter{cursor:pointer;font-family:inherit;transition:border-color .12s,background .12s}
+.stat-filter:hover{border-color:var(--text3)}
+.stat-filter.is-active{border-color:currentColor;background:color-mix(in srgb,currentColor 12%,var(--surface))}
+.stat-filter:focus-visible{outline:2px solid currentColor;outline-offset:2px}
 .stat strong{color:var(--text);font-weight:600}
 
 .byok-bar{
@@ -622,10 +626,10 @@ header{display:flex;align-items:center;justify-content:space-between;padding:20p
       Run Diagnostics
     </button>
     <div class="stats" id="statsBar">
-      <div class="stat"><strong id="statTotal">—</strong> total</div>
-      <div class="stat" style="color:var(--ok)"><strong id="statOk">—</strong> OK</div>
-      <div class="stat" style="color:var(--warn)"><strong id="statWarn">—</strong> WARN</div>
-      <div class="stat" style="color:var(--err)"><strong id="statErr">—</strong> ERR</div>
+      <button type="button" class="stat stat-filter is-active" id="filterAll" data-filter="ALL" onclick="setStatusFilter('ALL')" title="전체 보기 (1)"><strong id="statTotal">—</strong> total</button>
+      <button type="button" class="stat stat-filter" id="filterOk" data-filter="OK" style="color:var(--ok)" onclick="setStatusFilter('OK')" title="정상만 보기 (2)"><strong id="statOk">—</strong> OK</button>
+      <button type="button" class="stat stat-filter" id="filterWarn" data-filter="WARNING" style="color:var(--warn)" onclick="setStatusFilter('WARNING')" title="WARN 만 보기 (3)"><strong id="statWarn">—</strong> WARN</button>
+      <button type="button" class="stat stat-filter" id="filterErr" data-filter="ERROR" style="color:var(--err)" onclick="setStatusFilter('ERROR')" title="ERR 만 보기 (4)"><strong id="statErr">—</strong> ERR</button>
       <div class="stat"><strong id="releaseGate">—</strong> release</div>
       <div class="stat"><strong id="liveGate">—</strong> live</div>
       <div class="stat"><strong id="liveEvidence">—</strong> evidence</div>
@@ -775,12 +779,13 @@ header{display:flex;align-items:center;justify-content:space-between;padding:20p
 <script>
 const API = '';
 const DASHBOARD_TOKEN = __VIBE_DASHBOARD_TOKEN__;
-const DASHBOARD_EXPECTED = { version: '1.7.2', apiVersion: 2 };
+const DASHBOARD_EXPECTED = __VIBE_DASHBOARD_EXPECTED__;
 function apiFetch(url, options = {}) {
   return fetch(url, { ...options, headers: { ...(options.headers || {}), 'X-Vibe-Dashboard-Token': DASHBOARD_TOKEN } });
 }
 
 let diagnosticsList = [];
+let statusFilter = 'ALL';
 let lastResults = {};
 let lastSkipped = {};
 let byokConfigured = false;
@@ -1133,7 +1138,11 @@ function renderCards() {
     return;
   }
 
-  const displayList = [...diagnosticsList];
+  const displayList = diagnosticsList.filter(matchesStatusFilter);
+  if (displayList.length === 0) {
+    container.innerHTML = `<div class="empty"><div class="icon">🔎</div><p>${statusFilterLabel()} 에 해당하는 진단이 없습니다.</p></div>`;
+    return;
+  }
   if (diagnosticSort === 'slowest') {
     displayList.sort((a, b) => (resultDuration(lastResults[b.id]) ?? -1) - (resultDuration(lastResults[a.id]) ?? -1));
   }
@@ -1142,6 +1151,44 @@ function renderCards() {
     try { id = d.id; } catch { id = null; }
     return renderDiagnosticCard(d, id == null ? null : lastResults[id]);
   }).join('');
+}
+
+function statusFilterLabel() {
+  if (statusFilter === 'OK') return '정상';
+  if (statusFilter === 'WARNING') return 'WARN';
+  if (statusFilter === 'ERROR') return 'ERR';
+  return '전체';
+}
+
+function matchesStatusFilter(diagnostic) {
+  if (statusFilter === 'ALL') return true;
+  let id;
+  try { id = diagnostic.id; } catch { id = null; }
+  const result = id == null ? null : lastResults[id];
+  if (!result) return false;
+  return result.status === statusFilter;
+}
+
+function setStatusFilter(value) {
+  const allowed = ['ALL', 'OK', 'WARNING', 'ERROR'];
+  statusFilter = allowed.includes(value) ? value : 'ALL';
+  const buttons = typeof document.querySelectorAll === 'function' ? document.querySelectorAll('.stat-filter') : [];
+  for (const button of buttons) {
+    button.classList.toggle('is-active', button.dataset.filter === statusFilter);
+  }
+  renderCards();
+}
+
+if (typeof document !== 'undefined' && typeof document.addEventListener === 'function') {
+  document.addEventListener('keydown', event => {
+    if (event.ctrlKey || event.metaKey || event.altKey) return;
+    const tag = (event.target && event.target.tagName || '').toLowerCase();
+    if (tag === 'input' || tag === 'textarea' || tag === 'select' || (event.target && event.target.isContentEditable)) return;
+    const shortcut = { '1': 'ALL', '2': 'OK', '3': 'WARNING', '4': 'ERROR' }[event.key];
+    if (!shortcut) return;
+    event.preventDefault();
+    setStatusFilter(shortcut);
+  });
 }
 
 function setDiagnosticSort(value) {

@@ -191,7 +191,8 @@ function startDashboard(projectDir, port = 7700, options = {}) {
 
     if (req.method === 'GET' && url.pathname === '/') {
       const html = fs.readFileSync(HTML_PATH, 'utf-8')
-        .replace('__VIBE_DASHBOARD_TOKEN__', JSON.stringify(shutdownToken));
+        .replace('__VIBE_DASHBOARD_TOKEN__', JSON.stringify(shutdownToken))
+        .replace('__VIBE_DASHBOARD_EXPECTED__', JSON.stringify({ version: identity.version, apiVersion: identity.apiVersion }));
       sendHtml(res, html);
       return;
     }

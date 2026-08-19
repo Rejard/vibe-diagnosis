@@ -36,7 +36,7 @@ test('dashboard API returns the centralized V1.7 report', async t => {
   assert.equal(health.status, 200);
   const healthBody = await health.json();
   assert.equal(healthBody.service, 'vibe-diagnosis-dashboard');
-  assert.equal(healthBody.version, '1.7.2');
+  assert.equal(healthBody.version, '1.7.3');
   assert.equal(healthBody.apiVersion, 2);
   assert.ok(healthBody.capabilities.includes('persistent-report-v1'));
 });
@@ -87,7 +87,10 @@ test('dashboard client handles conflict responses before reading results and alw
   assert.match(html, /Promise\.all\(\[\s*fetchList\(\),\s*getDashboardJson\('\/api\/report'\)/);
   assert.match(html, /formatDuration/);
   assert.match(html, /slowest/);
-  assert.match(html, new RegExp(`DASHBOARD_EXPECTED = \\{ version: '${packageVersion.replace(/\./g, '\\.')}'`));
+  assert.match(html, /DASHBOARD_EXPECTED = __VIBE_DASHBOARD_EXPECTED__;/);
+  const server = fs.readFileSync(path.join(__dirname, '..', 'src', 'dashboard.js'), 'utf8');
+  assert.match(server, /__VIBE_DASHBOARD_EXPECTED__[\s\S]{0,120}identity\.version/);
+  assert.ok(packageVersion);
   assert.match(html, /necessityStars/);
   assert.match(html, /setDiagnosticStateUi/);
   assert.match(html, /removeDiagnosticUi/);

@@ -1,6 +1,6 @@
 # Change Log
 
-## 1.7.2 (Current)
+## 1.7.3 (Current)
 
 - Safely renders string, scalar, array, and structured-object diagnostic details without aborting dashboard restoration.
 - Isolates malformed card fields so one diagnostic cannot hide the rest of the latest persisted report.

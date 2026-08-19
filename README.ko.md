@@ -4,7 +4,7 @@
 
 [English README](./README.md)
 
-Vibe Diagnosis 1.7.2는 Codex, Claude Code, Cursor, Windsurf, Gemini CLI, Antigravity 등 MCP를 지원하는 코딩 에이전트에서 사용할 수 있습니다. 사용자가 명령어를 외우는 것이 중심이 아닙니다. AI에게 자연어로 설치·연결·진단·대시보드·완료 검증·수리 계획을 지시하는 것이 기본 사용법입니다.
+Vibe Diagnosis 1.7.3는 Codex, Claude Code, Cursor, Windsurf, Gemini CLI, Antigravity 등 MCP를 지원하는 코딩 에이전트에서 사용할 수 있습니다. 사용자가 명령어를 외우는 것이 중심이 아닙니다. AI에게 자연어로 설치·연결·진단·대시보드·완료 검증·수리 계획을 지시하는 것이 기본 사용법입니다.
 
 핵심 원칙은 세 문장입니다.
 
@@ -15,7 +15,7 @@ Vibe Diagnosis 1.7.2는 Codex, Claude Code, Cursor, Windsurf, Gemini CLI, Antigr
 MCP를 지원하는 바이브코딩 도구에서 프로젝트를 연 뒤 다음 지시문을 붙여 넣습니다.
 
 ```text
-이 프로젝트에서 Vibe Diagnosis 1.7.2를 로컬 MCP 서버로 사용할 수 있게 설정해줘. 현재 코딩 도구가 사용하는 MCP 설정 형식을 확인하고 npx로 vibe-diagnosis-mcp@1.7.2를 등록한 뒤, 연결 후 도구 목록을 조회해 검증해. API 키를 소스, Git, 명령 기록에 넣지 마. 클라이언트 설정을 안전하게 직접 수정할 수 없다면 정확한 설정 내용과 입력 위치만 보여주고, 내가 클라이언트를 재시작할 때까지 기다려.
+이 프로젝트에서 Vibe Diagnosis 1.7.3를 로컬 MCP 서버로 사용할 수 있게 설정해줘. 현재 코딩 도구가 사용하는 MCP 설정 형식을 확인하고 npx로 vibe-diagnosis-mcp@1.7.3를 등록한 뒤, 연결 후 도구 목록을 조회해 검증해. API 키를 소스, Git, 명령 기록에 넣지 마. 클라이언트 설정을 안전하게 직접 수정할 수 없다면 정확한 설정 내용과 입력 위치만 보여주고, 내가 클라이언트를 재시작할 때까지 기다려.
 ```
 
 에이전트 또는 클라이언트를 재시작한 뒤 다음처럼 말합니다.
@@ -76,7 +76,7 @@ MCP를 지원하는 바이브코딩 도구에서 프로젝트를 연 뒤 다음 
 이 프로젝트에 연결된 Vibe Diagnosis 대시보드만 정상 종료하고 프로젝트 잠금이 해제됐는지 확인해. 다른 Node 프로세스나 다른 프로젝트 대시보드는 종료하지 마.
 ```
 
-1.7.2부터 페이지를 새로고침하거나 서버를 다시 시작해도 프로젝트의 `.vibe-diagnosis/runs/latest.json`에서 최신 결과를 복원합니다. 문자열·숫자·boolean·배열·구조화 객체형 `details`를 읽기 쉬운 이스케이프 문자열로 표시하고 순환 값에도 안전하게 대응합니다. 카드 하나의 필드가 잘못돼도 나머지 보고서 렌더링은 계속됩니다. 각 항목의 성공·경고·실패·건너뜀 상태, 건강도, 게이트, 완료 가능 여부, 항목별 실제 소요 시간과 전체 시간을 함께 복원합니다. 시간이 없던 구버전 보고서도 안전하게 열리며, `DISABLED`·`SKIP_ONCE` 같은 정책 제외 항목은 `0ms`가 아니라 “실행 안 함”으로 구분됩니다. 최신 실행에 기록이 전혀 없는 항목만 `Not yet tested`로 표시됩니다. 기본 상태·필요도 순서는 그대로 두고 “느린 순”을 선택해 오래 걸린 진단을 찾을 수 있습니다.
+1.7.3부터 페이지를 새로고침하거나 서버를 다시 시작해도 프로젝트의 `.vibe-diagnosis/runs/latest.json`에서 최신 결과를 복원합니다. 문자열·숫자·boolean·배열·구조화 객체형 `details`를 읽기 쉬운 이스케이프 문자열로 표시하고 순환 값에도 안전하게 대응합니다. 카드 하나의 필드가 잘못돼도 나머지 보고서 렌더링은 계속됩니다. 각 항목의 성공·경고·실패·건너뜀 상태, 건강도, 게이트, 완료 가능 여부, 항목별 실제 소요 시간과 전체 시간을 함께 복원합니다. 시간이 없던 구버전 보고서도 안전하게 열리며, `DISABLED`·`SKIP_ONCE` 같은 정책 제외 항목은 `0ms`가 아니라 “실행 안 함”으로 구분됩니다. 최신 실행에 기록이 전혀 없는 항목만 `Not yet tested`로 표시됩니다. 기본 상태·필요도 순서는 그대로 두고 “느린 순”을 선택해 오래 걸린 진단을 찾을 수 있습니다.
 
 대시보드 health와 프로젝트 lock에는 패키지 버전, API 버전, PID, 인증된 프로젝트 식별자와 기능 계약이 기록됩니다. `open_dashboard`, CLI, VS Code는 인증된 같은 프로젝트의 구버전 서버만 식별한 뒤 정상 종료를 요청하고 포트 해제를 기다린 다음 설치된 버전을 시작합니다. 다른 프로젝트 또는 식별할 수 없는 프로세스는 종료하지 않습니다. 오래된 브라우저 탭이 구형 서버의 일반 문자열 `Not found`를 받아도 JSON 파싱 예외 대신 서버 갱신 안내를 표시합니다.
 
@@ -212,7 +212,7 @@ MCP에 전달하는 프로젝트 경로는 절대경로여야 합니다. 같은 
   "mcpServers": {
     "vibe-diagnosis": {
       "command": "npx",
-      "args": ["-y", "vibe-diagnosis-mcp@1.7.2"]
+      "args": ["-y", "vibe-diagnosis-mcp@1.7.3"]
     }
   }
 }
@@ -221,13 +221,13 @@ MCP에 전달하는 프로젝트 경로는 절대경로여야 합니다. 같은 
 Claude Code 보조 설치 명령:
 
 ```bash
-claude mcp add vibe-diagnosis --scope local -- npx -y vibe-diagnosis-mcp@1.7.2
+claude mcp add vibe-diagnosis --scope local -- npx -y vibe-diagnosis-mcp@1.7.3
 ```
 
 Windows 네이티브 Claude Code:
 
 ```powershell
-claude mcp add vibe-diagnosis --scope local -- cmd /c npx -y vibe-diagnosis-mcp@1.7.2
+claude mcp add vibe-diagnosis --scope local -- cmd /c npx -y vibe-diagnosis-mcp@1.7.3
 ```
 
 MCP 설정을 바꾼 뒤 코딩 도구를 재시작하거나 서버 연결을 갱신하고 “Vibe Diagnosis 도구 목록만 보여주고 프로젝트는 수정하지 마”라고 지시해 연결을 검증하세요.
@@ -237,15 +237,15 @@ MCP 설정을 바꾼 뒤 코딩 도구를 재시작하거나 서버 연결을 �
 CLI는 CI, 자동화 스크립트, MCP를 지원하지 않는 환경용 보조 수단입니다. 바이브코딩의 기본 사용 경로는 AI 에이전트와 MCP입니다.
 
 ```bash
-npx -y vibe-diagnosis@1.7.2 init
-npx -y vibe-diagnosis@1.7.2 run --json
-npx -y vibe-diagnosis@1.7.2 run --all --json
-npx -y vibe-diagnosis@1.7.2 complete
-npx -y vibe-diagnosis@1.7.2 diagnostic-state <id> disabled --reason "의도적 보류"
-npx -y vibe-diagnosis@1.7.2 remove-diagnostic <id> --confirm --reason "프로젝트에 적용되지 않음"
-npx -y vibe-diagnosis@1.7.2 restore-diagnostic <id>
-npx -y vibe-diagnosis@1.7.2 dashboard
-npx -y vibe-diagnosis@1.7.2 stop
+npx -y vibe-diagnosis@1.7.3 init
+npx -y vibe-diagnosis@1.7.3 run --json
+npx -y vibe-diagnosis@1.7.3 run --all --json
+npx -y vibe-diagnosis@1.7.3 complete
+npx -y vibe-diagnosis@1.7.3 diagnostic-state <id> disabled --reason "의도적 보류"
+npx -y vibe-diagnosis@1.7.3 remove-diagnostic <id> --confirm --reason "프로젝트에 적용되지 않음"
+npx -y vibe-diagnosis@1.7.3 restore-diagnostic <id>
+npx -y vibe-diagnosis@1.7.3 dashboard
+npx -y vibe-diagnosis@1.7.3 stop
 ```
 
 현재 셸이 대상 프로젝트 내부가 아니면 `--cwd <프로젝트 절대경로>`를 사용합니다. 일반 `run`은 점검 필요도를 따르고 `run --all`은 활성 상태의 선택 진단까지 모두 실행합니다. `snoozed`에는 `--until <미래 ISO 시각>`도 필요합니다.

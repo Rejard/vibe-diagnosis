@@ -3,9 +3,9 @@
 [![VS Code Marketplace](https://img.shields.io/visual-studio-marketplace/v/Rejard.vibe-diagnosis-vscode?style=flat-square&color=blue)](https://marketplace.visualstudio.com/items?itemName=Rejard.vibe-diagnosis-vscode)
 [![Open VSX](https://img.shields.io/open-vsx/v/Rejard/vibe-diagnosis-vscode?style=flat-square&color=purple)](https://open-vsx.org/extension/Rejard/vibe-diagnosis-vscode)
 
-VS Code integration for Vibe Diagnosis 1.7.2. Run project diagnostics, inspect failures in the Problems panel, open the optional authenticated local dashboard, and review a fully sealed repair plan before approving any file change.
+VS Code integration for Vibe Diagnosis 1.7.3. Run project diagnostics, inspect failures in the Problems panel, open the optional authenticated local dashboard, and review a fully sealed repair plan before approving any file change.
 
-Version 1.7.2 keeps the 1.7 priority and policy controls, persistent dashboard result restoration, per-diagnostic timing, structured API errors, and identity-verified replacement of an older same-project dashboard server. It also renders structured diagnostic details safely without allowing one malformed card to hide the report.
+Version 1.7.3 keeps the 1.7 priority and policy controls, persistent dashboard result restoration, per-diagnostic timing, structured API errors, and identity-verified replacement of an older same-project dashboard server. It also renders structured diagnostic details safely without allowing one malformed card to hide the report.
 
 ## Requirements
 
@@ -59,7 +59,7 @@ Install the MCP server separately:
   "mcpServers": {
     "vibe-diagnosis": {
       "command": "npx",
-      "args": ["-y", "vibe-diagnosis-mcp@1.7.2"]
+      "args": ["-y", "vibe-diagnosis-mcp@1.7.3"]
     }
   }
 }
@@ -67,7 +67,7 @@ Install the MCP server separately:
 
 ## 한국어 안내
 
-Vibe Diagnosis 1.7.2 확장은 별 1~5개의 점검 필요도와 정책 기능에 더해 대시보드 최신 결과 복원, 구조화 진단 상세 정보의 안전한 표시, 항목별 소요 시간, 구조화된 API 오류, 같은 프로젝트의 구버전 서버 안전 갱신을 제공합니다.
+Vibe Diagnosis 1.7.3 확장은 별 1~5개의 점검 필요도와 정책 기능에 더해 대시보드 최신 결과 복원, 구조화 진단 상세 정보의 안전한 표시, 항목별 소요 시간, 구조화된 API 오류, 같은 프로젝트의 구버전 서버 안전 갱신을 제공합니다.
 
 명령 팔레트에서 다음 명령을 사용할 수 있습니다.
 

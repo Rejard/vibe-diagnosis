@@ -64,7 +64,7 @@ function makeDashboardContext({ diagnostics = [], report = null } = {}) {
     },
   };
   vm.createContext(context);
-  const servedHtml = html.replace('__VIBE_DASHBOARD_TOKEN__', JSON.stringify('test-token'));
+  const servedHtml = html.replace('__VIBE_DASHBOARD_TOKEN__', JSON.stringify('test-token')).replace('__VIBE_DASHBOARD_EXPECTED__', JSON.stringify({ version: require('../package.json').version, apiVersion: 2 }));
   const script = servedHtml.match(/<script>([\s\S]*?)<\/script>/)?.[1];
   assert.ok(script, 'dashboard inline script should exist');
   new vm.Script(script.replace(/\ninit\(\);\n/, '\n')).runInContext(context);
