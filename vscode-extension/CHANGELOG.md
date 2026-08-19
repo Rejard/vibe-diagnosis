@@ -2,6 +2,11 @@
 
 ## 1.7.3 (Current)
 
+- Reads the version from the packaged manifest instead of hardcoding it, so a release cannot bump one file and miss another.
+- Filters the diagnostic list by status. The total, OK, WARN, and ERR cards are buttons, and keys 1 to 4 switch between them.
+
+## 1.7.2
+
 - Safely renders string, scalar, array, and structured-object diagnostic details without aborting dashboard restoration.
 - Isolates malformed card fields so one diagnostic cannot hide the rest of the latest persisted report.
 - Preserves policy exclusion and timing displays across initial load, refresh, and server restart.

@@ -186,6 +186,8 @@ Local keys are stored in `.vibe-diagnosis/byok.local.json`, which is ignored. Su
 - Server/API version negotiation with identity-verified graceful refresh
 - Per-diagnostic and total wall-clock timing with legacy report compatibility
 - MCP and CLI parity for policy and focused forced execution
+- Single-source version identity across the core package, the MCP server, and the VS Code extension
+- Dashboard status filter: the total, OK, WARN, and ERR cards act as buttons, and keys 1 to 4 switch between them
 - Completion blocking for excluded 5-star diagnostics and policy-bound receipts
 
 The following 1.6 contracts remain supported:
