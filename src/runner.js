@@ -10,6 +10,7 @@ const { summarizeResults } = require('./run-summary');
 const { detectFragileStringChecks } = require('./assertions');
 const { createCompletionReceipt } = require('./completion-receipt');
 const { withDiagnosticsLock } = require('./diagnostics-lock');
+const { compareEnvironments } = require('./workspace-changes');
 const {
   describePolicy,
   consumeSkipOnce,
@@ -74,6 +75,7 @@ async function runDiagnosticsReportUnlocked(projectDir, options = {}) {
     durationMs: null,
   }));
   consumeSkipOnce(resolvedProjectDir, skippedDiagnostics.filter(item => item.state === 'SKIP_ONCE').map(item => item.id), policyInfo.policy);
+  const initialPolicyFingerprint = diagnosticPolicyFingerprint(resolvedProjectDir);
   const startedAt = new Date().toISOString();
   const runId = options.runId || `${startedAt.replace(/[:.]/g, '-')}-${crypto.randomBytes(3).toString('hex')}`;
   let results = [];
@@ -131,6 +133,7 @@ async function runDiagnosticsReportUnlocked(projectDir, options = {}) {
     environment,
     policy: {
       fingerprint: diagnosticPolicyFingerprint(resolvedProjectDir),
+      initialFingerprint: initialPolicyFingerprint,
       defaultNecessity: 4,
       skipped: skippedDiagnostics.length,
       removed: policyInfo.removed.length,
@@ -157,7 +160,11 @@ async function runDiagnostics(projectDir, options = {}) {
 }
 
 async function runCompletionDiagnostics(projectDir, options = {}) {
-  return withDiagnosticsLock(projectDir, { executionKind: options.executionKind || 'completion' }, async () => {
+  return withDiagnosticsLock(projectDir, {
+    executionKind: options.executionKind || 'completion',
+    waitTimeoutMs: options.waitTimeoutMs,
+    signal: options.signal,
+  }, async () => {
     const report = await runDiagnosticsReportUnlocked(projectDir, {
       ...options,
       persist: false,
@@ -167,15 +174,25 @@ async function runCompletionDiagnostics(projectDir, options = {}) {
     });
     const reasons = [];
     report.completionEnvironment = captureEnvironment(path.resolve(projectDir));
+    const workspaceChanges = compareEnvironments(report.environment, report.completionEnvironment);
     if (report.discovered === 0) reasons.push('NO_DIAGNOSTICS');
     const requiredSkipped = report.skippedDiagnostics.filter(item => item.diagnosticNecessity === 5 && item.skipReason !== 'PRIORITY_NOT_DUE');
     if (requiredSkipped.length) reasons.push('REQUIRED_DIAGNOSTICS_SKIPPED');
     if (report.summary.error > 0) reasons.push('DIAGNOSTIC_FAILURES');
+    if (report.policy.initialFingerprint !== diagnosticPolicyFingerprint(projectDir)) {
+      reasons.push('DIAGNOSTIC_POLICY_CHANGED_DURING_DIAGNOSTICS');
+      workspaceChanges.changed = true;
+      workspaceChanges.action = 'RERUN_AFTER_WORKSPACE_STABILIZES';
+      if (!workspaceChanges.changedFiles.some(item => item.file === '.vibe-diagnosis/diagnostic-policy.local.json')) {
+        workspaceChanges.changedFiles.push({ file: '.vibe-diagnosis/diagnostic-policy.local.json', change: 'POLICY_CHANGED', impact: 'DIAGNOSTIC_POLICY_CHANGED' });
+      }
+    }
     if (report.gates.releaseStatus === 'RELEASE_BLOCKED') reasons.push('RELEASE_BLOCKED');
     if (report.environment.fingerprint !== report.completionEnvironment.fingerprint) reasons.push('WORKSPACE_CHANGED_DURING_DIAGNOSTICS');
     report.completion = {
       eligible: reasons.length === 0,
       reasons,
+      workspaceChanges,
       fullSuite: report.selected === report.discovered,
       scheduledSuiteComplete: report.selected + report.skippedDiagnostics.length === report.discovered,
       requiredSkipped: requiredSkipped.map(item => item.id),
@@ -185,7 +202,7 @@ async function runCompletionDiagnostics(projectDir, options = {}) {
       warnings: report.summary.warning,
       verifiedFingerprint: report.completionEnvironment.fingerprint,
       instruction: reasons.length
-        ? 'Do not report the development task complete. Resolve or accurately report failed or skipped required diagnostics.'
+        ? 'Do not report the development task complete. Resolve or report the listed reasons. For workspace changes, inspect workspaceChanges and rerun after the workspace stabilizes; diagnostic passes do not override this block.'
         : 'The uncached priority-aware completion suite completed. Report warnings, policy exceptions, and evidence limitations.',
     };
     report.completion.receipt = createCompletionReceipt(report);

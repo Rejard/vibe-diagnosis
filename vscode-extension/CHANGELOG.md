@@ -1,6 +1,10 @@
 # Change Log
 
-## 1.8.0 (Current)
+## 1.8.1 (Current)
+
+- Core/MCP compatibility version aligned with bounded completion waiting, run-bound receipts, and clearer diagnostic gate/evidence labels.
+
+## 1.8.0
 
 - `run_diagnostics` and `complete_task_diagnostics` answer with a summary, gates, and every failing diagnostic by default, so the response no longer grows with the number of passing diagnostics.
 - Added `verbosity` with `summary`, `list`, and `full`. The previous response is `verbosity: "full"`.

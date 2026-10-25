@@ -95,6 +95,13 @@ test('dashboard has one escapeHtml implementation and safely renders every detai
   assert.doesNotThrow(() => vm.runInContext('escapeHtml(unreadableDetails)', context));
 });
 
+test('dashboard separates legacy passing live gates from absent operational evidence', () => {
+  const { context, getElement } = makeDashboardContext();
+  vm.runInContext(`applyReport({ results: [], summary: {total: 1, ok: 1, warning: 0, error: 0}, gates: {liveTradingStatus: 'LIVE_ALLOWED'}, evidenceSummary: {liveEvidenceStatus: 'UNVERIFIED'} });`, context);
+  assert.equal(getElement('liveGate').textContent, 'PASSED');
+  assert.equal(getElement('liveEvidence').textContent, 'UNVERIFIED');
+});
+
 test('object details restore all 238 executed cards, one disabled card, timing, and slow sorting', async () => {
   const diagnostics = [];
   const results = [];

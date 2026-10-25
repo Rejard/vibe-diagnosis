@@ -5,7 +5,8 @@ const { diagnosticPolicyFingerprint } = require('./diagnostic-policy');
 function receiptPayload(report) {
   const environment = report.completionEnvironment || report.environment;
   return {
-    schemaVersion: 2,
+    schemaVersion: 3,
+    eligible: report.completion?.eligible === true,
     runId: report.runId,
     issuedAt: report.finishedAt,
     gitSha: environment.git.sha,
@@ -25,11 +26,13 @@ function createCompletionReceipt(report) {
   return { ...payload, checksum: checksum(payload) };
 }
 
-function verifyCompletionReceipt(projectDir, receipt) {
+function verifyCompletionReceipt(projectDir, receipt, options = {}) {
   if (!receipt || typeof receipt !== 'object') return { valid: false, current: false, reasons: ['MISSING_RECEIPT'] };
   const { checksum: suppliedChecksum, ...payload } = receipt;
   const reasons = [];
   if (suppliedChecksum !== checksum(payload)) reasons.push('INVALID_CHECKSUM');
+  if (receipt.eligible === false) reasons.push('INELIGIBLE_COMPLETION');
+  if (options.expectedRunId !== undefined && receipt.runId !== options.expectedRunId) reasons.push('RUN_ID_MISMATCH');
   const current = captureEnvironment(projectDir);
   if (receipt.environmentFingerprint !== current.fingerprint) reasons.push('STALE_WORKSPACE');
   if (receipt.diagnosticPolicyFingerprint !== diagnosticPolicyFingerprint(projectDir)) reasons.push('STALE_DIAGNOSTIC_POLICY');

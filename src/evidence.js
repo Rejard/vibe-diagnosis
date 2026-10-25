@@ -36,6 +36,7 @@ function summarizeEvidence(results) {
   return {
     byType,
     liveEvidenceStatus,
+    interpretation: 'Status of reported diagnostic evidence only. VERIFIED covers the supplied evidence types and observations, not overall operational readiness, service recovery, or exchange fills.',
     coverage: {
       diagnosticsWithEvidence,
       totalDiagnostics: results.length,

@@ -15,6 +15,7 @@ function summarizeResults(results) {
   const liveBlockedBy = results.filter(r => r.status === 'ERROR' && r.blocksLiveTrading).map(r => r.id);
   const releaseEvaluated = results.some(r => r.gateDeclarations?.release);
   const liveEvaluated = results.some(r => r.gateDeclarations?.liveTrading);
+  const evidenceSummary = summarizeEvidence(results);
   const overallStatus = releaseBlockedBy.length ? 'RELEASE_BLOCKED'
     : liveBlockedBy.length ? 'LIVE_BLOCKED'
       : summary.error ? 'ERROR' : summary.warning ? 'WARNING' : 'OK';
@@ -32,11 +33,13 @@ function summarizeResults(results) {
     gates: {
       releaseStatus: releaseBlockedBy.length ? 'RELEASE_BLOCKED' : releaseEvaluated ? 'RELEASE_ALLOWED' : 'NOT_EVALUATED',
       liveTradingStatus: liveBlockedBy.length ? 'LIVE_BLOCKED' : liveEvaluated ? 'LIVE_ALLOWED' : 'NOT_EVALUATED',
+      liveDiagnosticGateStatus: liveBlockedBy.length ? 'BLOCKED' : liveEvaluated ? 'PASSED' : 'NOT_EVALUATED',
+      interpretation: 'Diagnostic policy gates only. LIVE_ALLOWED is a legacy gate value, not trading authorization or proof of service recovery or exchange fills.',
       releaseBlockedBy,
       liveBlockedBy,
       coverage: { release: releaseEvaluated, liveTrading: liveEvaluated },
     },
-    evidenceSummary: summarizeEvidence(results),
+    evidenceSummary,
     domains,
     rootCauseGroups: groupRootCauses(results),
   };

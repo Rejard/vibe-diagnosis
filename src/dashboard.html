@@ -631,8 +631,8 @@ header{display:flex;align-items:center;justify-content:space-between;padding:20p
       <button type="button" class="stat stat-filter" id="filterWarn" data-filter="WARNING" style="color:var(--warn)" onclick="setStatusFilter('WARNING')" title="WARN 만 보기 (3)"><strong id="statWarn">—</strong> WARN</button>
       <button type="button" class="stat stat-filter" id="filterErr" data-filter="ERROR" style="color:var(--err)" onclick="setStatusFilter('ERROR')" title="ERR 만 보기 (4)"><strong id="statErr">—</strong> ERR</button>
       <div class="stat"><strong id="releaseGate">—</strong> release</div>
-      <div class="stat"><strong id="liveGate">—</strong> live</div>
-      <div class="stat"><strong id="liveEvidence">—</strong> evidence</div>
+      <div class="stat" title="Diagnostic policy only; not trading authorization or proof of service recovery or exchange fills."><strong id="liveGate">—</strong> live diagnostic gate</div>
+      <div class="stat" title="Reported observations only. VERIFIED does not establish overall operational readiness or exchange fills."><strong id="liveEvidence">—</strong> reported live evidence</div>
       <div class="stat"><strong id="totalDuration">—</strong> duration</div>
       <div class="stat"><strong id="completionStatus">—</strong> completion</div>
     </div>
@@ -1269,7 +1269,7 @@ function applyReport(report) {
   document.getElementById('statWarn').textContent = summary.warning;
   document.getElementById('statErr').textContent = summary.error;
   document.getElementById('releaseGate').textContent = latestReport.gates?.releaseStatus || '—';
-  document.getElementById('liveGate').textContent = latestReport.gates?.liveTradingStatus || '—';
+  document.getElementById('liveGate').textContent = latestReport.gates?.liveDiagnosticGateStatus || ({ LIVE_ALLOWED: 'PASSED', LIVE_BLOCKED: 'BLOCKED' }[latestReport.gates?.liveTradingStatus]) || 'NOT_EVALUATED';
   document.getElementById('liveEvidence').textContent = latestReport.evidenceSummary?.liveEvidenceStatus || '—';
   document.getElementById('totalDuration').textContent = formatDuration(latestReport.durationMs ?? latestReport.totalDurationMs);
   document.getElementById('completionStatus').textContent = latestReport.completion ? (latestReport.completion.eligible ? 'eligible' : 'blocked') : 'not evaluated';

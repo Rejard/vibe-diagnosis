@@ -4,7 +4,24 @@
 
 [English README](./README.md)
 
-Vibe Diagnosis 1.7.3는 Codex, Claude Code, Cursor, Windsurf, Gemini CLI, Antigravity 등 MCP를 지원하는 코딩 에이전트에서 사용할 수 있습니다. 사용자가 명령어를 외우는 것이 중심이 아닙니다. AI에게 자연어로 설치·연결·진단·대시보드·완료 검증·수리 계획을 지시하는 것이 기본 사용법입니다.
+## 1.8.1 로컬 업데이트
+
+### 소스 보존 범위와 독립 대시보드
+
+코어·MCP 어댑터·VS Code 확장·테스트·lockfile·릴리스 문서를 보존합니다. 자격증명, 프로젝트별 로컬 진단 정의·결과·완료 영수증·캐시·로그, 설치된 의존성과 생성 패키지는 이번 백업 대상에서 제외합니다. 이미 존재하는 과거 진단 fixture 이력은 이번 작업에서 삭제하지 않습니다.
+
+대시보드와 MCP 연결은 별도 프로세스입니다. stdio MCP 연결은 코딩 클라이언트가 관리하며, 대시보드만 PM2 같은 프로세스 관리자로 독립 실행할 수 있습니다. 설치본의 `bin/vibe-diag.js`에 `dashboard --cwd <프로젝트 절대경로> --port 7700`을 전달하거나, 소스 폴더에서 `node bin/vibe-diag.js dashboard --cwd <프로젝트 절대경로> --port 7700`으로 실행합니다. localhost에만 바인딩하며 기존 포트를 재사용하기 전에 인증된 프로젝트 식별을 확인합니다. PM2 등록만으로 PC 부팅 시 자동 실행까지 설정되는 것은 아닙니다.
+
+화면 통계는 메모리 제한이 있는 별도 워커에서 최대 10초 동안 계산합니다. 같은 동시 요청은 합치고 성공한 결과는 30초 캐시하며, 생성 자료 폴더와 심볼릭 링크는 탐색에서 제외합니다. 통계 조회 실패를 진단 통과로 처리하지 않습니다. 계산 중에도 상태 API와 화면은 응답합니다. 구현 검증은 `npm run test:unit`으로 실행할 수 있습니다. 소스 보존은 운영 정상화나 패키지 레지스트리 게시의 증거가 아닙니다.
+
+이 작업공간은 1.8.1을 준비합니다. 레지스트리 게시와 실행 중 MCP 교체는 별도 단계입니다. 게시 전에는 설치할 디렉터리에서 로컬 패키지 두 개(`vibe-diagnosis-1.8.1.tgz`, `vibe-diagnosis-mcp-1.8.1.tgz`)를 함께 사용하세요. 아래 버전 고정 npx 예시는 게시 후에 사용할 수 있습니다.
+
+- `complete_task_diagnostics({ projectDir, waitTimeoutMs: 60000 })`는 사용 중인 프로젝트를 최대 60초 기다린 뒤 호출자 자신의 비캐시 진단을 새로 실행합니다. 기본값은 `0`(즉시 충돌), 최댓값은 `120000`입니다. MCP 취소는 대기만 취소하며 기존 소유자나 이미 시작된 진단을 종료하지 않습니다. 시간 초과는 `DIAGNOSTICS_WAIT_TIMEOUT`, 클라이언트가 취소 응답을 유지하는 경우 취소는 `DIAGNOSTICS_WAIT_CANCELLED`로 표시됩니다. 영속·선착순 대기열이 아니며 전체 진단 소요 시간을 제한하지 않습니다.
+- 반환된 `runId`를 보관하고 `verify_completion_receipt({ projectDir, expectedRunId: runId })`로 검증하세요. 최신 영수증이 다른 실행이면 `RUN_ID_MISMATCH`로 거부됩니다. 다른 호출자의 영수증을 대신 쓰지 말고 자신의 완료 진단을 다시 실행하세요. `expectedRunId`를 생략하면 기존 작업공간 기준 검증을 유지합니다. 영수증 스키마 3은 완료 적격성을 기록하고 부적격 영수증을 거부합니다.
+- `completion.workspaceChanges`에 변경 경로·종류와 재실행 조치가 표시됩니다. 진단의 `files` 선언만으로 전체 의존성을 입증할 수 없어 무관해 보이는 변경도 차단합니다. Git에서 무시된 진단 코드도 지문에 포함하며 설정·정책 변경 역시 차단합니다. 스냅샷 비교는 일시적인 변경 후 원복, 외부 의존성, 보호 대상이 아닌 ignored 런타임 파일 전체를 추적하지 못합니다. 파일시스템 격리를 보장하지 않습니다.
+- `gates.liveDiagnosticGateStatus`는 `PASSED`, `BLOCKED`, `NOT_EVALUATED`를 사용합니다. 호환용 `liveTradingStatus`는 유지하지만 `LIVE_ALLOWED`는 진단 정책 통과만 뜻합니다. 별도 `evidenceSummary.liveEvidenceStatus`의 `UNVERIFIED`는 보고된 운영 증거가 없음을, `VERIFIED`는 제공된 관측 범위만 뜻합니다. 거래 권한·거래소 체결·서비스 정상화의 증명이 아닙니다.
+
+Vibe Diagnosis 1.8.1는 Codex, Claude Code, Cursor, Windsurf, Gemini CLI, Antigravity 등 MCP를 지원하는 코딩 에이전트에서 사용할 수 있습니다. 사용자가 명령어를 외우는 것이 중심이 아닙니다. AI에게 자연어로 설치·연결·진단·대시보드·완료 검증·수리 계획을 지시하는 것이 기본 사용법입니다.
 
 핵심 원칙은 세 문장입니다.
 
@@ -15,7 +32,7 @@ Vibe Diagnosis 1.7.3는 Codex, Claude Code, Cursor, Windsurf, Gemini CLI, Antigr
 MCP를 지원하는 바이브코딩 도구에서 프로젝트를 연 뒤 다음 지시문을 붙여 넣습니다.
 
 ```text
-이 프로젝트에서 Vibe Diagnosis 1.7.3를 로컬 MCP 서버로 사용할 수 있게 설정해줘. 현재 코딩 도구가 사용하는 MCP 설정 형식을 확인하고 npx로 vibe-diagnosis-mcp@1.7.3를 등록한 뒤, 연결 후 도구 목록을 조회해 검증해. API 키를 소스, Git, 명령 기록에 넣지 마. 클라이언트 설정을 안전하게 직접 수정할 수 없다면 정확한 설정 내용과 입력 위치만 보여주고, 내가 클라이언트를 재시작할 때까지 기다려.
+이 프로젝트에서 Vibe Diagnosis 1.8.1를 로컬 MCP 서버로 사용할 수 있게 설정해줘. 현재 코딩 도구가 사용하는 MCP 설정 형식을 확인하고 npx로 vibe-diagnosis-mcp@1.8.1를 등록한 뒤, 연결 후 도구 목록을 조회해 검증해. API 키를 소스, Git, 명령 기록에 넣지 마. 클라이언트 설정을 안전하게 직접 수정할 수 없다면 정확한 설정 내용과 입력 위치만 보여주고, 내가 클라이언트를 재시작할 때까지 기다려.
 ```
 
 에이전트 또는 클라이언트를 재시작한 뒤 다음처럼 말합니다.
@@ -192,7 +209,7 @@ Vibe Diagnosis로 이 프로젝트의 빌드 안전성을 확인해. PASSED, FAI
 | 에이전트 연속성 | `sync_ai_context`, `sync_agent_rules` |
 | 로컬 오류 지식 | `read_error_pattern`, `write_error_pattern` |
 
-MCP에 전달하는 프로젝트 경로는 절대경로여야 합니다. 같은 프로젝트는 MCP·CLI·대시보드·별도 Node 프로세스를 합쳐 동시에 한 번만 진단합니다. 중복 요청은 기다리지 않고 `DIAGNOSTICS_ALREADY_RUNNING`으로 즉시 종료되며, 서로 다른 프로젝트는 동시에 진단할 수 있습니다.
+MCP에 전달하는 프로젝트 경로는 절대경로여야 합니다. 같은 프로젝트는 MCP·CLI·대시보드·별도 Node 프로세스를 합쳐 동시에 한 번만 진단합니다. 중복 요청은 기본적으로 `DIAGNOSTICS_ALREADY_RUNNING`으로 즉시 종료되지만, 완료 호출은 위의 제한 시간 대기를 선택할 수 있습니다. 서로 다른 프로젝트는 동시에 진단할 수 있습니다.
 
 `run_diagnostics` 와 `complete_task_diagnostics` 는 기본값 `verbosity: "summary"` 로 응답합니다.
 집계, 게이트, `runFile`, 그리고 **실패한 진단 전부** 를 그대로 담습니다. 통과 진단이 늘어도
@@ -220,7 +237,7 @@ MCP에 전달하는 프로젝트 경로는 절대경로여야 합니다. 같은 
   "mcpServers": {
     "vibe-diagnosis": {
       "command": "npx",
-      "args": ["-y", "vibe-diagnosis-mcp@1.7.3"]
+      "args": ["-y", "vibe-diagnosis-mcp@1.8.1"]
     }
   }
 }
@@ -229,13 +246,13 @@ MCP에 전달하는 프로젝트 경로는 절대경로여야 합니다. 같은 
 Claude Code 보조 설치 명령:
 
 ```bash
-claude mcp add vibe-diagnosis --scope local -- npx -y vibe-diagnosis-mcp@1.7.3
+claude mcp add vibe-diagnosis --scope local -- npx -y vibe-diagnosis-mcp@1.8.1
 ```
 
 Windows 네이티브 Claude Code:
 
 ```powershell
-claude mcp add vibe-diagnosis --scope local -- cmd /c npx -y vibe-diagnosis-mcp@1.7.3
+claude mcp add vibe-diagnosis --scope local -- cmd /c npx -y vibe-diagnosis-mcp@1.8.1
 ```
 
 MCP 설정을 바꾼 뒤 코딩 도구를 재시작하거나 서버 연결을 갱신하고 “Vibe Diagnosis 도구 목록만 보여주고 프로젝트는 수정하지 마”라고 지시해 연결을 검증하세요.
@@ -245,15 +262,15 @@ MCP 설정을 바꾼 뒤 코딩 도구를 재시작하거나 서버 연결을 �
 CLI는 CI, 자동화 스크립트, MCP를 지원하지 않는 환경용 보조 수단입니다. 바이브코딩의 기본 사용 경로는 AI 에이전트와 MCP입니다.
 
 ```bash
-npx -y vibe-diagnosis@1.7.3 init
-npx -y vibe-diagnosis@1.7.3 run --json
-npx -y vibe-diagnosis@1.7.3 run --all --json
-npx -y vibe-diagnosis@1.7.3 complete
-npx -y vibe-diagnosis@1.7.3 diagnostic-state <id> disabled --reason "의도적 보류"
-npx -y vibe-diagnosis@1.7.3 remove-diagnostic <id> --confirm --reason "프로젝트에 적용되지 않음"
-npx -y vibe-diagnosis@1.7.3 restore-diagnostic <id>
-npx -y vibe-diagnosis@1.7.3 dashboard
-npx -y vibe-diagnosis@1.7.3 stop
+npx -y vibe-diagnosis@1.8.1 init
+npx -y vibe-diagnosis@1.8.1 run --json
+npx -y vibe-diagnosis@1.8.1 run --all --json
+npx -y vibe-diagnosis@1.8.1 complete
+npx -y vibe-diagnosis@1.8.1 diagnostic-state <id> disabled --reason "의도적 보류"
+npx -y vibe-diagnosis@1.8.1 remove-diagnostic <id> --confirm --reason "프로젝트에 적용되지 않음"
+npx -y vibe-diagnosis@1.8.1 restore-diagnostic <id>
+npx -y vibe-diagnosis@1.8.1 dashboard
+npx -y vibe-diagnosis@1.8.1 stop
 ```
 
 현재 셸이 대상 프로젝트 내부가 아니면 `--cwd <프로젝트 절대경로>`를 사용합니다. 일반 `run`은 점검 필요도를 따르고 `run --all`은 활성 상태의 선택 진단까지 모두 실행합니다. `snoozed`에는 `--until <미래 ISO 시각>`도 필요합니다.

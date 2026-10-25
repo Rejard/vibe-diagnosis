@@ -10,6 +10,22 @@ const rootPackage = require('../package.json');
 const mcpPackage = require('../mcp-server/package.json');
 const extensionPackage = require('../vscode-extension/package.json');
 
+test('all package READMEs match the package version and completion safety contract', () => {
+  for (const file of ['README.md', 'README.ko.md', 'mcp-server/README.md', 'vscode-extension/README.md']) {
+    const text = fs.readFileSync(path.join(root, file), 'utf8');
+    assert.ok(text.includes(`Vibe Diagnosis ${rootPackage.version}`), file);
+    const pins = [...text.matchAll(/vibe-diagnosis(?:-mcp)?@(\d+\.\d+\.\d+)/g)].map(match => match[1]);
+    if (file !== 'vscode-extension/README.md') assert.ok(pins.length > 0, file);
+    assert.ok(pins.every(version => version === rootPackage.version), file);
+    for (const term of ['waitTimeoutMs', 'expectedRunId', 'RUN_ID_MISMATCH', 'workspaceChanges', 'liveDiagnosticGateStatus', 'UNVERIFIED', 'VERIFIED']) assert.ok(text.includes(term), `${file}: ${term}`);
+  }
+  for (const folder of ['', 'mcp-server', 'vscode-extension']) {
+    const lock = JSON.parse(fs.readFileSync(path.join(root, folder, 'package-lock.json'), 'utf8'));
+    assert.equal(lock.version, rootPackage.version);
+    assert.equal(lock.packages[''].version, rootPackage.version);
+  }
+});
+
 test('the published packages carry the same version', () => {
   assert.equal(
     mcpPackage.version,

@@ -68,6 +68,8 @@ async function main() {
   assert.ok(rootFiles.includes('src/dashboard-control.js'));
   assert.ok(rootFiles.includes('src/completion-receipt.js'));
   assert.ok(rootFiles.includes('src/diagnostics-lock.js'));
+  assert.ok(rootFiles.includes('src/diagnostics-wait.js'));
+  assert.ok(rootFiles.includes('src/workspace-changes.js'));
   assert.ok(rootFiles.includes('src/dashboard-contract.js'));
   assert.ok(rootFiles.includes('src/report-store.js'));
   assert.ok(rootFiles.includes('src/report-view.js'));
@@ -93,13 +95,17 @@ async function main() {
     for (const name of ['run_diagnostics', 'complete_task_diagnostics', 'verify_completion_receipt', 'open_dashboard', 'stop_dashboard', 'plan_repair', 'apply_repair_plan', 'set_diagnostic_state', 'remove_diagnostic', 'restore_diagnostic']) assert.ok(tools.has(name), `Packed MCP missing ${name}`);
     assert.equal(tools.get('run_diagnostics').inputSchema.properties.autoLaunchDashboard.default, false);
     assert.equal(tools.get('run_diagnostics').inputSchema.properties.verbosity.default, 'summary');
+    assert.equal(tools.get('complete_task_diagnostics').inputSchema.properties.waitTimeoutMs.maximum, 120000);
+    assert.ok(tools.get('verify_completion_receipt').inputSchema.properties.expectedRunId);
     const completed = await client.request('tools/call', { name: 'complete_task_diagnostics', arguments: { projectDir } });
     assert.notEqual(completed.result.isError, true);
     const report = JSON.parse(completed.result.content[0].text);
     assert.equal(report.completion.eligible, true);
+    assert.equal(report.completion.receipt.schemaVersion, 3);
+    assert.equal(report.gates.liveDiagnosticGateStatus, 'NOT_EVALUATED');
     assert.equal(report.completion.dashboardRequired, false);
     assert.equal(report.response.verbosity, 'summary');
-    const receipt = await client.request('tools/call', { name: 'verify_completion_receipt', arguments: { projectDir } });
+    const receipt = await client.request('tools/call', { name: 'verify_completion_receipt', arguments: { projectDir, expectedRunId: report.runId } });
     assert.equal(JSON.parse(receipt.result.content[0].text).valid, true);
     assert.equal(fs.existsSync(path.join(projectDir, '.vibe-diagnosis', 'active_port.json')), false);
     process.stdout.write(`${JSON.stringify({ verified: true, rootTarball: rootPack.filename, mcpTarball: mcpPack.filename, tools: tools.size, completion: report.completion }, null, 2)}\n`);

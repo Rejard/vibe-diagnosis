@@ -30,7 +30,8 @@ function formatResults(value, projectDir) {
   if (report.skippedDiagnostics?.length) lines.push(`  Skipped: ${report.skippedDiagnostics.length} | ${report.skippedDiagnostics.map(item => `${item.id}(${item.skipReason})`).join(', ')}`);
   if (report.removedDiagnostics?.length) lines.push(`  Removed (recoverable): ${report.removedDiagnostics.length}`);
   lines.push(`  Overall: ${report.overallStatus} - Health ${report.healthPercent}%`);
-  lines.push(`  Release: ${report.gates.releaseStatus} | Live: ${report.gates.liveTradingStatus} | Live evidence: ${report.evidenceSummary.liveEvidenceStatus}`, '');
+  lines.push(`  Release: ${report.gates.releaseStatus} | Live diagnostic gate: ${report.gates.liveDiagnosticGateStatus || report.gates.liveTradingStatus} | Reported live evidence: ${report.evidenceSummary.liveEvidenceStatus}`,
+    '  Diagnostic gates and reported evidence do not establish trading authorization, service recovery, or exchange fills.', '');
   return lines.join('\n');
 }
 

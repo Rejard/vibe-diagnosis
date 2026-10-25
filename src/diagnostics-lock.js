@@ -164,7 +164,7 @@ async function withDiagnosticsLock(projectDir, options, operation) {
   if (active?.active && active.projectKey === key) {
     return operation({ startedAt: active.startedAt, reentrant: true });
   }
-  const lock = acquireDiagnosticsLock(projectDir, options);
+  const lock = await require('./diagnostics-wait').acquireWithWait(projectDir, options);
   const context = { active: true, projectKey: key, startedAt: lock.startedAt };
   try {
     return await executionStorage.run(context, () => operation({ startedAt: lock.startedAt, reentrant: false }));

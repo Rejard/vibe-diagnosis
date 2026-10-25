@@ -3,7 +3,9 @@
 [![VS Code Marketplace](https://img.shields.io/visual-studio-marketplace/v/Rejard.vibe-diagnosis-vscode?style=flat-square&color=blue)](https://marketplace.visualstudio.com/items?itemName=Rejard.vibe-diagnosis-vscode)
 [![Open VSX](https://img.shields.io/open-vsx/v/Rejard/vibe-diagnosis-vscode?style=flat-square&color=purple)](https://open-vsx.org/extension/Rejard/vibe-diagnosis-vscode)
 
-VS Code integration for Vibe Diagnosis 1.7.3. Run project diagnostics, inspect failures in the Problems panel, open the optional authenticated local dashboard, and review a fully sealed repair plan before approving any file change.
+VS Code integration for Vibe Diagnosis 1.8.1. Run project diagnostics, inspect failures in the Problems panel, open the optional authenticated local dashboard, and review a fully sealed repair plan before approving any file change.
+
+The 1.8.1 core distinguishes `liveDiagnosticGateStatus` from reported live evidence (`UNVERIFIED` or `VERIFIED` within the supplied observation scope). The separately installed MCP adds bounded completion waiting with `waitTimeoutMs`, caller-owned receipt verification with `expectedRunId` (`RUN_ID_MISMATCH` on a different run), and `workspaceChanges` explanations. These MCP arguments are not VS Code commands. Update the core and MCP packages separately; installing this VSIX alone does not replace a running MCP server. This local build has not been published to a marketplace.
 
 Version 1.7.2 keeps the 1.7 priority and policy controls, persistent dashboard result restoration, per-diagnostic timing, structured API errors, and identity-verified replacement of an older same-project dashboard server. It also renders structured diagnostic details safely without allowing one malformed card to hide the report.
 
@@ -59,7 +61,7 @@ Install the MCP server separately:
   "mcpServers": {
     "vibe-diagnosis": {
       "command": "npx",
-      "args": ["-y", "vibe-diagnosis-mcp@1.7.3"]
+      "args": ["-y", "vibe-diagnosis-mcp@1.8.1"]
     }
   }
 }

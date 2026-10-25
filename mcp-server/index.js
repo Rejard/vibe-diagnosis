@@ -6,6 +6,7 @@ import { z } from "zod";
 import { createRequire } from "module";
 import fs from "fs";
 import path from "path";
+import { fileURLToPath } from "url";
 import { exec, spawn } from "child_process";
 const require = createRequire(import.meta.url);
 
@@ -26,7 +27,10 @@ console.warn = (...args) => {
 };
 
 function loadCore() {
+  const localCore = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..', 'package.json');
+  const useLocalCore = fs.existsSync(localCore) && JSON.parse(fs.readFileSync(localCore, 'utf8')).name === 'vibe-diagnosis';
   try {
+    if (useLocalCore) throw new Error('Use the core shipped beside this MCP entry point.');
     return {
       runner: require("vibe-diagnosis/src/runner"),
       schema: require("vibe-diagnosis/src/schema"),
@@ -99,7 +103,7 @@ server.tool = (name, description, schema, handler) => {
     destructiveHint: DESTRUCTIVE_TOOLS.has(name),
     idempotentHint: READ_ONLY_TOOLS.has(name),
     openWorldHint: OPEN_WORLD_TOOLS.has(name),
-  }, async args => core.redaction.redactValue(await handler(args)));
+  }, async (args, extra) => core.redaction.redactValue(await handler(args, extra)));
 };
 
 function openBrowser(url) {
@@ -302,14 +306,15 @@ server.tool(
 
 server.tool(
   "complete_task_diagnostics",
-  "MANDATORY final step for development tasks. Run the complete diagnostic suite without cache or dashboard and return a completion eligibility decision.",
+  "Run an uncached completion suite. Optionally wait for a busy project, then run a fresh suite for this caller; never reuse another caller's result. MCP cancellation cancels waiting only. Diagnostic gates are not proof of operational readiness.",
   {
     projectDir: z.string().describe("Absolute path to the project root directory containing .vibe-diagnosis/"),
     verbosity: z.enum(["summary", "list", "full"]).optional().default("summary").describe("summary: the completion decision, gates, and every failing diagnostic in full (default, constant size). list: adds id, name, and duration for passing and skipped diagnostics. full: the complete report, the pre-1.8.0 response"),
+    waitTimeoutMs: z.number().int().min(0).max(120000).optional().default(0).describe("Maximum wait for the project lock in milliseconds. 0 returns an immediate conflict. Does not limit or cancel an already started suite."),
   },
-  async ({ projectDir, verbosity }) => {
+  async ({ projectDir, verbosity, waitTimeoutMs }, extra) => {
     try {
-      const report = await runCompletionDiagnostics(projectDir, { persist: true, executionKind: "mcp-complete" });
+      const report = await runCompletionDiagnostics(projectDir, { persist: true, executionKind: "mcp-complete", waitTimeoutMs, signal: extra?.signal });
       report.agentIntegration = { modified: false, instruction: "Use init_diagnostics or sync_agent_rules to update agent rule files explicitly." };
       return {
         content: [{ type: "text", text: JSON.stringify(core.reportView.shapeReport(report, verbosity), null, 2) }],
@@ -317,7 +322,7 @@ server.tool(
       };
     } catch (err) {
       const conflict = conflictPayload(err);
-      return { content: [{ type: "text", text: JSON.stringify(conflict || { error: `Completion diagnostics failed: ${err.message}` }, null, 2) }], isError: true };
+      return { content: [{ type: "text", text: JSON.stringify(conflict || { error: `Completion diagnostics failed: ${err.message}`, code: err.code, activeExecution: err.conflict }, null, 2) }], isError: true };
     }
   }
 );
@@ -327,15 +332,16 @@ server.tool(
   "Verify that the latest completion receipt is intact and still matches the current workspace state.",
   {
     projectDir: z.string().describe("Absolute path to the project root directory containing .vibe-diagnosis/"),
+    expectedRunId: z.string().optional().describe("Run ID returned by your own completion call. Rejects another caller's latest receipt. Omit only for legacy workspace-only verification."),
   },
-  async ({ projectDir }) => {
+  async ({ projectDir, expectedRunId }) => {
     try {
       const runsDir = path.join(projectDir, ".vibe-diagnosis", "runs");
       const completionPath = path.join(runsDir, "latest-completion.json");
       const latestPath = fs.existsSync(completionPath) ? completionPath : path.join(runsDir, "latest.json");
       if (!fs.existsSync(latestPath)) throw new Error("No saved diagnostic run was found.");
       const latest = JSON.parse(fs.readFileSync(latestPath, "utf8"));
-      const verification = core.completionReceipt.verifyCompletionReceipt(projectDir, latest.completion?.receipt);
+      const verification = core.completionReceipt.verifyCompletionReceipt(projectDir, latest.completion?.receipt, { expectedRunId });
       return {
         content: [{ type: "text", text: JSON.stringify({ runId: latest.runId, eligible: latest.completion?.eligible === true, ...verification }, null, 2) }],
         isError: !verification.valid || latest.completion?.eligible !== true,

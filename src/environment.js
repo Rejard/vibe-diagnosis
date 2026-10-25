@@ -2,6 +2,7 @@ const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
 const { execFileSync } = require('child_process');
+const { fileDigest, diagnosticFiles } = require('./workspace-changes');
 
 function git(projectDir, args) {
   try {
@@ -17,18 +18,20 @@ const PROTECTED_SKIP_DIRS = new Set(['.git', 'node_modules', 'dist', 'build', '.
 const PROTECTED_FILE = /^(?:\.env(?:\..+)?|\.npmrc|\.pypirc|byok\.local\.json|config\.json|.*(?:credential|secret|private[-_]?key|api[-_]?key).*(?:\.json|\.ya?ml|\.toml|\.ini)?|.*\.(?:pem|key|p12|pfx))$/i;
 const MAX_PROTECTED_HASH_BYTES = 2 * 1024 * 1024;
 
-function hashDirectory(hash, root, current = root) {
+function hashDirectory(hash, root, current = root, fileState = {}) {
   for (const entry of fs.readdirSync(current, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
     const absolute = path.join(current, entry.name);
     const relative = path.relative(root, absolute).replace(/\\/g, '/');
     if (FINGERPRINT_IGNORES.has(entry.name) || (relative.startsWith('.vibe-diagnosis/') && VIBE_RUNTIME_DIRS.has(entry.name))) continue;
     if (entry.isSymbolicLink()) {
       hash.update(`${relative}:SYMLINK`);
+      fileState[relative] = fileDigest(root, relative);
     } else if (entry.isDirectory()) {
-      hashDirectory(hash, root, absolute);
+      hashDirectory(hash, root, absolute, fileState);
     } else if (entry.isFile()) {
       hash.update(relative);
       hash.update(fs.readFileSync(absolute));
+      fileState[relative] = fileDigest(root, relative);
     }
   }
 }
@@ -72,12 +75,13 @@ function captureEnvironment(projectDir) {
   const status = git(projectDir, ['status', '--porcelain']);
   const changedFiles = status ? status.split(/\r?\n/).filter(Boolean).map(line => line.slice(3).trim()) : [];
   const diff = git(projectDir, ['diff', '--binary', 'HEAD']) || '';
-  const untrackedOutput = git(projectDir, ['ls-files', '--others', '--exclude-standard']);
-  const untracked = untrackedOutput ? untrackedOutput.split(/\r?\n/).filter(Boolean).sort() : [];
+  const untrackedOutput = git(projectDir, ['ls-files', '--others', '--exclude-standard', '-z']);
+  const untracked = untrackedOutput ? untrackedOutput.split('\0').filter(Boolean).sort() : [];
   const workspaceHash = crypto.createHash('sha256');
+  const fileState = {};
   if (sha === null) {
     workspaceHash.update('NO_GIT');
-    hashDirectory(workspaceHash, path.resolve(projectDir));
+    hashDirectory(workspaceHash, path.resolve(projectDir), path.resolve(projectDir), fileState);
   } else {
     workspaceHash.update(diff);
     for (const relative of untracked) {
@@ -88,14 +92,25 @@ function captureEnvironment(projectDir) {
   }
   const workspaceFingerprint = workspaceHash.digest('hex');
   const protectedWorkspace = protectedState(projectDir);
+  const tracked = sha === null ? [] : (git(projectDir, ['ls-files', '-z']) || '').split('\0').filter(Boolean);
+  const diagnostics = diagnosticFiles(projectDir);
+  for (const relative of new Set([...tracked, ...untracked, ...protectedWorkspace.files, ...diagnostics])) {
+    fileState[relative] = fileDigest(projectDir, relative);
+  }
+  const diagnosticFingerprint = crypto.createHash('sha256')
+    .update(JSON.stringify(diagnostics.map(file => [file, fileState[file]]))).digest('hex');
+  const fileStateFingerprint = crypto.createHash('sha256')
+    .update(JSON.stringify(Object.keys(fileState).sort().map(file => [file, fileState[file]]))).digest('hex');
   const environment = {
     node: process.version,
     platform: process.platform,
     arch: process.arch,
     cwd: path.resolve(projectDir),
   };
-  const fingerprint = crypto.createHash('sha256').update(JSON.stringify({ environment, sha, branch, workspaceFingerprint, protectedWorkspaceFingerprint: protectedWorkspace.fingerprint })).digest('hex');
-  return { git: { sha, branch, dirty: changedFiles.length > 0, changedFiles, workspaceFingerprint, protectedWorkspaceFingerprint: protectedWorkspace.fingerprint, protectedFiles: protectedWorkspace.files }, environment, fingerprint };
+  const fingerprint = crypto.createHash('sha256').update(JSON.stringify({ environment, sha, branch, workspaceFingerprint, diagnosticFingerprint, fileStateFingerprint, protectedWorkspaceFingerprint: protectedWorkspace.fingerprint })).digest('hex');
+  const captured = { git: { sha, branch, dirty: changedFiles.length > 0, changedFiles, workspaceFingerprint, protectedWorkspaceFingerprint: protectedWorkspace.fingerprint, protectedFiles: protectedWorkspace.files }, environment, fingerprint, diagnosticFingerprint };
+  Object.defineProperty(captured, 'fileState', { value: fileState });
+  return captured;
 }
 
 function hashFiles(projectDir, relativeFiles) {

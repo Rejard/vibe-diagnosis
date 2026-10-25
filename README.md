@@ -4,7 +4,24 @@ Tell your coding AI to diagnose its own work before it says “done.”
 
 [한국어 사용법](./README.ko.md)
 
-Vibe Diagnosis 1.7.3 is an MCP for vibe coding with Codex, Claude Code, Cursor, Windsurf, Gemini CLI, Antigravity, and other MCP-capable coding agents. You do not need to memorize commands. Give the agent a clear instruction; it can initialize project diagnostics, run checks during development, open the optional dashboard, prove completion, and prepare a repair plan when something fails.
+## 1.8.1 local update
+
+### Preserved source and independent dashboard
+
+The repository includes the core, MCP adapter, VS Code extension, tests, lockfiles and release notes. Local credentials, project diagnostic definitions and results, receipts, caches, logs, installed dependencies and generated packages are not part of this backup. Existing historical diagnostic fixtures are not removed by this update.
+
+The dashboard and MCP transport are separate processes. The coding client owns the stdio MCP connection; a process manager can keep only the dashboard running independently. Run the installed `bin/vibe-diag.js` with `dashboard --cwd <absolute-project-path> --port 7700`, or use `node bin/vibe-diag.js dashboard --cwd <absolute-project-path> --port 7700` from this source checkout. Bindings remain on loopback. Verify the authenticated project identity before reusing a listener. PM2 process registration alone does not configure operating-system boot startup.
+
+Dashboard metrics execute in a memory-limited worker with a 10-second timeout. Concurrent matching requests share one calculation, completed values are cached for 30 seconds, and runtime artifact directories and symbolic links are excluded from the scan. A metrics failure is not a diagnostic pass. HTTP health and the page remain responsive while metrics are running. Run `npm run test:unit` to verify the implementation; a saved source snapshot does not establish live service health or registry publication.
+
+This workspace prepares version 1.8.1; registry publication and replacement of running MCP servers are separate steps. Until published, use both local tarballs (`vibe-diagnosis-1.8.1.tgz` and `vibe-diagnosis-mcp-1.8.1.tgz`) in the intended installation directory. The pinned npx examples below apply after publication.
+
+- `complete_task_diagnostics({ projectDir, waitTimeoutMs: 60000 })` waits up to 60 seconds for a busy project, then executes its own fresh uncached suite. The default is `0` (immediate conflict), and the maximum is `120000`. MCP cancellation stops only the wait; it never terminates the existing owner or an already started suite. Timeout returns `DIAGNOSTICS_WAIT_TIMEOUT`; cancellation, when the client retains a response, returns `DIAGNOSTICS_WAIT_CANCELLED`. The wait is not a durable or fair queue and does not bound total suite duration.
+- Keep the returned `runId` and call `verify_completion_receipt({ projectDir, expectedRunId: runId })`. A different latest run returns `RUN_ID_MISMATCH`; rerun your completion suite instead of adopting another caller's receipt. Omitting `expectedRunId` retains legacy workspace-only verification. Receipt schema 3 records eligibility and rejects ineligible receipts.
+- `completion.workspaceChanges` lists changed paths, change kinds, and the rerun action. Apparently unrelated changes still block completion because diagnostic `files` declarations do not prove a complete dependency graph. Ignored diagnostic code is now fingerprinted too. Config and policy changes remain blocking. Snapshot comparison cannot detect every temporary edit-and-revert, external dependency, or ignored non-protected runtime file; this is not filesystem isolation.
+- `gates.liveDiagnosticGateStatus` uses `PASSED`, `BLOCKED`, or `NOT_EVALUATED`. The legacy `liveTradingStatus` remains compatible, but `LIVE_ALLOWED` means only the diagnostic policy passed. `evidenceSummary.liveEvidenceStatus` is separate: `UNVERIFIED` means no reported live evidence, and `VERIFIED` covers only supplied observations. Neither is trading authorization, exchange fill proof, or proof of service recovery.
+
+Vibe Diagnosis 1.8.1 is an MCP for vibe coding with Codex, Claude Code, Cursor, Windsurf, Gemini CLI, Antigravity, and other MCP-capable coding agents. You do not need to memorize commands. Give the agent a clear instruction; it can initialize project diagnostics, run checks during development, open the optional dashboard, prove completion, and prepare a repair plan when something fails.
 
 The key contract is simple:
 
@@ -15,7 +32,7 @@ The key contract is simple:
 Open your project in an MCP-capable coding agent and paste this:
 
 ```text
-Set up Vibe Diagnosis 1.7.3 for this project as a local MCP server. Detect the MCP configuration format used by this coding tool, add vibe-diagnosis-mcp@1.7.3 with npx, and verify the connection by listing its tools. Do not add API keys to source files, Git, or command history. If you cannot safely edit the client configuration, show me the exact config entry and where it belongs, then wait for me to restart the client.
+Set up Vibe Diagnosis 1.8.1 for this project as a local MCP server. Detect the MCP configuration format used by this coding tool, add vibe-diagnosis-mcp@1.8.1 with npx, and verify the connection by listing its tools. Do not add API keys to source files, Git, or command history. If you cannot safely edit the client configuration, show me the exact config entry and where it belongs, then wait for me to restart the client.
 ```
 
 After the agent or client restarts, paste:
@@ -192,7 +209,7 @@ Save the current goal, last completed work, diagnostic status, remaining blocker
 | Agent continuity | `sync_ai_context`, `sync_agent_rules` |
 | Local knowledge | `read_error_pattern`, `write_error_pattern` |
 
-All project paths passed to MCP tools must be absolute. The same project can have only one active diagnostic run across MCP, CLI, dashboard, and separate Node processes. A duplicate request fails immediately with `DIAGNOSTICS_ALREADY_RUNNING`; different projects can run concurrently.
+All project paths passed to MCP tools must be absolute. The same project can have only one active diagnostic run across MCP, CLI, dashboard, and separate Node processes. A duplicate request defaults to `DIAGNOSTICS_ALREADY_RUNNING`; completion calls may opt into bounded waiting as described above. Different projects can run concurrently.
 
 `run_diagnostics` and `complete_task_diagnostics` answer with `verbosity: "summary"` by default: counts,
 gates, `runFile`, and every failing diagnostic in full. The response does not grow as the project
@@ -220,7 +237,7 @@ Ask it to show, not guess, the config for your client. The generic entry is:
   "mcpServers": {
     "vibe-diagnosis": {
       "command": "npx",
-      "args": ["-y", "vibe-diagnosis-mcp@1.7.3"]
+      "args": ["-y", "vibe-diagnosis-mcp@1.8.1"]
     }
   }
 }
@@ -229,13 +246,13 @@ Ask it to show, not guess, the config for your client. The generic entry is:
 Claude Code fallback:
 
 ```bash
-claude mcp add vibe-diagnosis --scope local -- npx -y vibe-diagnosis-mcp@1.7.3
+claude mcp add vibe-diagnosis --scope local -- npx -y vibe-diagnosis-mcp@1.8.1
 ```
 
 Native Windows Claude Code fallback:
 
 ```powershell
-claude mcp add vibe-diagnosis --scope local -- cmd /c npx -y vibe-diagnosis-mcp@1.7.3
+claude mcp add vibe-diagnosis --scope local -- cmd /c npx -y vibe-diagnosis-mcp@1.8.1
 ```
 
 Restart or reconnect the coding client after changing its MCP configuration, then ask: “List the Vibe Diagnosis tools and do not modify the project.”
@@ -245,15 +262,15 @@ Restart or reconnect the coding client after changing its MCP configuration, the
 The CLI is useful for CI, scripts, and clients without MCP. It is not the primary vibe-coding workflow.
 
 ```bash
-npx -y vibe-diagnosis@1.7.3 init
-npx -y vibe-diagnosis@1.7.3 run --json
-npx -y vibe-diagnosis@1.7.3 run --all --json
-npx -y vibe-diagnosis@1.7.3 complete
-npx -y vibe-diagnosis@1.7.3 diagnostic-state <id> disabled --reason "intentional hold"
-npx -y vibe-diagnosis@1.7.3 remove-diagnostic <id> --confirm --reason "not applicable"
-npx -y vibe-diagnosis@1.7.3 restore-diagnostic <id>
-npx -y vibe-diagnosis@1.7.3 dashboard
-npx -y vibe-diagnosis@1.7.3 stop
+npx -y vibe-diagnosis@1.8.1 init
+npx -y vibe-diagnosis@1.8.1 run --json
+npx -y vibe-diagnosis@1.8.1 run --all --json
+npx -y vibe-diagnosis@1.8.1 complete
+npx -y vibe-diagnosis@1.8.1 diagnostic-state <id> disabled --reason "intentional hold"
+npx -y vibe-diagnosis@1.8.1 remove-diagnostic <id> --confirm --reason "not applicable"
+npx -y vibe-diagnosis@1.8.1 restore-diagnostic <id>
+npx -y vibe-diagnosis@1.8.1 dashboard
+npx -y vibe-diagnosis@1.8.1 stop
 ```
 
 Use `--cwd <absolute-project-path>` when the shell is not inside the target project. Routine `run` follows necessity; `run --all` includes every enabled optional check. `snoozed` additionally requires `--until <future-ISO-date>`.

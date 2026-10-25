@@ -1,13 +1,22 @@
 # vibe-diagnosis-mcp
 
-The primary Vibe Diagnosis 1.7.3 interface for AI coding agents.
+The primary Vibe Diagnosis 1.8.1 interface for AI coding agents.
+
+## 1.8.1 local update contract
+
+This version is prepared locally; publication and replacement of running MCP servers are separate steps. Before registry publication, install both local tarballs (`vibe-diagnosis-1.8.1.tgz` and `vibe-diagnosis-mcp-1.8.1.tgz`) together in the intended installation directory. The pinned npx examples below apply after publication.
+
+- Call `complete_task_diagnostics({ projectDir, waitTimeoutMs: 60000 })` to wait up to 60 seconds for the project lock, then execute a fresh uncached suite. The default is `0` (immediate conflict); the maximum is `120000`. MCP cancellation cancels waiting only, never the existing owner or an already started suite. Timeout is `DIAGNOSTICS_WAIT_TIMEOUT`; cancellation is `DIAGNOSTICS_WAIT_CANCELLED` if the client retains the response. There is no durable queue, fairness guarantee, or total-suite deadline.
+- Verify your returned `runId` with `verify_completion_receipt({ projectDir, expectedRunId: runId })`. A different latest receipt is rejected with `RUN_ID_MISMATCH`. Omitting the ID retains legacy workspace-only verification. Receipt schema 3 records eligibility and rejects an ineligible completion; do not adopt another caller's receipt.
+- `completion.workspaceChanges` identifies snapshot file changes and requests a rerun after stabilization. All detected changes still block, including apparently unrelated files: declared `files` are not a proven dependency graph. Ignored diagnostic code is fingerprinted; config and policy changes block too. Snapshot comparison does not cover every transient edit-and-revert, external dependency, or ignored non-protected runtime file.
+- `gates.liveDiagnosticGateStatus` is `PASSED`, `BLOCKED`, or `NOT_EVALUATED`. Legacy `liveTradingStatus=LIVE_ALLOWED` remains for compatibility and means diagnostic policy only. Separately, `evidenceSummary.liveEvidenceStatus=UNVERIFIED` means no reported live evidence; `VERIFIED` covers only supplied observations. Neither proves trading authorization, service recovery, or exchange fills.
 
 This package is designed to be operated through natural-language instructions in Codex, Claude Code, Cursor, Windsurf, Gemini CLI, Antigravity, and other MCP clients. The user describes the desired workflow; the agent maps that request to diagnosis, completion, dashboard, context, or approval-gated repair tools.
 
 ## Give this to your coding agent
 
 ```text
-Connect Vibe Diagnosis 1.7.3 to this coding tool as a project-local MCP server using npx and vibe-diagnosis-mcp@1.7.3. Detect and follow the client's actual MCP configuration format. Verify the server by initializing MCP and listing its tools. Do not initialize or modify the project yet. Do not store API keys in the MCP config. If a client restart is required, tell me exactly what was changed and wait.
+Connect Vibe Diagnosis 1.8.1 to this coding tool as a project-local MCP server using npx and vibe-diagnosis-mcp@1.8.1. Detect and follow the client's actual MCP configuration format. Verify the server by initializing MCP and listing its tools. Do not initialize or modify the project yet. Do not store API keys in the MCP config. If a client restart is required, tell me exactly what was changed and wait.
 ```
 
 After reconnecting:
@@ -139,7 +148,7 @@ Call sync_ai_context with action=save and record the current goal, last complete
 | Continuity | `sync_ai_context`, `sync_agent_rules` | Saves local context or updates the maintained rule block |
 | Error knowledge | `read_error_pattern`, `write_error_pattern` | Reads or writes project-local pattern documents |
 
-All `projectDir` inputs must be absolute paths. Same-project runs share a cross-process lock and return `DIAGNOSTICS_ALREADY_RUNNING` immediately on duplication. Different projects do not block one another.
+All `projectDir` inputs must be absolute paths. Same-project runs share a cross-process lock and default to `DIAGNOSTICS_ALREADY_RUNNING` on duplication. Completion callers can opt into bounded waiting as described above. Different projects do not block one another.
 
 ## Agent configuration fallback
 
@@ -150,7 +159,7 @@ Use this only when the coding agent cannot configure its own MCP client safely:
   "mcpServers": {
     "vibe-diagnosis": {
       "command": "npx",
-      "args": ["-y", "vibe-diagnosis-mcp@1.7.3"]
+      "args": ["-y", "vibe-diagnosis-mcp@1.8.1"]
     }
   }
 }
@@ -159,13 +168,13 @@ Use this only when the coding agent cannot configure its own MCP client safely:
 Claude Code:
 
 ```bash
-claude mcp add vibe-diagnosis --scope local -- npx -y vibe-diagnosis-mcp@1.7.3
+claude mcp add vibe-diagnosis --scope local -- npx -y vibe-diagnosis-mcp@1.8.1
 ```
 
 Native Windows Claude Code:
 
 ```powershell
-claude mcp add vibe-diagnosis --scope local -- cmd /c npx -y vibe-diagnosis-mcp@1.7.3
+claude mcp add vibe-diagnosis --scope local -- cmd /c npx -y vibe-diagnosis-mcp@1.8.1
 ```
 
 Requirements: Node.js 20 or newer, `npx`, and a project workspace writable by the MCP client. Restart or reconnect the client after changing configuration.
