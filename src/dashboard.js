@@ -6,7 +6,7 @@ const { runDiagnosticsReport, discoverDiagnostics } = require('./runner');
 const { getByokConfig, saveByokConfig } = require('./config-manager');
 const { repairDiagnostic, createRepairPlan, applyRepairPlan, readAudit } = require('./repairer');
 const { listProviders } = require('./ai-provider');
-const { runHeuristicMetrics } = require('./analyzer');
+const { createMetricsReader } = require('./dashboard-metrics');
 const { resolveWithin } = require('./path-policy');
 const { inspectDiagnosticSource } = require('./selector');
 const { conflictPayload, projectKey } = require('./diagnostics-lock');
@@ -170,6 +170,7 @@ async function readOptionalBody(req) {
 
 function startDashboard(projectDir, port = 7700, options = {}) {
   const resolvedProjectDir = path.resolve(projectDir);
+  const readMetrics = createMetricsReader(resolvedProjectDir, options.metrics);
   const identity = dashboardIdentity(resolvedProjectDir);
   let lastRunReport = loadLatestRunReport(resolvedProjectDir);
   let lastRunResults = lastRunReport?.results || [];
@@ -251,7 +252,7 @@ function startDashboard(projectDir, port = 7700, options = {}) {
         lastRunResults = lastRunReport.results;
         const { summary, overallStatus, healthPercent } = report;
         
-        // Log to session history
+
         const passRate = summary.total > 0 ? summary.ok / summary.total : 1.0;
         const cardResults = results.map(r => ({ id: r.id, status: r.status, durationMs: r.durationMs ?? r.duration ?? null }));
         logSessionHistory(projectDir, passRate, overallStatus, cardResults, report.durationMs ?? report.totalDurationMs ?? null);
@@ -398,7 +399,7 @@ function startDashboard(projectDir, port = 7700, options = {}) {
           ? lastRunResults.filter(r => r.status === 'OK').length
           : 0;
 
-        const metrics = runHeuristicMetrics(projectDir, total, passed);
+        const metrics = await readMetrics(total, passed);
         sendJson(res, { ...metrics, diagnosticsEvaluated });
       } catch (err) {
         sendJson(res, { error: err.message }, 500);
@@ -508,7 +509,7 @@ function startDashboard(projectDir, port = 7700, options = {}) {
           try {
             fs.unlinkSync(lockFile);
           } catch (e) {
-            // Safe ignore
+
           }
         }
 
@@ -523,9 +524,10 @@ function startDashboard(projectDir, port = 7700, options = {}) {
     else sendText(res, 'Not found', 404);
   });
 
+  server.once('close', () => readMetrics.close());
   server.listen(port, '127.0.0.1', () => {
     const actualPort = server.address().port;
-    // 기동 시 포트 락 파일(.vibe-diagnosis/active_port.json) 생성 및 저장
+
     try {
       const fs = require('fs');
       const lockDir = path.join(resolvedProjectDir, '.vibe-diagnosis');
@@ -545,7 +547,7 @@ function startDashboard(projectDir, port = 7700, options = {}) {
         }, null, 2), { encoding: 'utf8', mode: 0o600 });
       }
     } catch (e) {
-      // Safe skip if lock file write fails
+
     }
 
     const url = `http://localhost:${actualPort}`;

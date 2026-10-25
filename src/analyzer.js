@@ -2,20 +2,22 @@ const fs = require('fs');
 const path = require('path');
 const { parseAst, walk } = require('./assertions');
 
-/**
- * Recursively find all files with specific extensions in a directory
- */
-function findFiles(dir, extensions, excludeDirs = ['node_modules', '.git', '.vibe-diagnosis', 'dist', 'build']) {
+
+
+
+function findFiles(dir, extensions, excludeDirs = ['node_modules', '.git', '.vibe-diagnosis', 'dist', 'build', 'backups', 'reports', 'scratch', 'uploads', 'temp_uploads', '.codex-remote-attachments']) {
   let results = [];
   if (!fs.existsSync(dir)) return results;
 
   const list = fs.readdirSync(dir);
   for (const file of list) {
     const filePath = path.join(dir, file);
-    const stat = fs.statSync(filePath);
+    const stat = fs.lstatSync(filePath);
+    if (stat.isSymbolicLink()) continue;
 
     if (stat.isDirectory()) {
       if (excludeDirs.includes(file)) continue;
+      if (file === 'research' && fs.existsSync(path.join(dir, '.alobtc-aidl-research.quarantine'))) continue;
       results = results.concat(findFiles(filePath, extensions, excludeDirs));
     } else {
       const ext = path.extname(file);
@@ -27,9 +29,9 @@ function findFiles(dir, extensions, excludeDirs = ['node_modules', '.git', '.vib
   return results;
 }
 
-/**
- * 1. Analyze CSS Layout Integrity (Responsive flex/grid ratio vs static px)
- */
+
+
+
 function analyzeCss(projectDir) {
   const cssFiles = findFiles(projectDir, ['.css']);
   let totalMatches = 0;
@@ -50,7 +52,7 @@ function analyzeCss(projectDir) {
       staticPxMatches += pxCount;
       totalMatches += (dynCount + pxCount);
     } catch (err) {
-      // Ignore read errors
+
     }
   }
 
@@ -71,9 +73,9 @@ function analyzeCss(projectDir) {
   };
 }
 
-/**
- * 2. Analyze Sound & Asset Independence (Local/WebAudio vs external CDNs)
- */
+
+
+
 function analyzeAssets(projectDir) {
   const sourceFiles = findFiles(projectDir, ['.ts', '.tsx', '.js', '.jsx', '.html']);
   let externalUrlsCount = 0;
@@ -86,17 +88,17 @@ function analyzeAssets(projectDir) {
     try {
       const content = fs.readFileSync(file, 'utf-8');
 
-      // Check external asset URLs
+
       const urls = content.match(urlRegex) || [];
       const assetUrls = urls.filter(u => /\.(png|jpg|jpeg|gif|mp3|wav|ogg|aac|woff|woff2|svg)$/i.test(u));
       externalUrlsCount += assetUrls.length;
 
-      // Check Web Audio API hooks
+
       if (webAudioTerms.test(content)) {
         webAudioDetected = true;
       }
     } catch (err) {
-      // Ignore read errors
+
     }
   }
 
@@ -119,15 +121,15 @@ function analyzeAssets(projectDir) {
   };
 }
 
-/**
- * 3. Dead Code & Debt Index
- */
+
+
+
 function analyzeDeadCode(projectDir) {
   const sourceFiles = findFiles(projectDir, ['.ts', '.tsx', '.js', '.jsx']);
   let totalDeclarations = 0;
   let unreferencedDeclarations = 0;
 
-  // Simple heuristic regex patterns for unreferenced variables (unexported let/const)
+
   const unusedRegex = /(?:let|const|var)\s+([\w_]+)\s*=\s*/g;
 
   for (const file of sourceFiles) {
@@ -139,14 +141,14 @@ function analyzeDeadCode(projectDir) {
         const varName = match[1];
         totalDeclarations++;
 
-        // Simple check: if the variable name only appears once (the declaration itself), it is unused.
+
         const occurrences = (content.match(new RegExp(`\\b${varName}\\b`, 'g')) || []).length;
         if (occurrences === 1) {
           unreferencedDeclarations++;
         }
       }
     } catch (err) {
-      // Ignore
+
     }
   }
 
@@ -162,25 +164,25 @@ function analyzeDeadCode(projectDir) {
   };
 }
 
-/**
- * Synthesize All Metrics & Calculate Build Predictor Score
- */
+
+
+
 function runHeuristicMetrics(projectDir, totalDiags = 0, passedDiags = 0) {
   const css = analyzeCss(projectDir);
   const assets = analyzeAssets(projectDir);
   const debt = analyzeDeadCode(projectDir);
 
-  // Configuration check heuristics
+
   const hasTsConfig = fs.existsSync(path.join(projectDir, 'tsconfig.json'));
   const hasPackageJson = fs.existsSync(path.join(projectDir, 'package.json'));
 
   const passRate = totalDiags > 0 ? passedDiags / totalDiags : 1.0;
 
-  // Predictor formula weights:
-  // - 65% on Diagnostic Pass Rate
-  // - 15% on UI Integrity (A+ -> 100, A -> 90, B -> 70, C -> 50, etc.)
-  // - 10% on Code Debt Cleanness (100 - debtPercent)
-  // - 10% on Config File Existence (5% tsconfig, 5% package.json)
+
+
+
+
+
   let uiWeight = 100;
   if (css.grade === 'A') uiWeight = 90;
   else if (css.grade === 'B') uiWeight = 70;
@@ -188,7 +190,7 @@ function runHeuristicMetrics(projectDir, totalDiags = 0, passedDiags = 0) {
   else if (css.grade === 'D') uiWeight = 30;
   else if (css.grade === 'F') uiWeight = 10;
 
-  const configWeight = (hasTsConfig ? 50 : 0) + (hasPackageJson ? 50 : 0); // 0 to 100
+  const configWeight = (hasTsConfig ? 50 : 0) + (hasPackageJson ? 50 : 0);
   const codeCleanness = 100 - debt.deadCodeDebtPercent;
 
   let predictorScore = (0.65 * passRate * 100) + 
@@ -196,7 +198,7 @@ function runHeuristicMetrics(projectDir, totalDiags = 0, passedDiags = 0) {
                        (0.10 * codeCleanness) + 
                        (0.10 * configWeight);
 
-  // Cap it nicely
+
   if (predictorScore > 100) predictorScore = 100;
   if (predictorScore < 0) predictorScore = 0;
 
@@ -233,7 +235,7 @@ function analyzeMonolithicUiFiles(projectDir, customConfig) {
   const warnings = [];
   const blockRegex = /(?:<(?:[A-Z]\w*)?(?:Card|Section|Block|Tab|Panel|View|Tile)\b|class(?:Name)?=["'][^"']*\b(?:card|section|block|tab-pane|panel)\b|<section\b|<article\b)/gi;
 
-  // 1. Scan UI components (Adaptive Threshold: >= 300 lines)
+
   for (const file of uiFiles) {
     try {
       const content = fs.readFileSync(file, 'utf-8');
@@ -251,7 +253,7 @@ function analyzeMonolithicUiFiles(projectDir, customConfig) {
     } catch {}
   }
 
-  // 2. Scan Logic & Backend files (Adaptive Threshold: >= 600 lines)
+
   for (const file of logicFiles) {
     try {
       const content = fs.readFileSync(file, 'utf-8');
