@@ -47,10 +47,12 @@ async function main() {
       return;
     }
     process.send?.({ type: 'metadata', module: { id: mod.id, name: mod.name, layer: mod.layer, ...normalizeMetadata(mod) } });
-    try {
-      const { PrismaClient } = require(path.join(projectDir, 'node_modules', '@prisma', 'client'));
-      db = new PrismaClient();
-    } catch {}
+    if (process.env.VIBE_DIAG_EXECUTION_PROFILE === 'STANDARD' || process.env.VIBE_DIAG_EXECUTION_PROFILE === 'LIVE') {
+      try {
+        const { PrismaClient } = require(path.join(projectDir, 'node_modules', '@prisma', 'client'));
+        db = new PrismaClient();
+      } catch {}
+    }
     const result = await mod.run({ projectDir, db });
     const resultError = validateResult(result, mod.id);
     if (resultError) {

@@ -6,6 +6,12 @@ Tell your coding AI to diagnose its own work before it says “done.”
 
 ## 1.8.1 local update
 
+### Local safety boundary validation (2026-11-06)
+
+Restricted or unspecified diagnostic profiles do not instantiate a project's Prisma client automatically. Workspace fingerprints use metadata for credential files, databases, private directories and quarantined research, while ordinary source files retain content hashes. Metadata checks do not prove protected-file content equality.
+
+Validation: `node --test --test-concurrency=1 test/*.test.cjs` passed 121/121. The initial parallel run passed 120/121 with a five-second completion-wait timeout; its sequential rerun passed without changing timeouts or production behavior. Diagnostic definitions and historical reports remain local and are excluded from this source update.
+
 ### Preserved source and independent dashboard
 
 The repository includes the core, MCP adapter, VS Code extension, tests, lockfiles and release notes. Local credentials, project diagnostic definitions and results, receipts, caches, logs, installed dependencies and generated packages are not part of this backup. Existing historical diagnostic fixtures are not removed by this update.

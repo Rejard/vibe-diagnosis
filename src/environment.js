@@ -3,6 +3,7 @@ const path = require('path');
 const crypto = require('crypto');
 const { execFileSync } = require('child_process');
 const { fileDigest, diagnosticFiles } = require('./workspace-changes');
+const { metadataOnly } = require('./fingerprint-boundary');
 
 function git(projectDir, args) {
   try {
@@ -16,7 +17,6 @@ const FINGERPRINT_IGNORES = new Set(['.git', 'node_modules']);
 const VIBE_RUNTIME_DIRS = new Set(['runs', 'repair-plans', 'scratch_test_guard', 'scratch_test_ainative', 'scratch_test_omission']);
 const PROTECTED_SKIP_DIRS = new Set(['.git', 'node_modules', 'dist', 'build', '.next', 'coverage', 'runs', 'repair-plans']);
 const PROTECTED_FILE = /^(?:\.env(?:\..+)?|\.npmrc|\.pypirc|byok\.local\.json|config\.json|.*(?:credential|secret|private[-_]?key|api[-_]?key).*(?:\.json|\.ya?ml|\.toml|\.ini)?|.*\.(?:pem|key|p12|pfx))$/i;
-const MAX_PROTECTED_HASH_BYTES = 2 * 1024 * 1024;
 
 function hashDirectory(hash, root, current = root, fileState = {}) {
   for (const entry of fs.readdirSync(current, { withFileTypes: true }).sort((a, b) => a.name.localeCompare(b.name))) {
@@ -26,11 +26,14 @@ function hashDirectory(hash, root, current = root, fileState = {}) {
     if (entry.isSymbolicLink()) {
       hash.update(`${relative}:SYMLINK`);
       fileState[relative] = fileDigest(root, relative);
+    } else if (entry.isDirectory() && metadataOnly(root, relative)) {
+      fileState[relative] = fileDigest(root, relative);
+      hash.update(relative + fileState[relative]);
     } else if (entry.isDirectory()) {
       hashDirectory(hash, root, absolute, fileState);
     } else if (entry.isFile()) {
       hash.update(relative);
-      hash.update(fs.readFileSync(absolute));
+      hash.update(fileDigest(root, relative));
       fileState[relative] = fileDigest(root, relative);
     }
   }
@@ -48,7 +51,7 @@ function protectedState(projectDir) {
       const relative = path.relative(root, absolute).replace(/\\/g, '/');
       if (entry.isSymbolicLink()) continue;
       if (entry.isDirectory()) {
-        if (!PROTECTED_SKIP_DIRS.has(entry.name)) visit(absolute, depth + 1);
+        if (!PROTECTED_SKIP_DIRS.has(entry.name) && !metadataOnly(root, relative)) visit(absolute, depth + 1);
         continue;
       }
       if (!entry.isFile() || !PROTECTED_FILE.test(entry.name)) continue;
@@ -56,8 +59,7 @@ function protectedState(projectDir) {
       const hash = crypto.createHash('sha256');
       hash.update(relative);
       hash.update(String(stat.size));
-      if (stat.size <= MAX_PROTECTED_HASH_BYTES) hash.update(fs.readFileSync(absolute));
-      else hash.update(String(stat.mtimeMs));
+      hash.update(fileDigest(root, relative));
       files.push({ file: relative, fingerprint: hash.digest('hex') });
     }
   }
@@ -74,7 +76,7 @@ function captureEnvironment(projectDir) {
   const branch = git(projectDir, ['branch', '--show-current']);
   const status = git(projectDir, ['status', '--porcelain']);
   const changedFiles = status ? status.split(/\r?\n/).filter(Boolean).map(line => line.slice(3).trim()) : [];
-  const diff = git(projectDir, ['diff', '--binary', 'HEAD']) || '';
+  const diff = git(projectDir, ['diff', '--no-ext-diff', '--name-status', 'HEAD']) || '';
   const untrackedOutput = git(projectDir, ['ls-files', '--others', '--exclude-standard', '-z']);
   const untracked = untrackedOutput ? untrackedOutput.split('\0').filter(Boolean).sort() : [];
   const workspaceHash = crypto.createHash('sha256');
@@ -87,7 +89,7 @@ function captureEnvironment(projectDir) {
     for (const relative of untracked) {
       workspaceHash.update(relative);
       const absolute = path.join(projectDir, relative);
-      if (fs.existsSync(absolute) && fs.statSync(absolute).isFile()) workspaceHash.update(fs.readFileSync(absolute));
+      if (fs.existsSync(absolute)) workspaceHash.update(fileDigest(projectDir, relative));
     }
   }
   const workspaceFingerprint = workspaceHash.digest('hex');
@@ -120,7 +122,7 @@ function hashFiles(projectDir, relativeFiles) {
     const rel = path.relative(projectDir, absolute);
     hash.update(relative);
     if (rel.startsWith('..') || path.isAbsolute(rel) || !fs.existsSync(absolute)) hash.update('MISSING');
-    else hash.update(fs.readFileSync(absolute));
+    else hash.update(fileDigest(projectDir, relative));
   }
   return hash.digest('hex');
 }

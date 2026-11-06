@@ -1,12 +1,14 @@
 const fs = require('fs');
 const path = require('path');
 const crypto = require('crypto');
+const { metadataOnly, metadataDigest } = require('./fingerprint-boundary');
 
 function fileDigest(root, relative) {
   const absolute = path.join(root, relative);
   try {
     const stat = fs.lstatSync(absolute);
     if (stat.isSymbolicLink()) return `SYMLINK:${fs.readlinkSync(absolute)}`;
+    if (metadataOnly(root, relative)) return metadataDigest(stat);
     if (!stat.isFile()) return 'NON_FILE';
     return crypto.createHash('sha256').update(fs.readFileSync(absolute)).digest('hex');
   } catch (error) {
